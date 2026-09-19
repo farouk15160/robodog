@@ -1,0 +1,1008 @@
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+\input{generated_facts}
+
+\title{\vspace{-12mm}\textbf{robodog}\\[2mm]
+\large Software architecture for a 12-DOF quadruped\\
+\normalsize 12 $\times$ ROBSTRIDE02 QDD actuators \textbullet\ \RdMassTotal\,kg \textbullet\ ROS 2 Jazzy}
+\author{\small Generated from the Onshape CAD export \texttt{\RdCadSha}}
+\date{\small Revision 0.1 --- simulation-complete, hardware-ready}
+
+\begin{document}
+\maketitle
+\vspace{-6mm}
+
+\begin{abstract}\noindent\small
+This document specifies the first software architecture for a 12-DOF quadruped
+built around twelve ROBSTRIDE02 quasi-direct-drive actuators. The robot model is
+derived programmatically from the CAD assembly; the control stack runs at
+\RdControlRate\,Hz behind a hardware abstraction that has three
+implementations, two simulated and one for the real CAN bus. Everything is
+implemented and running in simulation. Nothing above the hardware boundary
+changes when the real actuators and camera are connected --- that is the
+property the architecture is organised around, and Section~\ref{sec:migration}
+states exactly what remains to be done.
+\end{abstract}
+
+\vspace{-2mm}
+\tableofcontents
+\vspace{4mm}
+
+% =====================================================================
+\section{Scope and status}
+
+\paragraph{What exists.} Eight ROS 2 packages, 171 passing tests, a MuJoCo
+model generated from the same parameters as the URDF, a five-room test house,
+a modular web GUI, and the complete ROBSTRIDE02 CAN frame codec with 29 unit
+tests. The robot stands, holds pose and walks in simulation.
+
+\paragraph{What does not.} No hardware has been driven. The CAN backend is
+written but unvalidated; per-joint direction and offset are unknown until the
+robot is assembled and calibrated. The camera depth path is a placeholder in
+one respect only (how the HP60C delivers depth over USB). Estimated quantities
+--- rotor inertia, thermal constants, joint friction --- are marked as such
+throughout and listed in Section~\ref{sec:assumptions}.
+
+\paragraph{How to read this.} Every quantity quoted here is generated from
+\code{robot\_parameters.yaml} and \code{robstride02.yaml} by
+\code{tools/make\_doc\_facts.py}. If the CAD changes and the model is
+regenerated, the numbers in this document change with it.
+
+% =====================================================================
+\section{System overview}
+
+\archfig{system_architecture}{System architecture. The red band is the
+hardware/software boundary: two abstract interfaces, \code{JointBackend} and
+\code{CameraBackend}. Simulation and hardware differ only below it.}{1.0}
+
+\subsection{Design targets}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Quantity} & \textbf{Target} & \textbf{Achieved} \\
+\midrule
+Total mass            & 10\,kg              & \RdMassTotal\,kg \\
+Degrees of freedom    & 12 (HAA/HFE/KFE)    & 12 \\
+Nominal stance height & ---                 & \RdStandHeight\,mm (\RdStandExtension\,\% of leg reach) \\
+Static torque margin  & within continuous   & 62.5\,\% of \RdTorqueCont\,N$\cdot$m \\
+Control rate          & ---                 & \RdControlRate\,Hz, sim and hardware alike \\
+Actuator              & ROBSTRIDE02         & \RdTorqueCont/\RdTorquePeak\,N$\cdot$m cont/peak \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Mass budget}
+
+The CAD assembly was drawn around RMD-X8 actuators at 760.8\,g each. Substituting
+ROBSTRIDE02 at \RdMassActuator\,g removes 4.57\,kg and lands the structure at
+\RdMassStruct\,kg, leaving \RdMassPayload\,kg for electronics and
+\RdMassCamera\,kg for the camera.
+
+\begin{center}\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Item} & \textbf{Mass (kg)} & \textbf{Note} \\
+\midrule
+CAD structure                       & 4.332 & body, brackets, legs, bearings \\
+12 $\times$ ROBSTRIDE02             & \RdMassTwelve & \RdMassActuator\,g each \\
+Battery, 12S LiPo                   & 0.700 & \RdVoltage\,V nominal \\
+Onboard computer                    & 0.200 & \\
+Power distribution and wiring       & 0.130 & \\
+IMU                                 & 0.010 & \\
+Camera (NUWA HP60C)                 & \RdMassCamera & separate link \\
+\midrule
+\textbf{Total}                      & \textbf{\RdMassTotal} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Per-link masses after aggregation: base \RdMassBase\,kg, hip \RdMassHip\,g,
+thigh \RdMassThigh\,g, calf \RdMassCalf\,g. The whole-robot centre of mass sits
+\RdComX\,mm from the body centre longitudinally.
+
+\subsection{Coordinate systems and conventions}
+\label{sec:conventions}
+
+\paragraph{Frames.} REP-103 throughout: $x$ forward, $y$ left, $z$ up.
+\code{base\_link} is at the body geometric centre. \code{odom} is the world
+frame for the estimated base pose and the test-world markers. Camera optical
+frames follow the ROS optical convention ($z$ forward, $x$ right, $y$ down),
+related to their body frames by $\mathrm{rpy} = (-\pi/2,\, 0,\, -\pi/2)$.
+
+\paragraph{Joint naming.} \code{\{FL,FR,RL,RR\}\_\{haa,hfe,kfe\}\_joint}.
+HAA is hip abduction/adduction, HFE hip flexion/extension, KFE the knee.
+
+\begin{decision}{Joint axes are not mirrored between left and right}
+Every HAA axis is $+x$ and every HFE and KFE axis is $+y$, expressed in
+\code{base\_link} orientation, for all four legs. The alternative --- mirroring
+the right side so that ``positive'' means abduction everywhere --- was rejected
+because it makes the URDF axes differ per leg and turns every sign question into
+a per-leg question.
+
+The consequence must be remembered: \textbf{positive HAA abducts the left legs
+and adducts the right legs.} Sim-to-real then reduces to one sign per joint in
+\code{robstride\_bus.yaml}, not a frame convention.
+\end{decision}
+
+\paragraph{Zero and sign.} All joints at zero puts the legs straight down, feet
+at $(\pm 0.221,\ \pm 0.1445,\ -0.430)$\,m. Positive HFE swings the thigh
+backward. Negative KFE folds the knee backward; KFE\,$=0$ is fully extended and
+the upper limit, so the knee cannot hyperextend.
+
+\begin{decision}{Named poses are specified as a base height, not joint angles}
+Each foot hangs vertically below its own HFE axis. That one rule yields, at
+once: identical joint angles on all four legs despite the non-mirrored axes; a
+support polygon of \RdFootprintL\,$\times$\,\RdFootprintW\,mm centred within
+\RdComX\,mm of the centre of mass; and the lowest peak joint torque of any
+centred foot placement.
+
+Placing the feet under the \emph{HAA} axes instead would need different front
+and rear angles, because the HFE sits \RdHfeDx\,mm outboard of the HAA, and
+would cost 73\,\% of the continuous rating on the rear knees instead of 62.5\,\%.
+\end{decision}
+
+% =====================================================================
+\section{Mechanical model}
+
+\subsection{CAD to URDF pipeline}
+
+The Onshape export is a flat tree of 85 part-links with 12 revolute joints,
+saved at an arbitrary mate pose. \code{tools/cad\_to\_model.py} turns it into a
+canonical 13-body model:
+
+\begin{enumerate}
+\item forward-kinematics every part into the \code{root} frame;
+\item cut the tree at the 12 revolute joints, giving 13 rigid bodies;
+\item recover the pose-invariant leg geometry (link lengths, axis offsets);
+\item solve the CAD mate angles against the canonical zero definition;
+\item re-express every visual mesh and inertia tensor in canonical body frames;
+\item substitute ROBSTRIDE02 mass properties for the CAD's RMD-X8 placeholders.
+\end{enumerate}
+
+The canonical chain reproduces the CAD joint positions to within
+\textbf{9.9\,$\mu$m}, and the four legs agree with each other to under 2\,$\mu$m
+--- the CAD is exactly symmetric, and the residual is mesh float precision.
+
+\begin{decision}{The URDF is generated, never hand-edited}
+\code{robot\_parameters.yaml} is the single source of truth. The Xacro, the
+MuJoCo MJCF, the inverse kinematics and this document all read it. A
+hand-maintained URDF drifts from the CAD, and a drift between the model the
+physics uses and the model the IK uses presents as a control bug that is very
+hard to attribute.
+\end{decision}
+
+\subsection{Kinematics}
+
+\begin{center}\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Meaning} \\
+\midrule
+HAA position       & $\pm$\RdHaaX, $\pm$\RdHaaY\,mm & from \code{base\_link} \\
+HAA $\to$ HFE      & \RdHfeDx\,mm longitudinal, \RdHfeDr\,mm radial & \\
+Thigh length $L_1$ & \RdThighLength\,mm & HFE to KFE, perpendicular \\
+Thigh lateral      & \RdThighLat\,mm & along the HFE axis \\
+Shank length $L_2$ & \RdShankLength\,mm & KFE to foot centre \\
+Leg-plane offset   & \RdLateral\,mm & constant, $= $ radial $+$ lateral \\
+Maximum reach      & \RdReach\,mm & $L_1 + L_2$ \\
+Foot sphere        & \RdFootRadius\,mm radius & contact geometry \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Because rotation about $y$ leaves $y$ unchanged, the lateral offset collapses to
+a constant. That is what makes the inverse kinematics closed-form: the abduction
+angle is fixed by the $(y,z)$ projection alone, and what remains is a planar
+two-link problem. Forward kinematics from the HAA joint frame:
+\[
+p = R_x(q_0)\bigl(d_1 + R_y(q_1)\bigl(d_2 + R_y(q_2)\, d_3\bigr)\bigr)
+\]
+with $d_1 = (s_x\,\text{hfe}_{dx},\, s_y\,\text{hfe}_{dr},\, 0)$,
+$d_2 = (0,\, s_y\,\text{lat},\, -L_1)$, $d_3 = (0,0,-L_2)$.
+
+The IK returns only the knee-backward branch ($q_2 \le 0$); the mirror solution
+exists mathematically but the robot cannot reach it. Round-tripping FK through
+IK over the full joint range gives a worst-case position error below
+$10^{-9}$\,m, and the analytic Jacobian matches central differences to
+$10^{-6}$.
+
+\subsection{Knee drive topology}
+
+The knee actuator is mounted \emph{proximally} on the thigh --- 48\,mm from the
+HFE axis, 179\,mm from the knee --- and drives the joint through a 1:1 belt.
+
+\begin{decision}{Proximal knee actuator, modelled as a simple revolute joint}
+This is the standard low-distal-inertia arrangement. Its effect is measurable in
+the generated model: the thigh's centre of mass sits only 27\,mm below the hip,
+and the calf masses just \RdMassCalf\,g. Because the motor rotates \emph{with}
+the thigh, the knee angle is not kinematically coupled to the hip angle, so the
+URDF needs no mimic joint or transmission --- the belt ratio is a parameter that
+is currently 1.0. Should a non-unity ratio be fitted, it enters in one place:
+the joint-to-motor map.
+\end{decision}
+
+\subsection{Joint limits}
+
+\begin{center}\small
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+\textbf{Joint} & \textbf{Lower (rad)} & \textbf{Upper (rad)} & \textbf{Rationale} \\
+\midrule
+HAA & \RdHaaLo & \RdHaaHi & $\pm$\RdHaaDeg$^\circ$ abduction envelope \\
+HFE & \RdHfeLo & \RdHfeHi & thigh forward to folded \\
+KFE & \RdKfeLo & \RdKfeHi & no hyperextension; folds backward only \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{caveat}{The CAD's own joint limits are not used}
+The Onshape export carries mate limits that are modelling artefacts --- for
+example \code{dof\_fl0} spans $[-0.704, 0.866]$, asymmetric and different on
+every leg. They describe how the assembly was posed, not what the mechanism can
+do. The limits above are design values chosen from the mechanical envelope and
+should be refined once self-collision checking runs against the real geometry.
+\end{caveat}
+
+% =====================================================================
+\section{Actuator: ROBSTRIDE02}
+\label{sec:actuator}
+
+\subsection{Specification and derived quantities}
+
+\begin{center}\small
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Quantity} & \textbf{Source} & \textbf{Value} \\
+\midrule
+Mass                    & spec    & \RdMassActuator\,g $\pm$ 3\,g \\
+Envelope                & spec    & 78.5\,mm dia $\times$ 41.5\,mm \\
+Gear ratio              & spec    & \RdGearRatio:1, machined steel \\
+Rated / peak torque     & spec    & \RdTorqueRated\,/\,\RdTorquePeak\,N$\cdot$m \\
+Rated speed             & spec    & 100\,rpm $=$ \RdSpeedRated\,rad/s \\
+No-load speed           & spec    & 410\,rpm $=$ \RdSpeedNoLoad\,rad/s \\
+Torque constant $K_t$   & spec    & \RdKt\,N$\cdot$m/A$_{\mathrm{rms}}$ \\
+Line resistance         & spec    & 0.58\,$\Omega$ (phase \RdRphase\,$\Omega$) \\
+Voltage                 & spec    & \RdVoltage\,V rated, \RdVoltMin--\RdVoltMax\,V \\
+Encoders                & spec    & 2 $\times$ \RdEncoderBits-bit absolute magnetic \\
+Output resolution       & derived & \RdEncoderRes\,rad \\
+Rated phase current     & derived & \RdRatedArms\,A$_{\mathrm{rms}}$ \\
+Copper loss at rating   & derived & \RdCopperLoss\,W \\
+Reflected rotor inertia & estimate& \RdArmature\,kg$\cdot$m$^2$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{$K_t$ is output-referred.} Dividing the rated torque by the torque
+constant gives $\RdTorqueRated / \RdKt = 4.92\,\mathrm{A_{rms}}$, which matches
+the rated phase current of 7\,A peak $/\sqrt{2} = \RdRatedArms\,\mathrm{A_{rms}}$.
+The constant is therefore quoted \emph{after} the \RdGearRatio:1 reduction. This
+matters: it makes the torque-to-current conversion used by the thermal observer
+a single multiplication, with no gear ratio in it.
+
+\paragraph{Reflected inertia dominates the distal link.} With
+$J_{\mathrm{rotor}} \approx \RdRotorInertia\,\mathrm{kg\,m^2}$ estimated for a
+28-pole outrunner, the inertia seen at the output is
+$J_{\mathrm{rotor}} \times \RdGearRatio^2 = \RdArmature\,\mathrm{kg\,m^2}$ ---
+larger than the calf's own inertia about the knee. Omitting it from the
+simulation would make the legs roughly four times too easy to accelerate.
+
+\subsection{CAN interface}
+
+Extended 29-bit identifiers at \RdCanRate\,Mbit/s. The identifier carries
+\texttt{[28:24] comm type | [23:8] data | [7:0] target}. The motion-control
+frame (type 1) is the MIT-style impedance command: target angle, velocity, $k_p$
+and $k_d$ occupy the eight payload bytes, and the feed-forward torque rides in
+the identifier's data field because the payload is full.
+
+\begin{decision}{The command interface is the actuator's native impedance frame}
+\code{JointCommand} carries $(\text{position},\ \text{velocity},\ \text{effort},\
+k_p,\ k_d)$ --- exactly one CAN frame. A narrower interface, such as position
+only, would force the host to close a loop the motor already closes in firmware
+at tens of kHz. The host sets \emph{setpoints}; it is not the servo.
+\end{decision}
+
+\subsection{Bus budget}
+
+An extended-ID frame with eight data bytes is 131 bits nominal and up to 159
+with worst-case stuffing; \RdBitsPerFrame\ bits is the design figure. Each joint
+needs one command and one feedback frame per cycle.
+
+\begin{center}\small
+\begin{tabular}{@{}rrrrl@{}}
+\toprule
+\textbf{Buses} & \textbf{Motors/bus} & \textbf{Rate} & \textbf{Load} & \textbf{Verdict} \\
+\midrule
+1 & 12 & 250\,Hz & 90\,\% & too tight, no margin \\
+1 & 12 & 400\,Hz & 144\,\% & impossible \\
+2 & 6  & \RdControlRate\,Hz & \RdBusLoad\,\% & \textbf{selected} \\
+2 & 6  & 500\,Hz & 90\,\% & rejected, no margin \\
+3 & 4  & 500\,Hz & 60\,\% & upgrade path \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{decision}{Two buses at \RdControlRate\,Hz, split front/rear}
+\RdControlRate\,Hz is not a compromise on control quality: because the RS02
+closes its position and velocity loop in firmware, the host rate is a
+\emph{setpoint update} rate. The same rate is used in simulation so that gains
+tuned in MuJoCo transfer without change.
+
+The split is front/rear rather than left/right so that each bus carries a
+complete leg \emph{pair}: a single bus failure leaves the robot in a
+recognisable posture rather than a diagonal collapse.
+\code{RobStride02Backend.check\_bus\_budget()} refuses any configuration above
+80\,\% at start-up.
+\end{decision}
+
+% =====================================================================
+\section{Software architecture}
+
+\archfig{software_architecture}{ROS 2 package graph. Arrows point from
+dependant to dependency. No package above the hardware layer depends on a
+simulation package.}{0.96}
+
+\subsection{Packages}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Package} & \textbf{Build} & \textbf{Responsibility} \\
+\midrule
+\code{robodog\_msgs}        & ament\_cmake  & message and service contract \\
+\code{robodog\_description} & ament\_cmake  & URDF/Xacro, meshes, RViz, actuator data \\
+\code{robodog\_hardware}    & ament\_python & \code{JointBackend} + RS02 CAN codec \\
+\code{robodog\_control}     & ament\_python & control loop, safety, gait, IK, estimator \\
+\code{robodog\_sim}         & ament\_python & MJCF generator, test worlds, markers \\
+\code{robodog\_perception}  & ament\_python & \code{CameraBackend}, depth, point cloud \\
+\code{robodog\_web}         & ament\_python & GUI server and protocol \\
+\code{robodog\_bringup}     & ament\_cmake  & launch composition only \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{robodog\_msgs} depends on nothing but \code{std\_msgs} and
+\code{geometry\_msgs}: it is the contract between layers and must not acquire an
+implementation dependency.
+
+\subsection{The hardware boundary}
+\label{sec:boundary}
+
+\archfig{hardware_boundary}{Everything above the boundary is unchanged by the
+swap to hardware. The per-joint direction and offset map is the only place where
+motor coordinates and canonical joint coordinates differ.}{1.0}
+
+\code{JointBackend} is a six-method abstract class:
+
+\begin{lstlisting}[language=Python]
+class JointBackend(ABC):
+    name: str; is_simulation: bool
+    def configure(self) -> None          # open devices / load model
+    def enable(self, mask) -> None       # energise
+    def disable(self, mask) -> None      # de-energise, back-driveable
+    def read(self) -> JointState         # pos, vel, effort, temperature, faults
+    def write(self, cmd: JointCommand)   # already safety-clamped
+    def step(self, dt) -> None           # advance a simulator; no-op on hardware
+    def base_state(self) -> BaseState | None   # None on real hardware
+\end{lstlisting}
+
+\begin{decision}{\code{base\_state()} returns \code{None} on the real robot}
+A simulator knows the floating-base state exactly; the real robot has no sensor
+for absolute base pose. Rather than inventing one, the contract makes the
+absence explicit and forces every consumer to handle it. The state estimator
+fills the gap from the IMU and leg kinematics, and marks its output
+\code{ground\_truth = False}. Returning a plausible-looking zero would hide the
+difference that matters most when a controller tuned in simulation is first run
+on hardware.
+\end{decision}
+
+Three implementations exist. \code{KinematicBackend} models each joint as an
+independent second-order system with the reflected rotor inertia --- no physics
+engine, no contact, no gravity --- so the entire stack above the boundary is
+runnable and testable with nothing installed. \code{MujocoBackend} adds
+rigid-body dynamics and contact. \code{RobStride02Backend} drives the real
+motors.
+
+\subsection{Interfaces}
+
+\archfig{node_topic_graph}{Node and topic graph. Identical in simulation and on
+hardware; only the implementations behind the two backends differ.}{1.0}
+
+\begin{center}\small
+\begin{tabular}{@{}llrl@{}}
+\toprule
+\textbf{Topic} & \textbf{Type} & \textbf{Rate} & \textbf{Purpose} \\
+\midrule
+\topicname{/joint\_states}              & JointState        & 100 & TF, RViz, standard tooling \\
+\topicname{/robodog/robot\_state}       & RobotState        & 50  & aggregate telemetry \\
+\topicname{/robodog/safety\_status}     & SafetyStatus      & 50  & limits, faults, loop health \\
+\topicname{/robodog/imu}                & Imu               & 50  & attitude and rates \\
+\topicname{/robodog/joint\_command}     & JointCommandArray & --- & direct joint control \\
+\topicname{/robodog/gait\_command}      & GaitCommand       & --- & gait selection \\
+\topicname{/cmd\_vel}                   & Twist             & --- & body velocity \\
+\topicname{/robodog/world\_markers}     & MarkerArray       & latched & test environment \\
+\topicname{camera/color/image\_raw}     & Image (rgb8)      & 15  & colour \\
+\topicname{camera/depth/image\_rect\_raw}& Image (16UC1)    & 15  & depth, millimetres \\
+\topicname{camera/depth/points}         & PointCloud2       & 10  & range-filtered cloud \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Services: \code{set\_named\_pose}, \code{set\_gait}, \code{set\_control\_mode},
+\code{enable\_joints}, \code{emergency\_stop}.
+
+\begin{decision}{One aggregate telemetry message}
+\code{RobotState} carries all twelve joints, the four feet, the base estimate,
+controller state, safety state and simulation state in one message. A consumer
+therefore never has to time-align several topics to render a consistent picture.
+\code{/joint\_states} is published separately and at a different rate because
+the wider ROS ecosystem expects it.
+\end{decision}
+
+% =====================================================================
+\section{Control architecture}
+
+\archfig{control_architecture}{Control layers. Rates fall by roughly an order of
+magnitude per layer, and the innermost loop is not on the host at all.}{0.98}
+
+\subsection{The loop}
+
+One thread, \RdControlRate\,Hz, in \code{robodog\_control\_node}:
+
+\begin{center}\small
+\code{read()} $\to$ estimate $\to$ active controller $\to$ safety $\to$ \code{write()} $\to$ \code{step()}
+\end{center}
+
+ROS callbacks run on a separate executor and only ever set fields the loop
+reads; nothing in a callback touches the backend. Publishing is decimated ---
+\code{RobotState} at 50\,Hz, \code{/joint\_states} at 100\,Hz --- because
+publishing telemetry at \RdControlRate\,Hz would cost more than the control it
+reports on.
+
+\archfig{data_flow}{One \RdControlRate\,Hz cycle. The safety monitor is
+unconditional.}{1.0}
+
+\begin{decision}{Controllers are selected, not composed}
+Exactly one of \{\code{idle}, \code{joint}, \code{pose}, \code{gait},
+\code{joint\_test}\} drives the joints at any moment. Making that exclusive by
+construction is worth more than the flexibility of a controller chain, because
+two things writing to the same actuator is a failure mode with no good recovery.
+\end{decision}
+
+\subsection{Impedance control}
+
+The actuator evaluates
+\[
+\tau = k_p\,(q^{*} - q) + k_d\,(\dot q^{*} - \dot q) + \tau_{\mathrm{ff}}
+\]
+in firmware. Effective joint inertia is the reflected rotor inertia
+(\RdArmature) plus roughly $2\times10^{-3}$ of link, so $J \approx
+7\times10^{-3}\,\mathrm{kg\,m^2}$; $k_p = 120$ then gives
+$\omega_n = \sqrt{k_p/J} \approx 131$\,rad/s (21\,Hz) and a critical damping of
+$k_d = 2\sqrt{k_p J} = 1.83$.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+\textbf{Context} & $k_p$ & $k_d$ & \textbf{Rationale} \\
+\midrule
+Named pose, joint test & 80  & 2.0 & moderate, unloaded \\
+Stance leg             & 120 & 2.5 & stiff enough to hold the body up \\
+Swing leg              & 45  & 1.2 & compliant: an unexpected contact during
+                                     swing must not lever the robot over \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Gravity feed-forward and the force convention}
+
+Each stance leg is fed the torque that holds its share of the body weight. The
+sign convention is stated once and used everywhere:
+
+\begin{center}
+$f$ is the force the \emph{environment} applies to the foot (the ground
+reaction, $+z$ in stance), so \quad
+$\tau_{\mathrm{actuator}} = -J^{\mathsf{T}} f$, \quad
+$f = -(J^{\mathsf{T}})^{-1}\tau_{\mathrm{actuator}}$.
+\end{center}
+
+\begin{caveat}{This sign is not cosmetic}
+An inverted feed-forward makes a stance leg push the body \emph{down}. Measured
+in MuJoCo: with correct feed-forward the body sags 0.31\,mm below the commanded
+\RdStandHeight\,mm; without feed-forward it sags 5.34\,mm; with the sign
+inverted it sags 11.95\,mm. Magnitude-only tests pass in all three cases, which
+is why \code{test\_kinematics.py} asserts the \emph{direction} of the knee
+torque explicitly.
+\end{caveat}
+
+\subsection{Gait generation}
+
+A single normalised cycle phase advances at the step frequency. Each leg has a
+fixed offset and is in stance for \code{duty\_factor} of its period.
+
+\begin{center}\small
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+\textbf{Gait} & \textbf{Offsets} & \textbf{Duty} & \textbf{Freq (Hz)} & \textbf{Character} \\
+\midrule
+stand & ---                     & 1.00 & 0.0 & all feet planted \\
+walk  & 0, 0.50, 0.75, 0.25     & 0.75 & 1.2 & statically stable, one foot up \\
+trot  & 0, 0.50, 0.50, 0        & 0.50 & 2.2 & diagonal pairs; default travel \\
+pace  & 0, 0.50, 0, 0.50        & 0.50 & 2.0 & lateral pairs; rolls this narrow body \\
+bound & 0, 0, 0.50, 0.50        & 0.45 & 2.6 & front then rear; most demanding \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Swing horizontal position follows $s - \sin(2\pi s)/2\pi$, whose derivative
+$1 - \cos(2\pi s)$ vanishes at both ends, so the foot lifts off and touches down
+with no horizontal velocity relative to the ground. Height follows
+$\sin^2(\pi s)$, likewise zero-slope at both ends, with a small
+\code{touchdown\_depth} subtracted late in swing so the foot seeks the ground
+rather than hovering over an uneven floor. Stride length is not configured: it
+follows from the commanded velocity and the stance duration, clamped to 45\,\%
+of leg reach.
+
+\subsection{Balance}
+
+A foot-trajectory generator alone does not walk. With the open-loop gait and no
+balance term, a 0.3\,m/s trot in MuJoCo reached 25$^\circ$ of body tilt,
+saturated the actuators at the \RdTorquePeak\,N$\cdot$m peak and travelled
+28\,mm in six seconds. The feet were following their commanded paths; the body
+was not being held up. \code{balance.py} adds the two things that were missing.
+
+\paragraph{Force distribution.} A PD controller on height, roll, pitch, yaw rate
+and horizontal velocity produces a desired body wrench, and the stance foot
+forces are solved to reproduce it:
+\[
+\sum_i f_i = F, \qquad \sum_i r_i \times f_i = M
+\]
+Six equations in $3 n_{\mathrm{stance}}$ unknowns --- exactly determined for a
+trot, under-determined for a walk or a full stance --- solved by least squares,
+then projected into what a contact can deliver: $f_z \ge 0$ and
+$\lVert f_{xy} \rVert \le \mu f_z$.
+
+\begin{decision}{A stance leg is force controlled, not position controlled}
+This was measured the hard way. With \code{stance\_kp} at 120 the stance legs
+showed 0.17\,rad of tracking error and 20\,N$\cdot$m of pure disagreement with
+reality: the commanded foot position was advancing at the \emph{commanded} body
+velocity while the foot was physically planted, so the leg was dragging the
+robot through its own contact. Two changes follow. The stance foot now
+translates at a blend of the \emph{measured} and commanded velocity
+(\code{stance\_sweep\_gain}), and the placement offset is latched at touchdown
+so the command cannot move under a planted foot. Stiffness is reduced to 90:
+raising it turns the leg into a spring that anchors the body to its own foot
+and cancels the propulsion force.
+\end{decision}
+
+\paragraph{Foot placement.} Attitude control cannot regulate velocity --- a
+legged robot steers by where it puts its feet. The Raibert heuristic places the
+landing point at $v\,T_{\mathrm{stance}}/2 + k_v (v - v^{*})$.
+
+\subsection{Measured locomotion performance}
+\label{sec:locomotion-status}
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrrl@{}}
+\toprule
+\textbf{Gait} & \textbf{$v^{*}_x$} & \textbf{travelled} & \textbf{height} &
+\textbf{peak tilt} & \textbf{Verdict} \\
+ & (m/s) & (m in 6\,s) & (m) & (deg) & \\
+\midrule
+stand & 0.00 & $-0.003$ & 0.320 & 0.1 & solid; 5.5\,N$\cdot$m peak, no clamping \\
+trot  & 0.30 & $-0.241$ & 0.320 & 3.0 & attitude held; steps in place \\
+trot  & 0.50 & $-0.292$ & 0.311 & 10.4 & attitude held; steps in place \\
+walk  & 0.15 & $+0.528$ & 0.256 & 17.0 & moves forward; attitude marginal \\
+walk  & 0.30 & $-0.433$ & 0.119 & 125 & falls \\
+bound & 0.30 & $-0.178$ & 0.240 & 14.7 & marginal \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{caveat}{Locomotion does not yet track commanded velocity}
+Standing is solid and the balance layer regulates attitude and height well
+during stepping --- a 0.3\,m/s trot holds 3$^\circ$ of tilt at the commanded
+\RdStandHeight\,mm, against 25$^\circ$ without it. But the robot steps in place
+rather than travelling: trot drifts backward at about 0.04\,m/s, and only the
+slow walk makes forward progress, at the cost of attitude.
+
+The force-to-motion path is verified correct in isolation --- commanding
+$+30$\,N of ground reaction with all four feet planted moves the robot forward
+0.52\,m, and $-30$\,N moves it backward --- so this is a tuning and timing
+problem, not a sign or architecture error. What it needs is work that only
+makes sense against identified dynamics: co-tuning stance compliance, swing
+timing and placement gains, contact detection instead of a fixed schedule, and
+slip handling. That is deliberately outside the scope of a first architecture,
+and none of it changes an interface.
+\end{caveat}
+
+\subsection{State estimation}
+
+\begin{decision}{A complementary filter and leg odometry, not an EKF}
+Attitude comes from blending gyro integration with the gravity direction, with
+the gravity term weighted by how closely the measured acceleration magnitude
+resembles $g$ --- during a hard push-off it does not. Height and velocity come
+from treating each foot in contact as a temporary fixed point.
+
+An EKF was rejected \emph{for now} because until the robot exists its process
+and measurement covariances would be invented numbers. This is honest,
+debuggable and sufficient to stand, walk and visualise. Yaw is not observable
+from an IMU without a magnetometer and is flagged as drifting.
+\end{decision}
+
+% =====================================================================
+\section{Safety}
+\label{sec:safety}
+
+\subsection{Two-tier limits}
+
+\begin{center}\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Quantity} & \textbf{Hard (URDF)} & \textbf{Operational} & \textbf{Enforced by} \\
+\midrule
+Torque   & \RdTorquePeak\,N$\cdot$m & \RdTorqueCont\,N$\cdot$m continuous & $I^2t$ integrator \\
+Velocity & \RdSpeedNoLoad\,rad/s & \RdSpeedOp\,rad/s & clamp \\
+Position & joint end stops & end stops inset 0.05\,rad & clamp + rate limit \\
+Winding temperature & --- & \RdTempWarn/\RdTempDerate/\RdTempFault\,$^\circ$C & derate, then latch \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The URDF carries what the hardware can physically deliver; the operational tier
+is what the robot is allowed to use.
+
+\subsection{Design rules}
+
+\begin{enumerate}
+\item \textbf{It runs in simulation too.} The monitor executes on every cycle
+      regardless of backend. A safety layer that only activates on hardware has
+      never been tested by the time it matters.
+\item \textbf{It is a pure function.} \code{(measurement, request, state)}
+      $\to$ \code{(allowed command, status)}. No ROS, no I/O, no threads --- which
+      is what makes the whole envelope testable. \code{test\_safety.py} is the
+      specification.
+\item \textbf{It clamps rather than rejects.} Dropping a cycle mid-stride is
+      more dangerous than saturating one.
+\item \textbf{Protective faults latch.} Clearing requires the condition to have
+      gone away \emph{and} an explicit operator action.
+\end{enumerate}
+
+\subsection{Torque limiting under impedance control}
+
+\begin{decision}{Scale the whole $(k_p, k_d, \tau_{\mathrm{ff}})$ triple}
+The motor computes $k_p e + k_d \dot e + \tau_{\mathrm{ff}}$ itself, so clamping
+only the \code{effort} field would not limit the torque at all. The monitor
+predicts the resulting torque and, if it exceeds the budget, scales all three
+terms by the same factor --- limiting the magnitude while preserving the
+commanded impedance direction.
+\end{decision}
+
+The budget is the continuous rating normally, rising to peak while $I^2t$ credit
+remains. The integrator charges as $(\tau/\tau_{\mathrm{cont}})^2 - 1$ above the
+continuous rating, so twice the continuous torque exhausts the budget four times
+faster, and discharges when below.
+
+\subsection{Thermal model}
+
+\[
+P_{\mathrm{cu}} = 3 I_{\mathrm{rms}}^2 R_{\phi},\quad I_{\mathrm{rms}} = \tau/K_t,
+\qquad
+C_{\mathrm{th}}\,\dot T = P_{\mathrm{cu}} - \frac{T - T_{\mathrm{amb}}}{R_{\mathrm{th}}}
+\]
+
+with $R_{\mathrm{th}} = \RdRthermal$\,K/W and $C_{\mathrm{th}} = \RdCthermal$\,J/K,
+giving a time constant of \RdTauThermal\,minutes. It runs in two roles: in
+simulation it synthesises a plausible temperature, because MuJoCo has no concept
+of copper loss and the safety architecture must be exercised; on the real robot
+it runs as an \emph{observer} alongside the reported temperature, and the
+monitor takes the maximum of the two. The motor's own sensor sits on the driver
+board and lags the winding by tens of seconds --- the observer is what catches a
+stalled leg pushing against an obstacle.
+
+Between \RdTempDerate\ and \RdTempFault\,$^\circ$C the torque budget is scaled
+down linearly rather than cut at a threshold, because cutting output abruptly
+would drop the robot.
+
+\subsection{Watchdog and emergency stop}
+
+\begin{decision}{A stale command holds position; it does not go limp}
+Losing torque mid-stance drops a 10\,kg robot. The watchdog substitutes an
+impedance command that holds the measured position at moderate gain. If a joint
+is measured outside its soft range, the hold target is the limit, so the
+watchdog recovers the envelope gently rather than freezing outside it.
+\end{decision}
+
+A communication timeout on any joint latches an e-stop: a silently stale joint
+is the failure mode most likely to break a leg.
+
+\archfig{state_machine}{Robot states. FAULT and E-STOP are reachable from
+everywhere; leaving E-STOP requires the cause to have cleared.}{0.86}
+
+% =====================================================================
+\section{Simulation architecture}
+
+\archfig{simulation_architecture}{The MJCF and the URDF are generated from the
+same parameters, so the physics and the kinematics cannot drift apart.}{1.0}
+
+\subsection{Fidelity choices}
+
+These are not convenience settings; each is here because getting it wrong yields
+a controller that works in simulation and fails on the robot.
+
+\begin{enumerate}
+\item \textbf{The impedance law is evaluated at the physics rate}, not the
+      control rate. The real RS02 closes its loop in firmware at tens of kHz;
+      holding a \RdControlRate\,Hz zero-order hold on $k_p(q^*-q)$ would make the
+      simulated joints noticeably softer than the hardware and would tune gains
+      that are wrong on the robot. Only the \emph{setpoint} is held.
+\item \textbf{\code{armature} carries the reflected rotor inertia}
+      (\RdArmature\,kg$\cdot$m$^2$), which is larger than the calf's own inertia
+      about the knee. Omitting it is not a small error.
+\item \textbf{Command latency is injected} --- two physics steps, about 1\,ms,
+      the order of a 1\,Mbit/s bus at \RdControlRate\,Hz. Controllers tuned
+      against a zero-latency plant are optimistic in the wrong direction.
+\item \textbf{Capsules, not cylinders}, for the leg segments. URDF has no
+      capsule primitive; MuJoCo does, and capsule contact is far better
+      conditioned than the flat-ended cylinder a URDF must approximate it with.
+\item \textbf{Timestep 0.5\,ms} (2\,kHz), exactly five substeps per control
+      cycle. A non-integer ratio would make the effective command latency jitter.
+\end{enumerate}
+
+Not modelled: gearbox backlash, belt compliance in the knee drive, current-loop
+bandwidth, and CAN jitter.
+
+\subsection{Validation against the model}
+
+Standing in MuJoCo with gravity feed-forward, measured:
+
+\begin{center}\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Quantity} & \textbf{Predicted} & \textbf{Measured in MuJoCo} \\
+\midrule
+Total mass                & \RdMassTotal\,kg & \RdMassTotal\,kg \\
+Ground reaction, all feet & 98.10\,N & 98.10\,N \\
+Front load share          & 47.2\,\% & 47.0\,\% \\
+Body height               & \RdStandHeight\,mm & 320.31\,mm \\
+Peak joint torque         & 62.5\,\% of continuous & 64.6\,\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The front/rear split follows from the whole-robot centre of mass sitting
+12.3\,mm behind the body centre in the stance pose; agreement to 0.2\,\%
+confirms that the inertia aggregation, the MJCF generation and the contact model
+are mutually consistent.
+
+\subsection{Test environment}
+
+\begin{decision}{One world description, two renderers}
+\code{world\_spec.py} is consumed by the MJCF builder and by the RViz marker
+publisher. What the operator sees in RViz is geometrically what the robot
+collides with in MuJoCo; two hand-maintained files would drift, and the drift
+would look like a perception bug.
+\end{decision}
+
+The five-room house is 12\,$\times$\,9\,m and contains every indoor locomotion
+problem the robot must solve, each with enough approach room to be attempted in
+isolation:
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Feature} & \textbf{Dimension} & \textbf{Against} \\
+\midrule
+Doorways         & 0.90\,m, 20\,mm sill & body width 0.24\,m \\
+Narrow gaps      & 0.45 / 0.43 / 0.60\,m & foot span 0.289\,m \\
+Stairs           & 4 $\times$ 80\,mm; 3 $\times$ 120\,mm & realistic and stretch \\
+Ramp             & 12$^\circ$ & friction limit at $\mu = 0.9$ \\
+Under-table      & 0.36--0.46\,m clearance & stance height \RdStandHeight\,mm \\
+Debris field     & mixed 40--110\,mm blocks & foothold selection \\
+Movable props    & 4 free bodies & contact recovery \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{world\_check.py} measures every one of those clearances from the spec, and
+\code{test\_world.py} fails if an edit turns a designed challenge into a wall or
+an open field. It also rejects any overlapping geometry, because MuJoCo resolves
+interpenetration by pushing bodies apart at the first step --- silently moving
+the test environment out from under the experiment.
+
+% =====================================================================
+\section{Perception}
+
+\archfig{perception_pipeline}{One configuration file drives both backends, so
+the simulated camera has the real device's intrinsics and range.}{1.0}
+
+The Yahboom NUWA HP60C is mounted on the body's front face on a bracket at
+$z = 175$\,mm, pitched 0.26\,rad down.
+
+\begin{decision}{The camera mount height is set by self-occlusion}
+The front hip assemblies occupy roughly $x = 0.11 \ldots 0.26$\,m and reach
+$z = +0.05$\,m, leaving only a 42\,mm slot between them on the centreline.
+Rendering the simulated depth image from $z = 20$\,mm put \textbf{95\,\%} of the
+frame on the robot's own legs at 74\,mm; $z = 90$\,mm still left 48\,\%. Clearing
+the hip corner with the bottom edge of the frustum requires $z > 155$\,mm, so
+the camera sits on a mast --- as it does on every production quadruped. At
+175\,mm the self-view is 0\,\% and 98.5\,\% of the depth image is usable.
+\end{decision}
+
+\begin{decision}{The simulated camera loads its own MuJoCo model}
+The physics instance lives in the control node's backend. Rather than reach into
+it, the camera backend loads the same scene read-only and drives it from the
+published robot state. The camera is then a separate node with a separate
+lifecycle --- exactly as the real USB camera will be --- so the node graph does
+not change on hardware, rendering never steals time from the
+\RdControlRate\,Hz loop, and a camera crash cannot take the control loop down.
+\end{decision}
+
+Depth crosses the backend boundary as float32 metres with NaN for invalid,
+because that representation can express ``no reading''; the conversion to the
+ROS 16UC1-millimetre convention (where 0 means invalid) happens once, at the
+publisher. Stereo range error grows as $z^2$, so the simulated camera applies
+$\sigma_z = z^2 \sigma_d / (f b)$ --- about 4\,mm at 1\,m and 140\,mm at 6\,m ---
+and the point cloud is filtered to \code{max\_usable\_range\_m} rather than the
+datasheet maximum.
+
+\begin{caveat}{Camera parameters are placeholders}
+Resolution, field of view, range and baseline in
+\code{config/nuwa\_hp60c.yaml} are plausible for a device of this class but have
+\emph{not} been read from the datasheet; each is marked \code{[VERIFY]}. The
+architecture does not depend on them --- they are configuration, and both
+backends read the same file. How the HP60C delivers depth over USB (a second UVC
+stream, a side-by-side frame, or only through the vendor SDK) is the one thing
+that cannot be determined without the device, and is marked \code{HW-CHECK} in
+\code{backends/nuwa\_hp60c.py}.
+\end{caveat}
+
+% =====================================================================
+\section{Web GUI}
+
+A single process holds an rclpy node and an aiohttp server; rclpy spins in a
+background thread while aiohttp owns the asyncio loop. They meet at two
+dictionaries: the ROS callbacks write the latest state, the web tasks read it.
+No queue --- a GUI only ever wants the newest value, and buffering telemetry for
+a browser that fell behind is how a monitoring tool ends up showing the past.
+
+\begin{decision}{A purpose-built protocol rather than rosbridge}
+rosbridge would re-serialise every field at the full publish rate and expose the
+whole graph to the browser. This speaks a small versioned JSON protocol,
+decimated to 20\,Hz, and exposes exactly the commands the GUI is allowed to
+send. Less code, less bandwidth, and a much smaller surface from a page that can
+drive a robot.
+\end{decision}
+
+The browser fetches \code{/api/config} and builds itself from it: adding,
+removing or reordering a panel is a change to \code{config/web.yaml} alone.
+Panels cover robot state, controller state, per-joint telemetry with tracking
+error and load bars, foot contact and forces, safety and thermal state,
+simulation state and real-time factor, an event log, camera streams, pose and
+gait commands, and emergency stop.
+
+Operator limits are configuration, not constants in JavaScript: maximum
+commanded velocity, gait confirmation, and joint jogging --- which is disabled
+by default because it bypasses the gait layer and is the easiest way to put a
+leg where the body cannot support it. Video is a separate MJPEG endpoint so a
+slow video consumer cannot stall telemetry, and the page falls back to showing
+camera metadata if no JPEG encoder is installed.
+
+% =====================================================================
+\section{Migration to hardware}
+\label{sec:migration}
+
+\subsection{What changes}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Component} & \textbf{Simulation} & \textbf{Hardware} \\
+\midrule
+Joints  & \code{MujocoBackend} & \code{RobStride02Backend} \\
+Camera  & \code{SimCameraBackend} & \code{NuwaHP60CBackend} \\
+Base state & ground truth from the simulator & \code{StateEstimator} \\
+Temperature & thermal model & reported, with the model as observer \\
+Launch  & \code{backend:=mujoco} & \code{backend:=robstride02\_can} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Nothing else: not a topic, a service, a frame, a message, a controller or a gain.
+
+\subsection{Bring-up sequence}
+
+\begin{enumerate}
+\item \textbf{Verify the CAN protocol.} Power one motor alone; confirm
+      \code{GET\_DEVICE\_ID}, then \code{ENABLE} and the arrival of feedback
+      frames, then a 0.1\,N$\cdot$m command with $k_p = k_d = 0$ and check the
+      direction of motion. A firmware revision with a different identifier
+      layout changes exactly one file.
+\item \textbf{Calibrate each joint.} \code{ros2 run robodog\_hardware
+      calibrate\_joint} determines \code{direction} and \code{offset\_rad}
+      against the convention in Section~\ref{sec:conventions} and prints a YAML
+      fragment for review. Leave \code{enable\_on\_start: false} until signed off.
+\item \textbf{Identify the estimates.} Rotor inertia from a free-spin
+      deceleration test; joint friction and damping from a swing-down test;
+      thermal constants from a stall at rated torque. Until then the margins in
+      Section~\ref{sec:safety} carry the uncertainty.
+\item \textbf{Bring up on a stand}, legs free: joint test sweeps, then named
+      poses, then stance with the body supported.
+\item \textbf{On the ground}, walk gait first --- it is statically stable and
+      keeps three feet down.
+\end{enumerate}
+
+\subsection{Known gaps}
+\label{sec:assumptions}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Item} & \textbf{Status} & \textbf{Resolution} \\
+\midrule
+CAN frame layout          & from the RS02 manual & verify against delivered firmware \\
+Joint direction / offset  & unknown & \code{calibrate\_joint}, per joint \\
+Rotor inertia             & estimate \RdRotorInertia & free-spin deceleration \\
+Damping, Coulomb friction & estimate & swing-down test \\
+Thermal $R_{\mathrm{th}}$, $C_{\mathrm{th}}$ & estimate & stall at rated torque \\
+Temperature thresholds    & estimate & from the above, plus vendor guidance \\
+Camera intrinsics, range  & placeholder & datasheet, then \code{camera\_calibration} \\
+HP60C depth transport     & unknown & determine with the device \\
+Joint limits              & design values & self-collision check on real geometry \\
+Battery model             & nominal voltage only & add a cell model and state of charge \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Planned next steps}
+
+The \code{ros2\_control} interface contract is already declared in
+\code{urdf/ros2\_control.xacro} but not implemented: the runtime is Python.
+
+\begin{decision}{Python control loop now, C++ \code{SystemInterface} later}
+At \RdControlRate\,Hz the measured loop period is 2.49\,ms against a nominal
+2.50\,ms, with worst-case jitter under 1\,ms --- adequate, and it buys a stack
+that is fully testable and quick to change during architecture work. The
+declared \code{ros2\_control} block is the formal statement of the interfaces a
+C++ \code{SystemInterface} must provide, and is the migration path once jitter
+or CPU headroom demands it. Note that the command interface set there is the
+RS02's native impedance command, not a single position interface, for the reason
+in Section~\ref{sec:actuator}.
+\end{decision}
+
+% =====================================================================
+\section{Verification}
+
+\begin{center}\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Suite} & \textbf{Tests} & \textbf{What it protects} \\
+\midrule
+\code{robodog\_description} & 16 & URDF structure, conventions, limits, inertia validity \\
+\code{robodog\_hardware}    & 52 & CAN codec, backend contract, thermal, bus budget \\
+\code{robodog\_control}     & 40 & IK exactness, Jacobian, force signs, safety envelope \\
+\code{robodog\_sim}         & 46 & MJCF vs URDF consistency, world geometry, physics \\
+\code{robodog\_perception}  & 17 & intrinsics, deprojection, self-occlusion, noise model \\
+\midrule
+\textbf{Total}              & \textbf{171} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The most valuable are the cross-checks: the MJCF's per-link masses, joint
+origins, axes and ranges are asserted against the URDF, so the two descriptions
+cannot drift. Three tests exist specifically because a bug got past a weaker
+one --- the gravity-torque sign, the idle-command rate-limiter seed, and the
+camera self-occlusion fraction.
+
+\archfig{domain_model}{Domain model: the value types that cross the hardware
+boundary and the entities that own them.}{0.94}
+
+\vspace{4mm}
+\begin{center}\small\color{rdgrey}
+Generated from \code{robot\_parameters.yaml} (CAD \texttt{\RdCadSha}) and
+\code{robstride02.yaml}.\\
+Diagrams: \code{docs/diagrams/*.drawio}, rendered by \code{tools/make\_diagrams.py}.
+\end{center}
+
+\end{document}

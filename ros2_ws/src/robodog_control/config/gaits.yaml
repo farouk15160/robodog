@@ -1,0 +1,62 @@
+# =============================================================================
+# Gait library. Adding a gait is a block here plus a phase-offset entry in
+# robodog_control/gait.py -> GAIT_OFFSETS.
+# =============================================================================
+# step_frequency_hz  cycles per second
+# duty_factor        fraction of the cycle a foot spends in stance
+# step_height_m      peak foot lift during swing
+# stance_height_m    base_link height above the contact plane
+#
+# Stride length is NOT configured: it follows from the commanded velocity and
+# the stance duration, and is clamped to 45% of leg reach by the generator.
+gaits:
+  stand:
+    step_frequency_hz: 0.0
+    duty_factor: 1.0
+    step_height_m: 0.0
+    stance_height_m: 0.320
+    description: >
+      All four feet planted at the nominal stance. Costs 50.9% of the 6 N.m
+      continuous rating to hold, with the feet 10 mm from directly under the
+      hip pivots.
+
+  walk:
+    step_frequency_hz: 1.2
+    duty_factor: 0.75
+    step_height_m: 0.07
+    stance_height_m: 0.320
+    description: >
+      One foot in swing at a time, so three feet always form a support
+      triangle. Statically stable and the right choice for stairs, narrow
+      passages and first hardware trials.
+
+  trot:
+    step_frequency_hz: 2.2
+    duty_factor: 0.50
+    step_height_m: 0.06
+    stance_height_m: 0.320
+    description: >
+      Diagonal pairs. Dynamically stable rather than statically stable, and the
+      default travelling gait: the diagonal support line passes close to the
+      centre of mass, so it needs the least attitude correction of the
+      two-phase gaits.
+
+  pace:
+    step_frequency_hz: 2.0
+    duty_factor: 0.50
+    step_height_m: 0.06
+    stance_height_m: 0.320
+    description: >
+      Lateral pairs. Included for comparison; it rolls the body noticeably on a
+      robot this narrow (120 mm between hip pivots) and is not recommended for
+      carrying the camera.
+
+  bound:
+    step_frequency_hz: 2.6
+    duty_factor: 0.45
+    step_height_m: 0.08
+    stance_height_m: 0.310
+    description: >
+      Front pair then rear pair. The most demanding gait in the library --
+      use it to probe the peak-torque and I2t limits in simulation before ever
+      asking the hardware for it.

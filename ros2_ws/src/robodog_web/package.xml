@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>robodog_web</name>
+  <version>0.1.0</version>
+  <description>
+    Modular web GUI for monitoring and commanding the robodog quadruped. An
+    aiohttp server bridges a small versioned JSON protocol to the ROS graph;
+    the browser builds its panels from config/web.yaml.
+  </description>
+  <maintainer email="farouk15160@gmail.com">farouk</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>robodog_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+
+  <exec_depend>robodog_description</exec_depend>
+  <exec_depend>robodog_control</exec_depend>
+  <exec_depend>python3-aiohttp</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <!-- optional: python3-pil (video streaming); without it the camera panel
+       shows metadata only -->
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export><build_type>ament_python</build_type></export>
+</package>

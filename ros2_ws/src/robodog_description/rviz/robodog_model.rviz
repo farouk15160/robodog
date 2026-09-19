@@ -1,0 +1,67 @@
+# Minimal configuration for inspecting the URDF alone, with
+# joint_state_publisher_gui driving the joints. No simulation, no perception.
+# Fixed frame is base_link because there is no odometry in this mode.
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Tree Height: 760
+Visualization Manager:
+  Class: ""
+  Name: root
+  Global Options:
+    Background Color: 38; 40; 46
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.1
+      Plane Cell Count: 20
+      Color: 80; 84; 92
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot
+      Enabled: true
+      Description Topic:
+        Value: /robot_description
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+      Visual Enabled: true
+      Collision Enabled: false
+      Alpha: 1
+    - Class: rviz_default_plugins/RobotModel
+      Name: CollisionModel
+      Enabled: false
+      Description Topic:
+        Value: /robot_description
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+      Visual Enabled: false
+      Collision Enabled: true
+      Alpha: 0.4
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Axes: true
+      Show Names: true
+      Show Arrows: false
+      Marker Scale: 0.12
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/Measure
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Distance: 1.4
+      Focal Point: {X: 0, Y: 0, Z: -0.1}
+      Pitch: 0.32
+      Yaw: 2.4
+      Target Frame: base_link
+Window Geometry:
+  Displays: {collapsed: false}
+  Height: 950
+  Width: 1500
+  QMainWindow State: ""

@@ -1,0 +1,90 @@
+<?xml version="1.0"?>
+<!--
+  One leg = hip (HAA) -> thigh (HFE) -> calf (KFE) -> foot.
+
+  Joint axis convention (see config/robot_parameters.yaml -> conventions):
+    HAA axis = +x, HFE axis = +y, KFE axis = +y, ALL expressed in base_link
+    orientation and NOT mirrored between left and right. This keeps the URDF
+    axes literally identical for the four legs, so sim-to-real reduces to one
+    sign per joint in the actuator map instead of a per-leg frame convention.
+
+  Consequence to remember: +HAA abducts the left legs and adducts the right.
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:macro name="rd_leg" params="leg P RS">
+
+    <xacro:property name="G"  value="${P['geometry']}"/>
+    <xacro:property name="sx" value="${P['legs'][leg]['sx']}"/>
+    <xacro:property name="sy" value="${P['legs'][leg]['sy']}"/>
+    <xacro:property name="JL" value="${P['joint_limits']}"/>
+    <xacro:property name="OL" value="${RS['operational_limits']}"/>
+    <xacro:property name="JD" value="${RS['joint_dynamics']}"/>
+    <!-- URDF carries the HARDWARE maxima; the tighter operational values live in
+         robodog_control/config/safety.yaml and are enforced at runtime. -->
+    <xacro:property name="tau_max" value="${RS['performance']['peak_torque_nm']}"/>
+    <xacro:property name="vel_max" value="${RS['performance']['no_load_speed_rad_s']}"/>
+    <xacro:property name="soft"    value="${OL['position_margin_rad']}"/>
+
+    <xacro:rd_link name="${leg}_hip"   L="${P['links'][leg + '_hip']}"/>
+    <xacro:rd_link name="${leg}_thigh" L="${P['links'][leg + '_thigh']}"/>
+    <xacro:rd_link name="${leg}_calf"  L="${P['links'][leg + '_calf']}"/>
+
+    <!-- ========== HAA : hip abduction / adduction ========== -->
+    <joint name="${leg}_haa_joint" type="revolute">
+      <parent link="base_link"/>
+      <child  link="${leg}_hip"/>
+      <origin xyz="${sx * G['haa_x_m']} ${sy * G['haa_y_m']} 0" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="${JL['haa']['lower']}" upper="${JL['haa']['upper']}"
+             effort="${tau_max}" velocity="${vel_max}"/>
+      <safety_controller soft_lower_limit="${JL['haa']['lower'] + soft}"
+                         soft_upper_limit="${JL['haa']['upper'] - soft}"
+                         k_position="100.0" k_velocity="10.0"/>
+      <dynamics damping="${JD['damping_nms_per_rad']}" friction="${JD['coulomb_friction_nm']}"/>
+    </joint>
+
+    <!-- ========== HFE : hip flexion / extension ========== -->
+    <joint name="${leg}_hfe_joint" type="revolute">
+      <parent link="${leg}_hip"/>
+      <child  link="${leg}_thigh"/>
+      <origin xyz="${sx * G['hfe_dx_m']} ${sy * G['hfe_dr_m']} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="${JL['hfe']['lower']}" upper="${JL['hfe']['upper']}"
+             effort="${tau_max}" velocity="${vel_max}"/>
+      <safety_controller soft_lower_limit="${JL['hfe']['lower'] + soft}"
+                         soft_upper_limit="${JL['hfe']['upper'] - soft}"
+                         k_position="100.0" k_velocity="10.0"/>
+      <dynamics damping="${JD['damping_nms_per_rad']}" friction="${JD['coulomb_friction_nm']}"/>
+    </joint>
+
+    <!-- ========== KFE : knee ==========
+         Driven by an actuator mounted proximally on the thigh through a 1:1
+         belt, so the joint stays kinematically simple but the thigh carries the
+         motor mass (COM only 27 mm below the hip) and the calf is just 172 g. -->
+    <joint name="${leg}_kfe_joint" type="revolute">
+      <parent link="${leg}_thigh"/>
+      <child  link="${leg}_calf"/>
+      <origin xyz="0 ${sy * G['thigh_lateral_m']} ${-G['thigh_length_m']}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="${JL['kfe']['lower']}" upper="${JL['kfe']['upper']}"
+             effort="${tau_max}" velocity="${vel_max}"/>
+      <safety_controller soft_lower_limit="${JL['kfe']['lower'] + soft}"
+                         soft_upper_limit="${JL['kfe']['upper'] - soft}"
+                         k_position="100.0" k_velocity="10.0"/>
+      <dynamics damping="${JD['damping_nms_per_rad']}" friction="${JD['coulomb_friction_nm']}"/>
+    </joint>
+
+    <!-- ========== foot frame ==========
+         Origin at the centre of the 40 mm contact sphere, so the ground contact
+         point is foot_radius_m below it. Used by the IK, the gait generator and
+         the contact estimator. -->
+    <link name="${leg}_foot"/>
+    <joint name="${leg}_foot_joint" type="fixed">
+      <parent link="${leg}_calf"/>
+      <child  link="${leg}_foot"/>
+      <origin xyz="0 0 ${-G['shank_length_m']}" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+</robot>

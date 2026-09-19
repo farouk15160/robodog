@@ -1,0 +1,25 @@
+# Simulation tuning. These are FIDELITY choices, not convenience settings:
+# each one is here because getting it wrong produces a controller that works in
+# simulation and fails on the robot.
+robodog_sim:
+  # 0.0005 s = 2 kHz, five physics steps per 400 Hz control cycle. Contact
+  # between a 10 kg body and 20 mm foot spheres is stiff; at 1 kHz the solver
+  # visibly rings during touchdown.
+  timestep_s: 0.0005
+
+  # CAN round trip plus firmware latency, in physics steps. Two steps = 1 ms,
+  # the order of a 1 Mbit/s bus at 400 Hz. Controllers tuned against a
+  # zero-latency plant are optimistic in exactly the wrong direction.
+  command_delay_steps: 2
+
+  # Ground friction. 0.9 is a hard indoor floor; drop to 0.5 to reproduce a
+  # polished surface and check that the gait degrades rather than diverges.
+  ground_friction: 0.9
+  foot_friction: 1.0
+
+  contact:
+    solref: [0.004, 1.0]      # 4 ms contact time constant, critically damped
+    solimp: [0.95, 0.99, 0.001]
+    foot_condim: 6            # full friction cone with torsional friction at
+                              # the feet: a rolling sphere on a point contact
+                              # otherwise spins freely and flatters the gait

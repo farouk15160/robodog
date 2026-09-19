@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>robodog_perception</name>
+  <version>0.1.0</version>
+  <description>
+    Camera abstraction for the robodog quadruped. Publishes RGB, depth and
+    PointCloud2 from either a MuJoCo-rendered camera or the real Yahboom NUWA
+    HP60C, behind one backend interface and one configuration file.
+  </description>
+  <maintainer email="farouk15160@gmail.com">farouk</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>robodog_msgs</depend>
+
+  <exec_depend>robodog_description</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>image_transport</exec_depend>
+  <!-- optional: mujoco (sim backend), opencv-python (real backend) -->
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export><build_type>ament_python</build_type></export>
+</package>

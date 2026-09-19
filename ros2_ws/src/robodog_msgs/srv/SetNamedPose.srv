@@ -1,0 +1,8 @@
+# Interpolate every joint to a pose from robot_parameters.yaml -> named_poses
+# ('zero', 'stand', 'crouch', 'rest'). Runs as a minimum-jerk trajectory.
+string  pose
+float64 duration_s      # <= 0 uses the default for the pose
+---
+bool   success
+string message
+float64 planned_duration_s

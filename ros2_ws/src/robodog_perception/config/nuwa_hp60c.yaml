@@ -1,0 +1,62 @@
+# =============================================================================
+# Yahboom ROS Depth Camera NUWA HP60C
+# =============================================================================
+# Consumed by BOTH the simulated and the real camera backend, so the simulated
+# camera produces images with the real device's intrinsics, resolution and
+# range. A perception pipeline developed against this will not be surprised by
+# a different field of view on the first day with hardware.
+#
+# !! VALUES MARKED [VERIFY] ARE PLACEHOLDERS !!
+# They are plausible for a device of this class but have NOT been read off the
+# datasheet. Confirm each one before trusting a range measurement, then delete
+# the marker. The architecture does not depend on them: they are configuration,
+# and both backends read this same file.
+model: NUWA_HP60C
+vendor: Yahboom
+interface: USB3.0 UVC          # [VERIFY]
+mass_kg: 0.068                 # [VERIFY] must match the URDF camera_link mass
+
+color:
+  width: 1280                  # [VERIFY] 1920x1080 also expected to be offered
+  height: 720
+  fps: 30
+  format: rgb8
+  # Intrinsics are DERIVED from the FOV below until a real calibration exists.
+  # Replace with the output of camera_calibration; a hand-written guess for fx
+  # is the single biggest source of scale error in a depth pipeline.
+  hfov_deg: 65.0               # [VERIFY]
+  vfov_deg: 40.0               # [VERIFY]
+  distortion_model: plumb_bob
+  distortion: [0.0, 0.0, 0.0, 0.0, 0.0]   # [VERIFY] calibrate
+
+depth:
+  width: 640                   # [VERIFY]
+  height: 480
+  fps: 30
+  format: 16UC1                # millimetres, the ROS convention for uint16 depth
+  depth_scale_m: 0.001
+  hfov_deg: 65.0               # [VERIFY]
+  vfov_deg: 49.0               # [VERIFY]
+  min_range_m: 0.15            # [VERIFY]
+  max_range_m: 6.00            # [VERIFY]
+  baseline_m: 0.050            # [VERIFY] stereo baseline; sets the range noise
+  # Stereo range noise grows with the square of range:
+  #   sigma_z = z^2 * sigma_disparity / (f * baseline)
+  # With f ~ 500 px, baseline 0.05 m and 0.1 px disparity noise this is about
+  # 4 mm at 1 m and 140 mm at 6 m -- which is why max_usable_range_m below is
+  # what the mapping pipeline should actually filter to, not max_range_m.
+  disparity_noise_px: 0.1      # [VERIFY]
+  max_usable_range_m: 4.0
+
+pointcloud:
+  enabled: true
+  # Publishing a full 640x480 organised cloud at 30 Hz is 36 MB/s. The default
+  # decimates by 2 (one point per 2x2 block) and caps the rate, which is ample
+  # for local obstacle mapping on a robot that walks at well under 1 m/s.
+  decimation: 2
+  rate_hz: 10
+  organised: false             # dense clouds drop invalid points
+  frame_id: camera_depth_optical_frame
+
+# Mount pose is NOT here: it belongs to the robot, not the camera, and lives in
+# robodog_description/urdf/robodog.urdf.xacro (front face, pitched down 0.35 rad).

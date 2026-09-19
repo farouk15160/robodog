@@ -1,0 +1,64 @@
+% Shared preamble for the robodog engineering documentation.
+\usepackage[a4paper,margin=24mm,top=22mm,bottom=24mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[hidelinks,bookmarks=true]{hyperref}
+
+\definecolor{rdblue}{HTML}{1F4E79}
+\definecolor{rdgrey}{HTML}{5A6675}
+\definecolor{rdbg}{HTML}{F4F6F9}
+\definecolor{rdline}{HTML}{C8D0DA}
+\definecolor{rdred}{HTML}{A4262C}
+
+\hypersetup{linkcolor=rdblue, citecolor=rdblue, urlcolor=rdblue,
+            colorlinks=true, pdftitle={robodog -- software architecture}}
+
+\captionsetup{font=small, labelfont={bf,color=rdblue}, width=0.92\textwidth}
+\setlist{nosep, leftmargin=1.4em}
+\renewcommand{\arraystretch}{1.15}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{rdbg},
+  frame=single, rulecolor=\color{rdline},
+  breaklines=true, showstringspaces=false,
+  keywordstyle=\color{rdblue}\bfseries,
+  commentstyle=\color{rdgrey}\itshape,
+  numbers=none, xleftmargin=2pt, framexleftmargin=2pt,
+  aboveskip=6pt, belowskip=6pt,
+}
+
+% Decision box: used for every choice that a reader might otherwise have to
+% reverse-engineer from the code.
+\newtcolorbox{decision}[1]{
+  colback=rdbg, colframe=rdblue, boxrule=0.6pt, arc=2pt,
+  left=6pt, right=6pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\small, title={Decision --- #1}}
+
+\newtcolorbox{caveat}[1]{
+  colback=white, colframe=rdred, boxrule=0.6pt, arc=2pt,
+  left=6pt, right=6pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\small, title={#1}}
+
+\newcommand{\unit}[1]{\,\mathrm{#1}}
+\newcommand{\topicname}[1]{\texttt{\small #1}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+% figure with a standard width and placement
+\newcommand{\archfig}[3]{%
+  \begin{figure}[H]\centering
+  \includegraphics[width=#3\textwidth]{figures/#1.pdf}
+  \caption{#2}\label{fig:#1}\end{figure}}

@@ -1,0 +1,21 @@
+{
+  "source_url": "https://github.com/RobStride/Product_Information/blob/main/Product%20Literature/RS02/rs02.stp",
+  "source_sha256": "c988a3a398986fb6bc1453bf768d25c3198fad72c43af3483b7135d7e7a8f063",
+  "bounds_mm": [
+    -39.25932757539905,
+    -39.259327575399055,
+    -41.53218022471905,
+    39.259327575399055,
+    39.259327575399055,
+    4.009327575401679
+  ],
+  "extents_mm": [
+    78.51865515079811,
+    78.51865515079811,
+    45.541507800120726
+  ],
+  "original_shaft_axis": 2,
+  "mesh_units": "metres",
+  "mesh_origin": "bounding-box centre",
+  "note": "Manufacturer visual; primitive collision envelope is configured separately."
+}

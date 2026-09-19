@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>robodog control</title>
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="dot" id="link-dot"></span>
+    <strong>robodog</strong>
+    <span class="sub" id="brand-sub">12-DOF quadruped</span>
+  </div>
+  <div class="topstats">
+    <div class="stat"><label>state</label><span id="top-state" class="badge">--</span></div>
+    <div class="stat"><label>controller</label><span id="top-controller">--</span></div>
+    <div class="stat"><label>loop</label><span id="top-rate">--</span></div>
+    <div class="stat"><label>backend</label><span id="top-backend">--</span></div>
+  </div>
+  <div class="topactions">
+    <button id="btn-estop-top" class="btn danger">STOP</button>
+    <button id="btn-theme" class="btn ghost" title="toggle theme">◐</button>
+  </div>
+</header>
+
+<main id="grid" class="grid"></main>
+
+<footer class="footer">
+  <span id="foot-link">connecting…</span>
+  <span id="foot-proto"></span>
+  <span id="foot-seq"></span>
+</footer>
+
+<template id="tpl-panel">
+  <section class="panel">
+    <h2><span class="ptitle"></span><span class="pnote"></span></h2>
+    <div class="pbody"></div>
+  </section>
+</template>
+
+<script src="/static/js/panels.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

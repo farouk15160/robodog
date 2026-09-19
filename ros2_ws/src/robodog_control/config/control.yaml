@@ -1,0 +1,59 @@
+# =============================================================================
+# Control node parameters (ROS 2 parameter file).
+# =============================================================================
+# `/**` applies to the node whatever it is named, so a remapped or namespaced
+# instance still picks these up. Everything here is a genuine ROS parameter and
+# can be changed at runtime:
+#
+#     ros2 param set /robodog_control_node gains.stance_kp 140.0
+#
+# Structured data that is NOT parameters -- the gait library, the actuator
+# datasheet, the generated robot model -- stays in plain YAML loaded by path,
+# because a list of gait definitions is not something you want flattened into
+# dotted parameter names.
+/**:
+  ros__parameters:
+    # -------------------------------------------------------------------------
+    # Rates. 400 Hz is set by the CAN bus budget on the real robot (2 buses,
+    # 6 motors each, 72% load -- see robstride02.yaml). Simulation deliberately
+    # uses the SAME rate so gains tuned in MuJoCo transfer unchanged.
+    # -------------------------------------------------------------------------
+    control_rate_hz: 400.0
+    state_publish_rate_hz: 50.0      # RobotState, what the GUI consumes
+    joint_state_rate_hz: 100.0       # sensor_msgs/JointState for RViz and TF
+
+    # -------------------------------------------------------------------------
+    # Impedance gains, in the actuator's own units (N.m/rad, N.m.s/rad). These
+    # are sent to the RS02 and evaluated in its firmware; the host never closes
+    # this loop itself.
+    #
+    # Sizing: effective joint inertia is the reflected rotor inertia (4.8e-3)
+    # plus roughly 2e-3 of link, so about 7e-3 kg.m2.
+    #     omega_n = sqrt(kp / J)        kd_critical = 2 * sqrt(kp * J)
+    #     kp = 120 -> 131 rad/s (21 Hz), kd_critical = 1.83
+    # Values are set slightly over-damped. The RS02 accepts kp <= 500, kd <= 5.
+    # -------------------------------------------------------------------------
+    gains:
+      position_kp: 80.0    # named-pose moves and joint tests
+      position_kd: 2.0
+      # A stance leg is FORCE controlled: the balance layer computes the ground
+      # reaction it should produce and feeds the torque forward, so the
+      # stiffness only has to reject disturbance, not carry the body. Raising
+      # stance_kp past ~120 turns the leg into a stiff spring that anchors the
+      # body to its own foot and cancels the propulsion force -- measured, not
+      # theorised. Values below ~30 let the legs sag instead.
+      stance_kp: 90.0
+      stance_kd: 2.0
+      swing_kp: 60.0       # unloaded leg: tracks its trajectory
+      swing_kd: 1.5
+
+    # Peak joint speed while interpolating to a named pose. Well under the
+    # 20 rad/s operational limit, because a pose change is never urgent.
+    pose_transition_max_velocity_rad_s: 1.0
+
+    # Gait entered when a cmd_vel arrives while merely standing.
+    default_travel_gait: "trot"
+
+    state_estimator:
+      tau_attitude_s: 1.0             # complementary filter time constant
+      contact_force_threshold_n: 8.0  # ~1/3 of the 24.5 N static per-foot load

@@ -1,0 +1,4 @@
+GaitCommand command
+---
+bool   success
+string message

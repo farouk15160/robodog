@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<!--
+  Sensor frames. Deliberately contains NO simulation-specific tags: the same
+  frames are published whether the data comes from the MuJoCo renderer or from
+  the real Yahboom NUWA HP60C, so nothing downstream of these frames changes
+  when the real camera is connected.
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Body frame (x fwd, y left, z up) -> optical frame (z fwd, x right, y down) -->
+  <xacro:property name="OPTICAL_RPY" value="${-pi/2} 0 ${-pi/2}"/>
+  <xacro:property name="mast_top" value="0"/>
+  <xacro:property name="mast_height" value="0"/>
+
+  <xacro:macro name="rd_imu" params="parent xyz:='0 0 0'">
+    <link name="imu_link"/>
+    <joint name="imu_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="imu_link"/>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <!--
+    Yahboom ROS Depth Camera NUWA HP60C.
+    Envelope and optical parameters are PLACEHOLDERS pending the datasheet; they
+    live in robodog_perception/config/nuwa_hp60c.yaml and are consumed by both
+    the simulated and the real backend. Only the mount pose is fixed here.
+  -->
+  <!--
+    camera_link's origin is the OPTICAL CENTRE, at the front face of the
+    housing, not the centre of the housing box. Two reasons: it is where a real
+    camera's entrance pupil is, and in simulation a sensor placed at the centre
+    of its own housing renders the inside of that housing across half the frame.
+  -->
+  <xacro:macro name="rd_camera" params="parent xyz rpy
+                                        bx:=0.090 by:=0.025 bz:=0.025 baseline:=0.050
+                                        mast_section:=0.0 mast_base_z:=0.0 mast_x:=0.0">
+    <xacro:property name="back" value="${-bx/2}"/>
+
+    <!-- Bracket from the body shell up to the camera. The camera has to clear
+         the front hip actuators (see robot_parameters.yaml -> camera_mount), so
+         there is a real mast; drawing it keeps the model honest. Massless here
+         because its mass is already inside the electronics payload. -->
+    <xacro:if value="${mast_section > 0}">
+      <link name="camera_mast">
+        <visual>
+          <origin xyz="0 0 ${-(mast_height)/2}" rpy="0 0 0"/>
+          <geometry><box size="${mast_section} ${mast_section} ${mast_height}"/></geometry>
+          <material name="rd_shell"/>
+        </visual>
+      </link>
+      <joint name="camera_mast_joint" type="fixed">
+        <parent link="${parent}"/>
+        <child link="camera_mast"/>
+        <origin xyz="${mast_x} 0 ${mast_top}" rpy="0 0 0"/>
+      </joint>
+    </xacro:if>
+    <link name="camera_link">
+      <inertial>
+        <mass value="0.068"/>
+        <origin xyz="${back} 0 0" rpy="0 0 0"/>
+        <inertia ixx="1.0e-5" ixy="0" ixz="0" iyy="5.0e-5" iyz="0" izz="5.0e-5"/>
+      </inertial>
+      <visual>
+        <origin xyz="${back} 0 0" rpy="0 0 0"/>
+        <geometry><box size="${bx} ${by} ${bz}"/></geometry>
+        <material name="rd_sensor"/>
+      </visual>
+      <collision>
+        <origin xyz="${back} 0 0" rpy="0 0 0"/>
+        <geometry><box size="${bx} ${by} ${bz}"/></geometry>
+      </collision>
+    </link>
+    <joint name="camera_mount_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="camera_link"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+
+    <!-- colour stream -->
+    <link name="camera_color_frame"/>
+    <joint name="camera_color_joint" type="fixed">
+      <parent link="camera_link"/><child link="camera_color_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_color_optical_frame"/>
+    <joint name="camera_color_optical_joint" type="fixed">
+      <parent link="camera_color_frame"/><child link="camera_color_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${OPTICAL_RPY}"/>
+    </joint>
+
+    <!-- depth stream, origin on the left imager of the stereo pair -->
+    <link name="camera_depth_frame"/>
+    <joint name="camera_depth_joint" type="fixed">
+      <parent link="camera_link"/><child link="camera_depth_frame"/>
+      <origin xyz="0 ${baseline/2} 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_depth_optical_frame"/>
+    <joint name="camera_depth_optical_joint" type="fixed">
+      <parent link="camera_depth_frame"/><child link="camera_depth_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${OPTICAL_RPY}"/>
+    </joint>
+  </xacro:macro>
+</robot>

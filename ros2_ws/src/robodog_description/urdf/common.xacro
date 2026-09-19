@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<!--
+  Generic helper macros shared by every link of the robot.
+
+  All geometry, mass and inertia come from config/robot_parameters.yaml, which
+  is regenerated from the CAD by tools/cad_to_model.py. Nothing in this file
+  hard-codes a dimension.
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- ==================== materials ==================== -->
+  <material name="rd_shell">     <color rgba="0.26 0.28 0.32 1.0"/></material>
+  <material name="rd_actuator">  <color rgba="0.88 0.42 0.09 1.0"/></material>
+  <material name="rd_structure"> <color rgba="0.72 0.74 0.78 1.0"/></material>
+  <material name="rd_foot">      <color rgba="0.10 0.10 0.12 1.0"/></material>
+  <material name="rd_bearing">   <color rgba="0.62 0.81 0.93 1.0"/></material>
+  <material name="rd_sensor">    <color rgba="0.13 0.55 0.75 1.0"/></material>
+
+  <!-- Map a CAD part name onto one of the materials above. -->
+  <xacro:macro name="rd_material_for" params="mesh">
+    <xacro:if value="${mesh == 'robstride02.stl'}"><material name="rd_actuator"/></xacro:if>
+    <xacro:if value="${mesh == 'foot_ball.stl'}"><material name="rd_foot"/></xacro:if>
+    <xacro:if value="${mesh == '61804_2rs.stl'}"><material name="rd_bearing"/></xacro:if>
+    <xacro:if value="${mesh in ['body.stl','body_panel.stl','handle.stl']}"><material name="rd_shell"/></xacro:if>
+    <xacro:if value="${mesh in ['angle_motor_connect.stl','upperleg_main.stl','upperleg_cover.stl',
+                                'inline_connect.stl','lower_leg.stl','motor_pulley.stl']}">
+      <material name="rd_structure"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <!-- ==================== inertial ==================== -->
+  <xacro:macro name="rd_inertial" params="L">
+    <inertial>
+      <mass value="${L['mass_kg']}"/>
+      <origin xyz="${L['com_xyz'][0]} ${L['com_xyz'][1]} ${L['com_xyz'][2]}" rpy="0 0 0"/>
+      <inertia ixx="${L['inertia']['ixx']}" ixy="${L['inertia']['ixy']}" ixz="${L['inertia']['ixz']}"
+               iyy="${L['inertia']['iyy']}" iyz="${L['inertia']['iyz']}" izz="${L['inertia']['izz']}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ==================== visuals (recursive over the YAML list) ==================== -->
+  <xacro:macro name="rd_visuals" params="items">
+    <xacro:if value="${len(items) > 0}">
+      <visual>
+        <origin xyz="${items[0]['xyz'][0]} ${items[0]['xyz'][1]} ${items[0]['xyz'][2]}"
+                rpy="${items[0]['rpy'][0]} ${items[0]['rpy'][1]} ${items[0]['rpy'][2]}"/>
+        <geometry>
+          <mesh filename="package://robodog_description/meshes/${items[0]['mesh']}"/>
+        </geometry>
+        <xacro:rd_material_for mesh="${items[0]['mesh']}"/>
+      </visual>
+      <xacro:rd_visuals items="${items[1:]}"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <!-- ==================== collisions (recursive over the YAML list) ====================
+       URDF has no capsule primitive, so a capsule degrades to the cylinder with
+       the same radius and segment length. MuJoCo consumes the same YAML and uses
+       a true capsule (see robodog_sim/mujoco_model.py), which is why contact
+       behaviour at the leg tips is better in simulation than a URDF-only reading
+       of this model would suggest.                                              -->
+  <xacro:macro name="rd_collisions" params="items">
+    <xacro:if value="${len(items) > 0}">
+      <xacro:property name="c" value="${items[0]}" scope="local"/>
+      <collision>
+        <xacro:if value="${c['type'] == 'box'}">
+          <origin xyz="${c['xyz'][0]} ${c['xyz'][1]} ${c['xyz'][2]}"
+                  rpy="${c['rpy'][0]} ${c['rpy'][1]} ${c['rpy'][2]}"/>
+          <geometry><box size="${c['size'][0]} ${c['size'][1]} ${c['size'][2]}"/></geometry>
+        </xacro:if>
+        <xacro:if value="${c['type'] == 'cylinder'}">
+          <origin xyz="${c['xyz'][0]} ${c['xyz'][1]} ${c['xyz'][2]}"
+                  rpy="${c['rpy'][0]} ${c['rpy'][1]} ${c['rpy'][2]}"/>
+          <geometry><cylinder radius="${c['radius']}" length="${c['length']}"/></geometry>
+        </xacro:if>
+        <xacro:if value="${c['type'] == 'sphere'}">
+          <origin xyz="${c['xyz'][0]} ${c['xyz'][1]} ${c['xyz'][2]}" rpy="0 0 0"/>
+          <geometry><sphere radius="${c['radius']}"/></geometry>
+        </xacro:if>
+        <xacro:if value="${c['type'] == 'capsule'}">
+          <!-- URDF cylinders are z-aligned and centred, so convert the capsule's
+               two endpoints into (midpoint, length, rpy aligning +z with the axis). -->
+          <xacro:property name="cap_d" scope="local"
+                          value="${[c['to_'][k] - c['from_'][k] for k in python.range(3)]}"/>
+          <xacro:property name="cap_l" scope="local"
+                          value="${(cap_d[0]**2 + cap_d[1]**2 + cap_d[2]**2)**0.5}"/>
+          <origin xyz="${(c['from_'][0]+c['to_'][0])/2} ${(c['from_'][1]+c['to_'][1])/2} ${(c['from_'][2]+c['to_'][2])/2}"
+                  rpy="0 ${atan2((cap_d[0]**2 + cap_d[1]**2)**0.5, cap_d[2])} ${atan2(cap_d[1], cap_d[0])}"/>
+          <geometry><cylinder radius="${c['radius']}" length="${cap_l}"/></geometry>
+        </xacro:if>
+      </collision>
+      <xacro:rd_collisions items="${items[1:]}"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <!-- ==================== a complete link ==================== -->
+  <xacro:macro name="rd_link" params="name L">
+    <link name="${name}">
+      <xacro:rd_inertial L="${L}"/>
+      <xacro:rd_visuals items="${L['visuals']}"/>
+      <xacro:rd_collisions items="${L['collisions']}"/>
+    </link>
+  </xacro:macro>
+
+</robot>

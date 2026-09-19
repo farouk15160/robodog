@@ -1,0 +1,169 @@
+# RViz configuration for the full robodog stack.
+#
+# Fixed frame is `odom`: it is the frame the world markers and the estimated
+# base pose are published in, and it exists in simulation and on the real robot
+# alike. Using base_link instead would pin the robot and make the world move,
+# which hides exactly the drift a state estimator is judged on.
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Robot1
+        - /World1
+        - /Camera1
+      Splitter Ratio: 0.5
+    Tree Height: 700
+  - Class: rviz_common/Views
+    Name: Views
+    Expanded: [/Current View1]
+  - Class: rviz_common/Tool Properties
+    Name: Tool Properties
+Visualization Manager:
+  Class: ""
+  Name: root
+  Global Options:
+    Background Color: 33; 36; 41
+    Fixed Frame: odom
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 24
+      Color: 70; 74; 82
+      Line Style: {Line Width: 0.02, Value: Lines}
+      Reference Frame: <Fixed Frame>
+
+    # ---------------- robot ----------------
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot
+      Enabled: true
+      Description Topic:
+        Value: /robot_description
+        Depth: 5
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+      Visual Enabled: true
+      Collision Enabled: false
+      Alpha: 1
+      Links: {All Links Enabled: true, Expand Link Details: false}
+
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: false
+      Show Arrows: false
+      Show Axes: true
+      Show Names: true
+      Marker Scale: 0.15
+      Frame Timeout: 15
+      # Off by default: 30 frames of axes obscure the robot. Enable when
+      # debugging a frame convention.
+
+    # ---------------- test environment ----------------
+    # Published by robodog_sim/world_markers from the SAME spec the MuJoCo model
+    # is generated from, so what is drawn here is what the robot collides with.
+    - Class: rviz_default_plugins/MarkerArray
+      Name: World
+      Enabled: true
+      Topic:
+        Value: /robodog/world_markers
+        Depth: 1
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+      Namespaces: {}
+
+    # ---------------- perception ----------------
+    - Class: rviz_default_plugins/PointCloud2
+      Name: DepthPoints
+      Enabled: true
+      Topic:
+        Value: /robodog/camera/depth/points
+        Depth: 2
+        Durability Policy: Volatile
+        Reliability Policy: Best Effort
+      Style: Flat Squares
+      Size (m): 0.015
+      Color Transformer: RGB8
+      Decay Time: 0
+      Position Transformer: XYZ
+
+    - Class: rviz_default_plugins/Image
+      Name: Camera
+      Enabled: true
+      Topic:
+        Value: /robodog/camera/color/image_raw
+        Depth: 2
+        Durability Policy: Volatile
+        Reliability Policy: Best Effort
+      Max Value: 1
+      Min Value: 0
+      Normalize Range: true
+
+    - Class: rviz_default_plugins/Image
+      Name: Depth
+      Enabled: false
+      Topic:
+        Value: /robodog/camera/depth/image_rect_raw
+        Depth: 2
+        Durability Policy: Volatile
+        Reliability Policy: Best Effort
+      Normalize Range: true
+
+    # ---------------- state ----------------
+    - Class: rviz_default_plugins/Odometry
+      Name: BasePose
+      Enabled: false
+      Topic:
+        Value: /robodog/odom
+        Depth: 10
+        Reliability Policy: Reliable
+      Keep: 100
+      Shape: {Alpha: 0.6, Color: 40; 200; 220, Head Length: 0.05,
+              Head Radius: 0.03, Shaft Length: 0.15, Shaft Radius: 0.012,
+              Value: Arrow}
+
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+    - Class: rviz_default_plugins/SetGoal
+      Topic: {Value: /goal_pose, Depth: 5, Reliability Policy: Reliable}
+
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Distance: 3.2
+      Focal Point: {X: 3.0, Y: 0.7, Z: 0.25}
+      Pitch: 0.42
+      Yaw: 2.6
+      Near Clip Distance: 0.05
+      Target Frame: <Fixed Frame>
+    Saved:
+      - Class: rviz_default_plugins/Orbit
+        Name: FollowRobot
+        Distance: 2.0
+        Focal Point: {X: 0, Y: 0, Z: 0.2}
+        Pitch: 0.35
+        Yaw: 2.9
+        Target Frame: base_link
+      - Class: rviz_default_plugins/Orbit
+        Name: TopDown
+        Distance: 12.0
+        Focal Point: {X: 6.0, Y: 4.5, Z: 0}
+        Pitch: 1.5697
+        Yaw: 3.1416
+        Target Frame: <Fixed Frame>
+
+Window Geometry:
+  Displays: {collapsed: false}
+  Views: {collapsed: false}
+  Camera: {collapsed: false}
+  Height: 1000
+  Width: 1700
+  QMainWindow State: ""

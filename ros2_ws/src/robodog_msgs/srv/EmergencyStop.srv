@@ -1,0 +1,9 @@
+# engage=true  : inhibit all actuator output immediately and latch.
+# engage=false : clear the latch. Fails while any fault condition is still
+#                active, so a stuck over-temperature cannot be cleared away.
+bool   engage
+string reason
+---
+bool   success
+bool   latched
+string message

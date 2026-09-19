@@ -1,0 +1,49 @@
+# =============================================================================
+# Web GUI configuration.
+# =============================================================================
+# The front end builds itself from this file: it fetches /api/config on load and
+# renders exactly the panels listed, in the given order, with the given options.
+# Adding, removing or reordering a panel is a change here, not in JavaScript.
+robodog_web:
+  port: 8080
+  host: "0.0.0.0"
+  stream_rate_hz: 20.0      # telemetry push rate; the UI redraws at this rate
+  video_rate_hz: 10.0       # MJPEG frame rate, independent of telemetry
+  video_quality: 70         # JPEG quality
+  video_max_width: 640      # downscale before encoding; the GUI does not need
+                            # 1280 px to show what the camera is pointing at
+
+  # Operator safety. The GUI can command the robot, so what it is allowed to
+  # command is configuration, not a hard-coded constant in the browser.
+  limits:
+    max_linear_velocity: 0.6     # m/s, applied to the velocity sliders
+    max_angular_velocity: 1.2    # rad/s
+    manual_joint_step_rad: 0.05  # per click in the joint jog panel
+    require_confirm_for_gait: true
+    # Joint jogging is disabled by default: it bypasses the gait layer and is
+    # the easiest way to put a leg somewhere the body cannot support.
+    enable_joint_jog: false
+
+  panels:
+    - {id: estop,       title: "Emergency Stop",   enabled: true,  order: 10, width: 1}
+    - {id: state,       title: "Robot State",      enabled: true,  order: 20, width: 1}
+    - {id: controller,  title: "Controller",       enabled: true,  order: 30, width: 1}
+    - {id: safety,      title: "Safety",           enabled: true,  order: 40, width: 1}
+    - {id: pose,        title: "Poses",            enabled: true,  order: 50, width: 1}
+    - {id: gait,        title: "Gait & Velocity",  enabled: true,  order: 60, width: 2}
+    - {id: joints,      title: "Joints",           enabled: true,  order: 70, width: 4}
+    - {id: feet,        title: "Feet & Contact",   enabled: true,  order: 80, width: 2}
+    - {id: camera,      title: "Camera",           enabled: true,  order: 90, width: 2}
+    - {id: simulation,  title: "Simulation",       enabled: true,  order: 100, width: 1}
+    - {id: errors,      title: "Errors & Events",  enabled: true,  order: 110, width: 3}
+    - {id: jointtest,   title: "Joint Test",       enabled: false, order: 120, width: 2}
+
+  # Colour thresholds, as fractions of the configured limit. Shared by every
+  # bar and badge so "amber" means the same thing everywhere in the UI.
+  thresholds:
+    torque_warn: 0.70
+    torque_alarm: 0.95
+    temperature_warn_c: 70.0
+    temperature_alarm_c: 85.0
+    velocity_warn: 0.70
+    tracking_error_warn_rad: 0.05

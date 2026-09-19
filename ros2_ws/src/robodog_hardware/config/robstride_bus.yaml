@@ -1,0 +1,51 @@
+# =============================================================================
+# CAN topology and per-joint motor mapping for the real robot.
+# =============================================================================
+# Consumed only by robodog_hardware/backends/robstride_can.py. Nothing above the
+# hardware boundary reads this file, which is why simulation needs no equivalent.
+#
+# COMMISSIONING: `direction` and `offset_rad` are the ONLY place where motor
+# coordinates and canonical joint coordinates differ. Both are unknown until the
+# robot is assembled. Determine them with:
+#     ros2 run robodog_hardware calibrate_joint --joint FL_haa_joint
+# which drives a small torque, observes the sign of motion against the URDF
+# convention, then drives to a mechanical stop of known angle to fix the offset.
+# Until that has been run, leave enable_on_start false.
+
+host_id: 0xFD               # host node id used in the RS02 identifier
+control_rate_hz: 400        # per-joint command rate; 2 buses -> 72% load
+feedback_timeout_s: 0.05    # a joint stale for longer raises FAULT_COMMUNICATION
+enable_on_start: false      # never energise before calibration has been signed off
+
+# Two buses at 400 Hz: 6 motors x 2 frames x 150 bits x 400 Hz = 720 kbit/s per
+# bus = 72% of 1 Mbit/s. One bus cannot carry all 12 motors above 250 Hz, and
+# two buses at 500 Hz reach 90% with no margin for retransmission -- see the
+# bus budget table in robodog_description/config/robstride02.yaml.
+# Front/rear split rather than left/right: each bus carries a complete leg
+# PAIR, so a single bus failure leaves the robot in a recognisable posture
+# (front down or rear down) instead of a diagonal collapse.
+buses:
+  - id: 0
+    channel: can0
+    interface: socketcan
+    bitrate: 1000000
+    note: front legs (FL, FR)
+  - id: 1
+    channel: can1
+    interface: socketcan
+    bitrate: 1000000
+    note: rear legs (RL, RR)
+
+joints:
+  FL_haa_joint: {bus: 0, motor_id: 1, direction:  1, offset_rad: 0.0}
+  FL_hfe_joint: {bus: 0, motor_id: 2, direction:  1, offset_rad: 0.0}
+  FL_kfe_joint: {bus: 0, motor_id: 3, direction:  1, offset_rad: 0.0}
+  FR_haa_joint: {bus: 0, motor_id: 4, direction:  1, offset_rad: 0.0}
+  FR_hfe_joint: {bus: 0, motor_id: 5, direction:  1, offset_rad: 0.0}
+  FR_kfe_joint: {bus: 0, motor_id: 6, direction:  1, offset_rad: 0.0}
+  RL_haa_joint: {bus: 1, motor_id: 1, direction:  1, offset_rad: 0.0}
+  RL_hfe_joint: {bus: 1, motor_id: 2, direction:  1, offset_rad: 0.0}
+  RL_kfe_joint: {bus: 1, motor_id: 3, direction:  1, offset_rad: 0.0}
+  RR_haa_joint: {bus: 1, motor_id: 4, direction:  1, offset_rad: 0.0}
+  RR_hfe_joint: {bus: 1, motor_id: 5, direction:  1, offset_rad: 0.0}
+  RR_kfe_joint: {bus: 1, motor_id: 6, direction:  1, offset_rad: 0.0}

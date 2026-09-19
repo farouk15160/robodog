@@ -1,0 +1,53 @@
+robodog
+Copyright 2026 Farouk
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+--------------------------------------------------------------------------
+THIRD-PARTY CONTENT
+--------------------------------------------------------------------------
+
+This repository contains CAD geometry produced by third parties. It is
+included so that the CAD -> URDF pipeline is reproducible. It is NOT covered
+by the Apache-2.0 licence above and remains the property of its respective
+owners, redistributed here under their original terms.
+
+1. cad/actuators/robstride02_official.step
+   ROBSTRIDE RS02 actuator, published by RobStride at
+   https://github.com/RobStride/Product_Information
+   Provenance, including the source URL and a SHA-256 of the original file,
+   is recorded in cad/actuators/provenance.json.
+
+2. cad/robot/onshape_export/meshes/RMDX8V3.stl
+   MyActuator RMD-X8 V3 geometry, imported into the Onshape assembly as a
+   placeholder during design. It is NOT used by the generated robot model:
+   tools/cad_to_model.py substitutes the ROBSTRIDE02 envelope and mass in its
+   place. Retained only so the original assembly can be re-imported.
+
+If you are the owner of either and would prefer it not be redistributed here,
+open an issue and it will be removed; the pipeline can regenerate from a
+locally supplied copy instead.
+
+--------------------------------------------------------------------------
+DEPENDENCIES
+--------------------------------------------------------------------------
+
+This software builds on, but does not vendor, the following. Each is used
+under its own licence and must be obtained separately:
+
+  ROS 2 Jazzy Jalisco        Apache-2.0
+  MuJoCo                     Apache-2.0
+  NumPy, SciPy               BSD-3-Clause
+  aiohttp                    Apache-2.0
+  Pillow                     MIT-CMU
+  python-can (optional)      LGPL-3.0

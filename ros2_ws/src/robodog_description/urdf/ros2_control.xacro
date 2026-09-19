@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<!--
+  ros2_control interface contract.
+
+  STATUS: declared, not yet implemented (Phase 2). Default `use_ros2_control`
+  is false, so nothing loads this block today. It is kept in-tree because it is
+  the formal, machine-readable statement of the hardware boundary: the exact
+  state and command interfaces that robodog_hardware's Python backends
+  implement now, and that the C++ SystemInterface plugins must implement when
+  the control loop moves into controller_manager.
+
+  The command interface set is deliberately the ROBSTRIDE02 native impedance
+  command (position, velocity, effort, kp, kd) rather than a single position
+  interface, because that is what the motor accepts on CAN in one frame. Any
+  narrower interface would force the driver to close a loop the motor already
+  closes in firmware at a much higher rate.
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="rd_ros2_control" params="name hardware P RS">
+    <ros2_control name="${name}" type="system">
+      <hardware>
+        <xacro:if value="${hardware == 'sim'}">
+          <plugin>robodog_hardware/MujocoSystem</plugin>
+          <param name="model_path">$(find robodog_sim)/models/robodog_scene.xml</param>
+        </xacro:if>
+        <xacro:if value="${hardware == 'real'}">
+          <plugin>robodog_hardware/RobStride02CanSystem</plugin>
+          <param name="bus_config">$(find robodog_hardware)/config/robstride_bus.yaml</param>
+        </xacro:if>
+      </hardware>
+
+      <xacro:macro name="rd_joint_iface" params="jname jkind">
+        <joint name="${jname}">
+          <!-- command: the RS02 motion-control frame, one CAN message -->
+          <command_interface name="position">
+            <param name="min">${P['joint_limits'][jkind]['lower']}</param>
+            <param name="max">${P['joint_limits'][jkind]['upper']}</param>
+          </command_interface>
+          <command_interface name="velocity">
+            <param name="min">${-RS['operational_limits']['velocity_rad_s']}</param>
+            <param name="max">${ RS['operational_limits']['velocity_rad_s']}</param>
+          </command_interface>
+          <command_interface name="effort">
+            <param name="min">${-RS['performance']['peak_torque_nm']}</param>
+            <param name="max">${ RS['performance']['peak_torque_nm']}</param>
+          </command_interface>
+          <command_interface name="kp"><param name="min">0.0</param><param name="max">500.0</param></command_interface>
+          <command_interface name="kd"><param name="min">0.0</param><param name="max">5.0</param></command_interface>
+          <!-- state: the RS02 feedback frame -->
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+          <state_interface name="effort"/>
+          <state_interface name="temperature"/>
+        </joint>
+      </xacro:macro>
+
+      <xacro:macro name="rd_leg_iface" params="leg">
+        <xacro:rd_joint_iface jname="${leg}_haa_joint" jkind="haa"/>
+        <xacro:rd_joint_iface jname="${leg}_hfe_joint" jkind="hfe"/>
+        <xacro:rd_joint_iface jname="${leg}_kfe_joint" jkind="kfe"/>
+      </xacro:macro>
+
+      <xacro:rd_leg_iface leg="FL"/>
+      <xacro:rd_leg_iface leg="FR"/>
+      <xacro:rd_leg_iface leg="RL"/>
+      <xacro:rd_leg_iface leg="RR"/>
+
+      <sensor name="imu">
+        <state_interface name="orientation.x"/>      <state_interface name="orientation.y"/>
+        <state_interface name="orientation.z"/>      <state_interface name="orientation.w"/>
+        <state_interface name="angular_velocity.x"/> <state_interface name="angular_velocity.y"/>
+        <state_interface name="angular_velocity.z"/>
+        <state_interface name="linear_acceleration.x"/> <state_interface name="linear_acceleration.y"/>
+        <state_interface name="linear_acceleration.z"/>
+      </sensor>
+    </ros2_control>
+  </xacro:macro>
+</robot>

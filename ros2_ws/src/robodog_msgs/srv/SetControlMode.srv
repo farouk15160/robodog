@@ -1,0 +1,6 @@
+# Switch the joint-level control mode. Refused while an e-stop is latched.
+uint8    mode           # JointCommand.MODE_*
+string[] joints         # empty = all 12
+---
+bool   success
+string message

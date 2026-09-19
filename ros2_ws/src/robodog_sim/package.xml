@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>robodog_sim</name>
+  <version>0.1.0</version>
+  <description>
+    MuJoCo simulation assets for the robodog quadruped: the MJCF generator
+    driven by robot_parameters.yaml, the five-room test house, and the RViz
+    marker publisher that renders the same world description.
+  </description>
+  <maintainer email="farouk15160@gmail.com">farouk</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>visualization_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <exec_depend>robodog_description</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <!-- optional: mujoco (pip install mujoco) -->
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export><build_type>ament_python</build_type></export>
+</package>

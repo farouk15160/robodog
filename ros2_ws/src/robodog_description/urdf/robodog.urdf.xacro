@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<!--
+  =========================================================================
+  robodog - 12-DOF quadruped, 12 x ROBSTRIDE02 QDD actuators, 10 kg target
+  =========================================================================
+  Derived from cad/robot/onshape_export by tools/cad_to_model.py. Every number
+  used here comes from one of two generated/curated config files; this file
+  contains no hard-coded geometry.
+
+    config/robot_parameters.yaml  kinematics, inertias, visuals, collisions
+    config/robstride02.yaml       actuator limits, dynamics, CAN scaling
+
+  Frames (REP-103): x forward, y left, z up. base_link at the body geometric
+  centre, which is also within 3.6 mm of the centre of mass.
+
+  Usage:
+    xacro robodog.urdf.xacro hardware:=sim
+    xacro robodog.urdf.xacro hardware:=real use_ros2_control:=true
+-->
+<robot name="robodog" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- ==================== arguments ==================== -->
+  <!-- Selects which hardware backend the *metadata* describes. It does not
+       change a single link or joint: the kinematics are identical in sim and
+       on the real robot by construction. -->
+  <xacro:arg name="hardware"         default="sim"/>
+  <xacro:arg name="use_ros2_control" default="false"/>
+  <xacro:arg name="use_camera"       default="true"/>
+  <!-- Downward tilt of the depth camera, positive = looking down. Overrides
+       camera_mount.pitch_rad from robot_parameters.yaml; -1 keeps that value. -->
+  <xacro:arg name="camera_pitch"     default="-1"/>
+  <!-- Fixes base_link to the world. Useful for joint-level bring-up and for
+       RViz-only inspection without a physics engine. -->
+  <xacro:arg name="fixed_base"       default="false"/>
+
+  <xacro:property name="PKG" value="$(find robodog_description)"/>
+  <xacro:property name="P"   value="${xacro.load_yaml(PKG + '/config/robot_parameters.yaml')}"/>
+  <xacro:property name="RS"  value="${xacro.load_yaml(PKG + '/config/robstride02.yaml')}"/>
+
+  <xacro:include filename="$(find robodog_description)/urdf/common.xacro"/>
+  <xacro:include filename="$(find robodog_description)/urdf/leg.xacro"/>
+  <xacro:include filename="$(find robodog_description)/urdf/sensors.xacro"/>
+  <xacro:include filename="$(find robodog_description)/urdf/ros2_control.xacro"/>
+
+  <!-- ==================== body ==================== -->
+  <xacro:rd_link name="base_link" L="${P['links']['base']}"/>
+
+  <xacro:if value="$(arg fixed_base)">
+    <link name="world"/>
+    <joint name="world_to_base" type="fixed">
+      <parent link="world"/><child link="base_link"/>
+      <origin xyz="0 0 ${P['named_poses']['stand']['base_height_m']}" rpy="0 0 0"/>
+    </joint>
+  </xacro:if>
+
+  <!-- ==================== legs ==================== -->
+  <xacro:rd_leg leg="FL" P="${P}" RS="${RS}"/>
+  <xacro:rd_leg leg="FR" P="${P}" RS="${RS}"/>
+  <xacro:rd_leg leg="RL" P="${P}" RS="${RS}"/>
+  <xacro:rd_leg leg="RR" P="${P}" RS="${RS}"/>
+
+  <!-- ==================== sensors ==================== -->
+  <xacro:rd_imu parent="base_link" xyz="0 0 0"/>
+
+  <xacro:if value="$(arg use_camera)">
+    <!-- Mount pose comes from robot_parameters.yaml so the URDF and the MuJoCo
+         model cannot disagree about where the camera is. -->
+    <xacro:property name="CM" value="${P['camera_mount']}"/>
+    <!-- '>=' rather than '<': a literal '<' is not legal inside an XML
+         attribute value, and xacro evaluates the expression after parsing. -->
+    <xacro:property name="cam_pitch"
+                    value="${$(arg camera_pitch) if $(arg camera_pitch) >= 0 else CM['pitch_rad']}"/>
+    <xacro:property name="mast_top" value="${CM['xyz'][2]}" scope="global"/>
+    <xacro:property name="mast_height" value="${CM['xyz'][2] - CM['mast_base_z_m']}" scope="global"/>
+    <xacro:rd_camera parent="base_link"
+                     xyz="${CM['xyz'][0]} ${CM['xyz'][1]} ${CM['xyz'][2]}"
+                     rpy="0 ${cam_pitch} 0"
+                     mast_section="${CM['mast_section_m']}"
+                     mast_base_z="${CM['mast_base_z_m']}"
+                     mast_x="${CM['xyz'][0]}"/>
+  </xacro:if>
+
+  <!-- ==================== control interface ==================== -->
+  <xacro:if value="$(arg use_ros2_control)">
+    <xacro:rd_ros2_control name="robodog_system" hardware="$(arg hardware)" P="${P}" RS="${RS}"/>
+  </xacro:if>
+
+</robot>
