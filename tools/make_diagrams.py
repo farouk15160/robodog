@@ -80,7 +80,7 @@ def software_architecture() -> Diagram:
     d.box("sim", 890, 150, 210, 70, "robodog_sim", "MJCF + worlds", kind="package")
     d.box("hw", 330, 300, 250, 70, "robodog_hardware", "backends + RS02 codec", kind="package")
     d.box("desc", 620, 300, 230, 70, "robodog_description", "URDF, meshes, RViz", kind="package")
-    d.box("msgs", 430, 440, 300, 65, "robodog_msgs", "msg / srv definitions", kind="package")
+    d.box("msgs", 380, 440, 210, 65, "robodog_msgs", "msg / srv definitions", kind="package")
 
     d.box("gen", 60, 440, 300, 65, "tools/cad_to_model.py", "CAD -> robot_parameters.yaml",
           kind="store", dashed=True)
@@ -121,19 +121,21 @@ def node_topic_graph() -> Diagram:
 
     d.box("t_js", 480, 190, 290, 46, "/joint_states", "sensor_msgs/JointState  100 Hz", kind="topic")
     d.box("t_tf", 830, 190, 250, 46, "/tf", "odom -> base_link", kind="topic")
-    d.box("t_rs", 480, 480, 290, 46, "/robodog/robot_state", "RobotState  50 Hz", kind="topic")
-    d.box("t_ss", 830, 480, 250, 46, "/robodog/safety_status", "SafetyStatus", kind="topic")
-    d.box("t_jc", 170, 480, 270, 46, "/robodog/joint_command", "JointCommandArray", kind="topic")
-    d.box("t_gc", 170, 550, 270, 46, "/robodog/gait_command", "GaitCommand", kind="topic")
-    d.box("t_cv", 170, 620, 270, 46, "/cmd_vel", "geometry_msgs/Twist", kind="topic")
-    d.box("t_imu", 830, 550, 250, 46, "/robodog/imu", "sensor_msgs/Imu", kind="topic")
     d.box("t_wm", 60, 190, 250, 46, "/robodog/world_markers", "MarkerArray (latched)", kind="topic")
 
-    d.box("t_col", 60, 620, 250, 40, "camera/color/image_raw", kind="topic")
-    d.box("t_dep", 60, 670, 250, 40, "camera/depth/image_rect_raw", kind="topic")
-    d.box("t_pc", 60, 720, 250, 40, "camera/depth/points", "PointCloud2  10 Hz", kind="topic")
+    # inputs on the left, outputs on the right, services in the middle
+    d.box("t_jc", 60, 470, 270, 46, "/robodog/joint_command", "JointCommandArray", kind="topic")
+    d.box("t_gc", 60, 530, 270, 46, "/robodog/gait_command", "GaitCommand", kind="topic")
+    d.box("t_cv", 60, 590, 270, 46, "/cmd_vel", "geometry_msgs/Twist", kind="topic")
+    d.box("t_col", 60, 660, 270, 42, "camera/color/image_raw", kind="topic")
+    d.box("t_dep", 60, 710, 270, 42, "camera/depth/image_rect_raw", kind="topic")
+    d.box("t_pc", 60, 760, 270, 42, "camera/depth/points", "PointCloud2  10 Hz", kind="topic")
 
-    d.box("srv", 480, 620, 290, 140, "Services",
+    d.box("t_rs", 480, 470, 290, 46, "/robodog/robot_state", "RobotState  50 Hz", kind="topic")
+    d.box("t_ss", 830, 470, 250, 46, "/robodog/safety_status", "SafetyStatus", kind="topic")
+    d.box("t_imu", 830, 530, 250, 46, "/robodog/imu", "sensor_msgs/Imu", kind="topic")
+
+    d.box("srv", 480, 580, 290, 150, "Services",
           "set_named_pose\nset_gait\nset_control_mode\nenable_joints\nemergency_stop",
           kind="service")
 
