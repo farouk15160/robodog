@@ -9,6 +9,28 @@
 #
 # Stride length is NOT configured: it follows from the commanded velocity and
 # the stance duration, and is clamped to 45% of leg reach by the generator.
+#
+# STANCE HEIGHT IS THE CHEAPEST TORQUE LEVER THERE IS -- and it is not free.
+# Holding a load costs torque proportional to the horizontal distance from the
+# knee to the foot, and standing taller straightens the leg and shrinks it.
+# But a straighter leg also has a worse-conditioned Jacobian, so the balance
+# layer has less authority to correct attitude with. Measured over a 0.3 m/s
+# trot (tools/design_study.py, tools/torque_report.py):
+#
+#     stance   RMS torque   of continuous   body tilt   leg travel left
+#      300 mm     13.9 N.m        231%         2.5 deg       150 mm
+#      320 mm     10.4 N.m        173%         2.6 deg       130 mm   <- default
+#      340 mm      8.0 N.m        134%         5.2 deg       110 mm
+#      360 mm      5.9 N.m         99%         4.0 deg        90 mm
+#
+# 360 mm reaches the continuous rating outright, which is tempting. It is not
+# the default, for two reasons. At 340 mm and above the balance layer stops
+# measurably improving attitude over no balance at all, so the gain is bought
+# by stiffening the leg rather than by controlling it. And the gait is known
+# not to track velocity yet: choosing a posture to flatter a controller that is
+# about to be rewritten is fitting to a fiction.
+#
+# Raising this is the FIRST thing to try once locomotion works.
 gaits:
   stand:
     step_frequency_hz: 0.0

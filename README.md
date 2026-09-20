@@ -245,6 +245,40 @@ This is the strongest argument for doing hardware bring-up and system
 identification *before* chasing locomotion, and it is tracked as an
 expected-failure test so it turns green on its own once the gait is fixed.
 
+<details>
+<summary><b>Design study: would shorter legs help?</b> (measured — click to expand)</summary>
+
+Short answer: barely, and not for the reason it seems. Run
+`python3 tools/design_study.py` to reproduce.
+
+**Mass is not where the weight is.** Only the long parts of the thigh and shank
+scale with leg length — 320 g per leg out of 10 kg. Shortening the legs 20 %
+saves **256 g, or 2.6 %**. The actuators (4.56 kg) and the electronics
+(1.11 kg) do not shrink.
+
+**Torque does fall, but stance height is the same lever and it is free.**
+Holding a load costs torque proportional to the horizontal distance from knee
+to foot. Shorter links shrink it; so does standing taller, because both
+straighten the leg. At a fixed 320 mm ride height:
+
+| leg scale | links | mass | stance torque | leg travel left |
+|---|---|---:|---:|---:|
+| 1.00 | 213 / 217 mm | 10.00 kg | 63 % of continuous | 130 mm |
+| 0.90 | 192 / 196 mm | 9.87 kg | 49 % | 87 mm |
+| 0.80 | 170 / 174 mm | 9.74 kg | 34 % | 44 mm |
+
+**The cost is terrain capability.** At 0.80 scale the robot has 44 mm of leg
+travel left to lift a foot with — it could no longer climb its own 80 mm
+stairs. That is disqualifying for an indoor robot, and it is why quadrupeds
+stand at 60–75 % of leg extension rather than 85 %+.
+
+**And it would not fix the real problem.** A 20 % leg reduction buys roughly
+45 % less torque; the gait is drawing 173 % of continuous. You would land near
+95 % — still no margin — having permanently given up the stairs. The 3× excess
+is the controller, not the geometry.
+
+</details>
+
 See §6.6 of [the documentation](docs/robodog_architecture.pdf) for the measured
 numbers, and [CONTRIBUTING.md](CONTRIBUTING.md) if you would like to help.
 
