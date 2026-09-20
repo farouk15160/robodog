@@ -609,11 +609,58 @@ slow walk makes forward progress, at the cost of attitude.
 The force-to-motion path is verified correct in isolation --- commanding
 $+30$\,N of ground reaction with all four feet planted moves the robot forward
 0.52\,m, and $-30$\,N moves it backward --- so this is a tuning and timing
-problem, not a sign or architecture error. What it needs is work that only
-makes sense against identified dynamics: co-tuning stance compliance, swing
-timing and placement gains, contact detection instead of a fixed schedule, and
-slip handling. That is deliberately outside the scope of a first architecture,
-and none of it changes an interface.
+problem, not a sign or architecture error.
+\end{caveat}
+
+\subsection{Thermal load, and why the gait is not yet safe for hardware}
+\label{sec:thermal-load}
+
+Peak torque is the wrong question to ask of a motor. What decides whether a
+winding survives is the RMS torque, because copper loss goes as current
+squared: a \RdTorquePeak\,N$\cdot$m spike lasting 20\,ms is harmless, and
+10\,N$\cdot$m sustained is not. Measured over six seconds of each gait, with
+the start-up transient discarded:
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrl@{}}
+\toprule
+\textbf{Gait} & \textbf{peak} & \textbf{p99} & \textbf{RMS} &
+\textbf{RMS / cont.} & \textbf{$T_\infty$} & \textbf{Verdict} \\
+ & (N$\cdot$m) & (N$\cdot$m) & (N$\cdot$m) & & ($^\circ$C) & \\
+\midrule
+stand         &  3.9 &  3.9 &  3.9 & 65\,\%  &  45 & sustainable \\
+walk 0.15     & 17.0 & 15.0 &  8.5 & 141\,\% & 139 & over limit \\
+trot 0.30     & 17.0 & 17.0 & 10.4 & 173\,\% & 198 & over limit \\
+trot 0.50     & 17.0 & 17.0 & 12.0 & 201\,\% & 260 & over limit \\
+bound 0.30    & 17.0 & 17.0 & 11.2 & 187\,\% & 228 & over limit \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{caveat}{The current gait would destroy the actuators}
+Every travelling gait sits above the \RdTorqueCont\,N$\cdot$m continuous
+rating in RMS, saturates at the \RdTorquePeak\,N$\cdot$m peak for a quarter to
+a third of the time, and implies steady-state winding temperatures from
+139 to 260\,$^\circ$C. Neodymium magnets begin to demagnetise well below the
+upper end of that range.
+
+The diagnosis is \emph{not} that the actuators are undersized. Standing costs
+3.9\,N$\cdot$m RMS --- 65\,\% of continuous, settling at a comfortable
+45\,$^\circ$C --- and walking a 10\,kg robot should not cost three times the
+RMS of holding it still. The excess is the controller fighting itself: the same
+defect that stops the robot travelling is dissipating the torque as heat
+instead of as forward motion.
+
+The safety layer does catch it. The $I^2t$ integrator exhausts its budget in
+about two seconds and derates the limit to continuous, which is exactly what it
+is for --- but a robot that derates mid-stride falls over. This is the
+strongest argument for the bring-up order in Section~\ref{sec:migration}:
+locomotion must be fixed, against identified dynamics, before a gait is ever
+commanded on hardware.
+
+Tracked as an expected-failure test (\code{test\_trot\_is\_thermally\_sustainable})
+so it turns green on its own when the gait is fixed, and measurable at any time
+with \code{tools/torque\_report.py}.
 \end{caveat}
 
 \subsection{State estimation}
@@ -784,7 +831,17 @@ collides with in MuJoCo; two hand-maintained files would drift, and the drift
 would look like a perception bug.
 \end{decision}
 
-The five-room house is 12\,$\times$\,9\,m and contains every indoor locomotion
+Two worlds ship. \code{flat} is an open-air proving ground, 24\,$\times$\,24\,m,
+with eight independent lanes radiating from the spawn so that each locomotion
+problem can be attempted on its own: a measured run with metre markers for
+velocity tuning, a step ladder from 40 to 200\,mm, a stair complex (six
+80\,mm steps up, a landing, six down, and a 130\,mm flight beside it), slopes
+at 5, 10, 15 and 20$^\circ$, a 196-tile rough-terrain field, stepping stones,
+a gap course widening from 100 to 280\,mm, and a 220\,mm balance beam with a
+pole slalom. Gait work should not be debugged against furniture at the same
+time, which is why it is separate from the house.
+
+\code{house} is 12\,$\times$\,9\,m and contains every indoor locomotion
 problem the robot must solve, each with enough approach room to be attempted in
 isolation:
 

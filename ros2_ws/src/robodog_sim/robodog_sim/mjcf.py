@@ -73,7 +73,11 @@ def pretty(root: ET.Element) -> str:
 # Absolute clipping planes for the simulated depth camera, in metres. They
 # bracket the NUWA HP60C's 0.15-6 m usable range with margin.
 CAMERA_ZNEAR_M = 0.05
-CAMERA_ZFAR_M = 30.0
+# 60 m, not 30: the proving ground is 24 m across, and a free camera framing
+# the whole of it sits far enough back that 30 m clipped the scene to nothing.
+# Depth precision at the sensor's 6 m range is unaffected -- with znear at
+# 0.05 m the buffer resolution there is still under 0.1 mm.
+CAMERA_ZFAR_M = 60.0
 
 
 def add_defaults(root: ET.Element, rs: dict, timestep: float,

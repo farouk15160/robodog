@@ -439,3 +439,97 @@ def test_trotting_without_balance_is_measurably_worse(models_dir, RS, P):
     assert with_b["tilt"] < without["tilt"], (
         f"balance made attitude no better: {with_b['tilt']:.1f} vs "
         f"{without['tilt']:.1f} deg")
+
+
+# --------------------------------------------------------------------------- #
+# thermal load
+# --------------------------------------------------------------------------- #
+def _rms_torque(models_dir, RS, P, gait_name, vx, seconds=6.0):
+    """Peak and worst-joint RMS torque over a gait, skipping the transient."""
+    import yaml as _yaml
+    from ament_index_python.packages import get_package_share_directory
+    from robodog_control.balance import roll_pitch_from_quat
+    from robodog_control.gait import BodyFeedback, GaitGenerator, GaitParams
+    from robodog_control.kinematics import LegGeometry
+    from robodog_hardware.registry import create_backend
+    from robodog_hardware.types import ControlMode, JointCommand
+
+    with open(os.path.join(get_package_share_directory("robodog_control"),
+                           "config", "gaits.yaml")) as f:
+        gaits = _yaml.safe_load(f)["gaits"]
+    pose = P["named_poses"]["stand"]
+    q0 = np.array([pose["haa"], pose["hfe"], pose["kfe"]])
+    g = LegGeometry.from_params(P)
+    b = create_backend("mujoco", dict(
+        model_path=os.path.join(models_dir, "robodog_scene.xml"), keyframe="stand",
+        peak_torque_nm=RS["performance"]["peak_torque_nm"],
+        no_load_speed_rad_s=RS["performance"]["no_load_speed_rad_s"]))
+    b.configure()
+    b.enable()
+    gen = GaitGenerator(g, q0, P["mass_budget"]["total_kg"])
+    d = gaits[gait_name]
+    gen.set_params(GaitParams(gait=gait_name, step_frequency_hz=d["step_frequency_hz"],
+                              step_height_m=d["step_height_m"], duty_factor=d["duty_factor"],
+                              stance_height_m=d["stance_height_m"], vx=vx))
+    dt, log = 1 / 400.0, []
+    for i in range(int(seconds / dt)):
+        bs = b.base_state()
+        roll, pitch = roll_pitch_from_quat(bs.orientation)
+        fb = BodyFeedback(height=float(bs.position[2]), vz=float(bs.linear_velocity[2]),
+                          roll=roll, pitch=pitch, omega=tuple(bs.angular_velocity),
+                          v_xy=(float(bs.linear_velocity[0]), float(bs.linear_velocity[1])))
+        out = gen.update(dt, fb)
+        c = JointCommand()
+        c.mode[:] = int(ControlMode.IMPEDANCE)
+        c.position[:] = out.q
+        c.velocity[:] = out.qd
+        c.effort[:] = out.tau_ff
+        c.kp[:] = np.repeat(np.where(out.contact, 90.0, 60.0), 3)
+        c.kd[:] = np.repeat(np.where(out.contact, 2.0, 1.5), 3)
+        b.write(c)
+        b.step(dt)
+        if i * dt > 1.0:
+            log.append(np.abs(b.read().effort))
+    b.shutdown()
+    t = np.array(log)
+    return float(t.max()), float(np.sqrt((t ** 2).mean(axis=0)).max())
+
+
+def _steady_temp(rms, RS):
+    el, th = RS["electrical"], RS["thermal"]
+    return (th["ambient_temp_c"] + 3 * (rms / el["torque_constant_nm_per_arms"]) ** 2
+            * el["phase_resistance_ohm"] * th["thermal_resistance_k_per_w"])
+
+
+def test_standing_is_thermally_sustainable(models_dir, RS, P):
+    """Standing indefinitely must not cook the windings. RMS, not peak, is what
+    decides that: copper loss goes as current squared."""
+    _, rms = _rms_torque(models_dir, RS, P, "stand", 0.0)
+    cont = RS["operational_limits"]["continuous_torque_nm"]
+    temp = _steady_temp(rms, RS)
+    assert rms < cont, f"{rms:.2f} N.m RMS exceeds the {cont} N.m continuous rating"
+    assert temp < RS["operational_limits"]["temperature_warn_c"], (
+        f"standing would settle at {temp:.0f} C")
+
+
+@pytest.mark.xfail(strict=False, reason=(
+    "Known gap: the gait draws far more torque than the work requires because "
+    "it does not yet track velocity -- the legs fight the ground instead of "
+    "propelling the body. Standing needs 3.9 N.m RMS; a 0.3 m/s trot needs "
+    "10.4, which is 173% of the continuous rating and would settle near 200 C. "
+    "Tracked here rather than only in prose so it turns green on its own when "
+    "locomotion is fixed. See the locomotion status section of the docs."))
+def test_trot_is_thermally_sustainable(models_dir, RS, P):
+    peak, rms = _rms_torque(models_dir, RS, P, "trot", 0.30)
+    cont = RS["operational_limits"]["continuous_torque_nm"]
+    temp = _steady_temp(rms, RS)
+    assert rms < cont, (
+        f"trot draws {rms:.2f} N.m RMS ({rms/cont:.0%} of continuous), peak "
+        f"{peak:.1f}, implying {temp:.0f} C steady state")
+
+
+def test_the_thermal_model_agrees_with_the_datasheet(RS):
+    """Sanity check on the numbers the two tests above depend on: continuous
+    rated torque should settle around the calibration point."""
+    cont = RS["operational_limits"]["continuous_torque_nm"]
+    assert _steady_temp(cont, RS) == pytest.approx(80.0, abs=3.0)

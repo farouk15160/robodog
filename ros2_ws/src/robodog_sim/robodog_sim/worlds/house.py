@@ -30,7 +30,9 @@ turns a designed challenge into a wall or an open field.
 """
 from __future__ import annotations
 
-from ..world_spec import DOOR_W, Prim, World, Waypoint, ramp, stairs, table, wall
+from ..world_spec import (DOOR_W, Prim, World, Waypoint, balance_beam, gap_course,
+                          ramp, stairs, stairs_down, stepping_stones, table,
+                          terrain_tiles, wall)
 
 W, H = 12.0, 9.0
 MID_X, MID_Y = 4.5, 4.5
@@ -140,25 +142,87 @@ def build() -> World:
 
 
 def build_flat() -> World:
-    """Bare ground plus a calibration course. The DEFAULT world: gait work
-    should not be debugged against a house at the same time."""
-    w = World("flat", size=(14.0, 14.0), centred=True)
-    for d in (1, 2, 3):
-        w.add(Prim(f"marker_{d}m", "box", (float(d), 0.0, 0.003), (0.06, 0.60, 0.006),
+    """Open-air proving ground, 24 x 24 m, spawn at the centre.
+
+    Eight independent lanes radiating from the origin, so each locomotion
+    problem can be attempted on its own without first crossing the others.
+    The house is for navigation; this is for gait and terrain work, and gait
+    work should not be debugged against furniture at the same time.
+
+        +x  measured run      flat, 1 m markers, for velocity tuning
+        -x  step ladder       single steps 40 -> 200 mm
+        +y  stairs            6 x 80 mm up, landing, 6 x 80 mm down
+                              and a 4 x 130 mm flight beside it
+        -y  slopes            5, 10, 15, 20 degrees
+        NE  rough terrain     196 tiles, 12-70 mm, seeded
+        NW  stepping stones   discrete pillars with gaps
+        SE  gap course        platforms split by 100 -> 280 mm gaps
+        SW  balance beam      220 mm wide, plus a slalom
+    """
+    w = World("flat", size=(24.0, 24.0), centred=True)
+
+    # ---------------- +x : measured run ----------------
+    # A clean lane with metre markers. Velocity tracking is measured here, not
+    # inferred from a gait that is also fighting terrain.
+    for d in range(1, 9):
+        w.add(Prim(f"mark_{d}m", "box", (float(d), 0.0, 0.004), (0.05, 1.60, 0.008),
                    tag="target"))
-    w.add(Prim("step_40mm", "box", (-1.60, 0.00, 0.020), (0.50, 1.40, 0.040), tag="stair"))
-    w.add(Prim("step_80mm", "box", (-2.40, 0.00, 0.040), (0.50, 1.40, 0.080), tag="stair"))
-    w.add(Prim("step_120mm", "box", (-3.20, 0.00, 0.060), (0.50, 1.40, 0.120), tag="stair"))
-    w.add(ramp("ramp_12deg", 0.0, 2.50, length=1.60, width=1.00, angle_deg=12.0))
-    w.add(ramp("ramp_20deg", 0.0, -2.50, length=1.60, width=1.00, angle_deg=20.0))
-    w.add(Prim("gate_w", "box", (-0.30, 4.50, 0.30), (0.40, 0.40, 0.60), tag="obstacle"))
-    w.add(Prim("gate_e", "box", (0.75, 4.50, 0.30), (0.40, 0.40, 0.60), tag="obstacle"))
+    w.add(Prim("run_end", "box", (9.0, 0.0, 0.15), (0.12, 1.80, 0.30), tag="obstacle"))
+
+    # ---------------- -x : step ladder ----------------
+    # One step at a time, each taller than the last. 200 mm is past the point
+    # where body clearance rather than leg lift becomes the limit.
+    for i, h in enumerate((0.04, 0.08, 0.12, 0.16, 0.20)):
+        w.add(Prim(f"step_{int(h*1000)}mm", "box", (-2.0 - i * 1.30, 0.0, h / 2.0),
+                   (0.60, 1.70, h), tag="stair"))
+
+    # ---------------- +y : stairs up, landing, stairs down ----------------
+    w.add(*stairs("stair_up", -1.60, 3.40, steps=6, rise=0.08, run=0.28,
+                  width=1.30, landing=1.00))
+    # Starts exactly where the landing ends: a gap here would be a hole at
+    # 0.48 m, which is not the test anyone intended.
+    w.add(*stairs_down("stair_dn", 1.08, 3.40, steps=6, rise=0.08, run=0.28,
+                       width=1.30))
+    w.add(*stairs("stair_steep", -1.40, 5.60, steps=4, rise=0.13, run=0.30,
+                  width=1.10, landing=0.80))
+
+    # ---------------- -y : slopes ----------------
+    for i, deg in enumerate((5.0, 10.0, 15.0, 20.0)):
+        w.add(ramp(f"slope_{int(deg)}deg", 2.20, -3.00 - i * 1.70,
+                   length=2.20, width=1.30, angle_deg=deg))
+
+    # ---------------- NE : rough terrain ----------------
+    w.add(*terrain_tiles("rough", 5.60, 5.60, nx=14, ny=14, pitch=0.30,
+                         tile=0.28, max_h=0.07, seed=7))
+
+    # ---------------- NW : stepping stones ----------------
+    w.add(*stepping_stones("stone", -7.60, 4.20, n=8, pitch=0.44, size=0.24,
+                           height=0.11, jitter=0.04, seed=11))
+
+    # ---------------- SE : gap course ----------------
+    w.add(*gap_course("gap", 4.40, -6.20, gaps=(0.10, 0.16, 0.22, 0.28),
+                      platform=0.70, width=1.40, height=0.12))
+
+    # ---------------- SW : balance beam and slalom ----------------
+    w.add(*balance_beam("beam", -5.20, -4.20, length=2.60, width=0.22, height=0.16))
+    for i in range(5):
+        w.add(Prim(f"slalom_{i}", "cylinder", (-8.20 + i * 0.90,
+                                               -6.60 + (0.40 if i % 2 else -0.40), 0.35),
+                   (0.06, 0.70), tag="obstacle"))
+
     w.waypoints = [
-        Waypoint("start", (0.0, 0.0), 0.0, "spawn"),
-        Waypoint("steps", (-1.0, 0.0), 3.1416, "40/80/120 mm step ladder"),
-        Waypoint("ramp_12", (0.0, 1.5), 1.5708, "12 deg ramp"),
-        Waypoint("ramp_20", (0.0, -1.5), -1.5708, "20 deg ramp"),
-        Waypoint("gate", (0.225, 4.50), 1.5708, "0.65 m gate"),
+        Waypoint("start", (0.0, 0.0), 0.0, "spawn, open in every direction"),
+        Waypoint("run", (4.0, 0.0), 0.0, "measured run, 1 m markers"),
+        Waypoint("steps", (-1.2, 0.0), 3.1416, "40-200 mm step ladder"),
+        Waypoint("stairs_foot", (-2.4, 3.40), 0.0, "6 x 80 mm, up then down"),
+        Waypoint("stairs_top", (0.90, 3.40), 0.0, "landing", z=0.48),
+        Waypoint("stairs_steep", (-2.3, 5.60), 0.0, "4 x 130 mm stretch case"),
+        Waypoint("slopes", (0.6, -3.00), 0.0, "5, 10, 15 and 20 degrees"),
+        Waypoint("rough", (3.10, 5.60), 0.0, "196-tile rough terrain"),
+        Waypoint("stones", (-8.40, 4.20), 0.0, "stepping stones"),
+        Waypoint("gaps", (3.80, -6.20), 0.0, "100-280 mm gaps"),
+        Waypoint("beam", (-7.20, -4.20), 0.0, "220 mm balance beam"),
+        Waypoint("slalom", (-9.20, -6.60), 0.0, "pole slalom"),
     ]
     return w
 

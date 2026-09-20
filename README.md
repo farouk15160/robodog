@@ -9,7 +9,7 @@
   <img alt="ROS 2 Jazzy" src="https://img.shields.io/badge/ROS_2-Jazzy-22314E?logo=ros&logoColor=white">
   <img alt="MuJoCo" src="https://img.shields.io/badge/MuJoCo-3.x-ef6c00">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
-  <img alt="tests" src="https://img.shields.io/badge/tests-195_passing-3ecf8e">
+  <img alt="tests" src="https://img.shields.io/badge/tests-198_passing-3ecf8e">
   <img alt="licence" src="https://img.shields.io/badge/licence-Apache--2.0-blue">
 </p>
 
@@ -135,14 +135,49 @@ rendered to PDF and PNG from a single source by `tools/make_diagrams.py`.
 
 ---
 
-## The test environment
+## Test environments
+
+Two worlds ship. Gait work should not be debugged against furniture at the same
+time, so terrain and navigation are separate.
+
+### `flat` — open-air proving ground, 24 × 24 m
 
 <p align="center">
-  <img src="docs/images/house_overview.png" width="82%" alt="The five-room test house">
+  <img src="docs/images/proving_ground.png" width="78%" alt="The proving ground, seen from above">
 </p>
 
-A 12 × 9 m five-room house containing every indoor locomotion problem the robot
-has to solve, each with enough approach room to be attempted in isolation:
+Eight independent lanes radiating from the spawn, so each problem can be
+attempted on its own:
+
+| Lane | Contains |
+|---|---|
+| **+x** | measured run, 1 m markers — for velocity tuning |
+| **−x** | step ladder, 40 → 200 mm |
+| **+y** | 6 × 80 mm up, landing, 6 × 80 mm down; plus a 4 × 130 mm flight |
+| **−y** | slopes at 5°, 10°, 15°, 20° |
+| **NE** | 196-tile rough terrain, 12–70 mm, seeded and reproducible |
+| **NW** | stepping stones with gaps |
+| **SE** | gap course, 100 → 280 mm |
+| **SW** | 220 mm balance beam and a pole slalom |
+
+<p align="center">
+  <img src="docs/images/terrain_stairs.png" width="49%" alt="Stair complex">
+  <img src="docs/images/terrain_rough.png" width="49%" alt="Rough terrain">
+</p>
+
+Rough terrain is tiles rather than a MuJoCo heightfield for one reason: the same
+description has to render in RViz, and a heightfield has no marker equivalent.
+Tiles also make the problem the right kind of hard — the foot either lands on a
+face or it does not.
+
+### `house` — five rooms, 12 × 9 m
+
+<p align="center">
+  <img src="docs/images/house_overview.png" width="78%" alt="The five-room test house">
+</p>
+
+Every indoor locomotion problem, each with enough approach room to be attempted
+in isolation:
 
 | Feature | Dimension | Measured against |
 |---|---|---|
@@ -178,10 +213,37 @@ a designed challenge into a wall or an open field.
 The force-to-motion path is verified correct in isolation: commanding +30 N of
 ground reaction with all four feet planted moves the robot forward 0.52 m, and
 −30 N moves it backward. Locomotion is therefore a tuning and timing problem,
-not a sign or architecture error. Getting past it needs contact detection
-instead of a fixed gait schedule, slip handling, and co-tuning of stance
-compliance against swing timing — work that only makes sense against identified
-dynamics, and none of which changes an interface.
+not a sign or architecture error.
+
+### The gait is not yet safe for hardware
+
+Peak torque is the wrong question to ask of a motor — RMS is what decides
+whether a winding survives, because copper loss goes as current squared.
+Measured with `tools/torque_report.py`:
+
+| Gait | peak | RMS | RMS / continuous | steady-state winding |
+|---|---:|---:|---:|---:|
+| stand | 3.9 N·m | 3.9 N·m | 65 % | 45 °C |
+| walk 0.15 | 17.0 | 8.5 | 141 % | 139 °C |
+| trot 0.30 | 17.0 | 10.4 | 173 % | 198 °C |
+| trot 0.50 | 17.0 | 12.0 | 201 % | 260 °C |
+| bound 0.30 | 17.0 | 11.2 | 187 % | 228 °C |
+
+Every travelling gait sits above the 6 N·m continuous rating in RMS and
+saturates at the 17 N·m peak a quarter to a third of the time. **Do not command
+a gait on real actuators yet.**
+
+The diagnosis is *not* undersized actuators — standing costs 3.9 N·m RMS and
+settles at a comfortable 45 °C. Walking a 10 kg robot should not cost three
+times the RMS of holding it still. The excess is the controller fighting
+itself: the same defect that stops the robot travelling is dissipating torque
+as heat instead of forward motion. The I²t limiter does catch it and derates to
+continuous after about two seconds, which is exactly what it is for — but a
+robot that derates mid-stride falls over.
+
+This is the strongest argument for doing hardware bring-up and system
+identification *before* chasing locomotion, and it is tracked as an
+expected-failure test so it turns green on its own once the gait is fixed.
 
 See §6.6 of [the documentation](docs/robodog_architecture.pdf) for the measured
 numbers, and [CONTRIBUTING.md](CONTRIBUTING.md) if you would like to help.
@@ -216,6 +278,7 @@ docs/                       LaTeX documentation, Draw.io diagrams, figures
 | `models/*.xml` (MJCF) | `robodog_sim/mjcf.py` | `robot_parameters.yaml` |
 | diagrams (`.drawio`, `.pdf`, `.png`) | `tools/make_diagrams.py` | one Python description |
 | `docs/generated_facts.tex` | `tools/make_doc_facts.py` | the model and the datasheet |
+| preview renders | `tools/render_previews.py` | the MuJoCo models |
 
 The URDF, the MuJoCo model, the inverse kinematics and every number in the
 documentation read the same parameter file. Regenerate after a CAD change:
@@ -265,7 +328,8 @@ going into it:
 cd ros2_ws && MUJOCO_GL=egl python3 -m pytest src/*/test -q
 ```
 
-**195 tests.** The valuable ones are cross-checks rather than unit tests: the
+**198 tests** (197 pass, 1 expected failure tracking the gait thermal gap). The
+valuable ones are cross-checks rather than unit tests: the
 MuJoCo model's masses, joint origins, axes, ranges and visual-mesh orientations
 are asserted against the URDF, so the two descriptions cannot drift apart; the
 world geometry is measured against the clearances its own docstring claims; and

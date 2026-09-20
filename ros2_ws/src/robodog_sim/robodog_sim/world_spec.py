@@ -21,6 +21,7 @@ the 0.24 m the leg can lift while keeping the body level.
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass, field
 
 WALL_H = 1.20          # tall enough to block the robot and the camera frustum
@@ -41,6 +42,8 @@ PALETTE = {
     "platform":  (0.50, 0.55, 0.60, 1.0),
     "ramp":      (0.40, 0.52, 0.40, 1.0),
     "target":    (0.85, 0.25, 0.30, 1.0),
+    "terrain":   (0.55, 0.50, 0.44, 1.0),
+    "beam":      (0.72, 0.58, 0.35, 1.0),
 }
 
 
@@ -189,3 +192,99 @@ def ramp(name: str, x: float, y: float, *, length: float = 1.6, width: float = 1
     a = math.radians(angle_deg)
     return Prim(name, "box", (x, y, length * math.sin(a) / 2.0),
                 (length, width, 0.04), (0.0, -a, yaw), "ramp", friction=0.9)
+
+
+# --------------------------------------------------------------------------- #
+# proving-ground constructors
+# --------------------------------------------------------------------------- #
+def terrain_tiles(name: str, cx: float, cy: float, *, nx: int = 14, ny: int = 14,
+                  pitch: float = 0.30, tile: float = 0.28, max_h: float = 0.07,
+                  seed: int = 7) -> list[Prim]:
+    """A field of square tiles at pseudo-random heights.
+
+    Tiles rather than a MuJoCo heightfield for one reason: the same description
+    has to render in RViz, and a heightfield has no marker equivalent. Tiles
+    also make the problem the right kind of hard -- the foot either lands on a
+    face or it does not, which is what foothold selection actually has to solve.
+
+    Heights come from a seeded generator, so the terrain is identical on every
+    machine and a regression is reproducible.
+    """
+    rng = random.Random(seed)
+    out: list[Prim] = []
+    for i in range(nx):
+        for j in range(ny):
+            h = round(rng.uniform(0.012, max_h), 4)
+            x = cx + (i - (nx - 1) / 2.0) * pitch
+            y = cy + (j - (ny - 1) / 2.0) * pitch
+            out.append(Prim(f"{name}_{i}_{j}", "box", (x, y, h / 2.0),
+                            (tile, tile, h), tag="terrain", friction=0.9))
+    return out
+
+
+def stepping_stones(name: str, cx: float, cy: float, *, n: int = 7,
+                    pitch: float = 0.42, size: float = 0.26,
+                    height: float = 0.10, jitter: float = 0.10,
+                    seed: int = 11) -> list[Prim]:
+    """Discrete pillars with gaps between them: the foot must be placed, not
+    merely swung. Lateral jitter stops the robot from solving it with a
+    straight-line trot."""
+    rng = random.Random(seed)
+    out: list[Prim] = []
+    for i in range(n):
+        for k, side in enumerate((-1, 1)):
+            y = cy + side * 0.145 + rng.uniform(-jitter, jitter)
+            h = height + rng.uniform(-0.02, 0.02)
+            out.append(Prim(f"{name}_{i}{k}", "box",
+                            (cx + i * pitch, y, h / 2.0), (size, size, h),
+                            tag="obstacle", friction=0.9))
+    return out
+
+
+def gap_course(name: str, cx: float, cy: float, *, gaps=(0.10, 0.16, 0.22, 0.28),
+               platform: float = 0.70, width: float = 1.40,
+               height: float = 0.12) -> list[Prim]:
+    """Platforms separated by widening gaps. The robot must step across rather
+    than through; the last gap is deliberately beyond a comfortable stride."""
+    out: list[Prim] = []
+    x = cx
+    for i, gap in enumerate((0.0,) + tuple(gaps)):
+        x += gap
+        out.append(Prim(f"{name}_p{i}", "box", (x + platform / 2.0, cy, height / 2.0),
+                        (platform, width, height), tag="platform", friction=0.9))
+        x += platform
+    return out
+
+
+def balance_beam(name: str, cx: float, cy: float, *, length: float = 2.60,
+                 width: float = 0.22, height: float = 0.16,
+                 yaw: float = 0.0) -> list[Prim]:
+    """A raised beam narrower than the robot's foot span: crossing it means
+    placing all four feet within 220 mm laterally."""
+    c, s = math.cos(yaw), math.sin(yaw)
+    out = [Prim(f"{name}_beam", "box", (cx, cy, height / 2.0),
+                (length, width, height), (0, 0, yaw), "beam", friction=0.9)]
+    for i, d in enumerate((-1, 1)):
+        rx, ry = d * (length / 2 + 0.25), 0.0
+        out.append(Prim(f"{name}_ramp{i}", "box",
+                        (cx + rx * c - ry * s, cy + rx * s + ry * c, height / 2.0),
+                        (0.50, width + 0.20, height),
+                        (0, 0, yaw), "platform", friction=0.9))
+    return out
+
+
+def stairs_down(name: str, x: float, y: float, *, steps: int = 5, rise: float = 0.08,
+                run: float = 0.28, width: float = 1.30, yaw: float = 0.0) -> list[Prim]:
+    """A descending flight, for the case the ascending one does not cover:
+    going down is where a quadruped's centre of mass runs ahead of its feet."""
+    out: list[Prim] = []
+    c, s = math.cos(yaw), math.sin(yaw)
+    for i in range(steps):
+        h = rise * (steps - i - 1)
+        if h <= 0:
+            continue
+        lx = run * (i + 0.5)
+        out.append(Prim(f"{name}_step{i}", "box",
+                        (x + lx * c, y + lx * s, h / 2.0),
+                        (run, width, h), (0, 0, yaw), "stair"))
+    return out

@@ -27,6 +27,9 @@ SHOTS = [
     ("robot_crouch", "robodog_scene.xml", "crouch", (0.0, 0.0, 0.13), 0.95, 138, -16, (1300, 800)),
     ("robot_rest", "robodog_scene.xml", "rest", (0.0, 0.0, 0.10), 0.90, 138, -14, (1300, 800)),
     ("house_overview", "robodog_house.xml", "stand", (6.0, 4.5, 0.0), 14.0, 90, -80, (1500, 1150)),
+    ("proving_ground", "robodog_scene.xml", "stand", (0.0, -0.3, 0.0), 23.0, 90, -80, (1500, 1180)),
+    ("terrain_rough", "robodog_scene.xml", "stand", (4.2, 4.2, 0.2), 6.5, 135, -22, (1500, 900)),
+    ("terrain_stairs", "robodog_scene.xml", "stand", (0.0, 3.6, 0.3), 6.0, 120, -18, (1500, 900)),
     ("house_living", "robodog_house.xml", "stand", (2.8, 2.0, 0.4), 4.6, 135, -20, (1500, 900)),
     ("house_workshop", "robodog_house.xml", "stand", (10.0, 6.4, 0.4), 5.4, 215, -22, (1500, 900)),
 ]

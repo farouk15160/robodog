@@ -27,11 +27,13 @@ from typing import Any
 import numpy as np
 import rclpy
 import yaml
+from rclpy._rclpy_pybind11 import RCLError
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Point, Twist, Vector3
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.impl.rcutils_logger import RcutilsLogger  # noqa: F401  (typing aid)
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import Imu, JointState
 from std_msgs.msg import String
@@ -244,12 +246,19 @@ class RoboDogControlNode(Node):
     # ------------------------------------------------------------------ #
     def _control_loop(self) -> None:
         next_t = time.perf_counter()
-        while self._running:
+        while self._running and rclpy.ok():
             t0 = time.perf_counter()
             try:
                 self._cycle()
-            except Exception:
-                self.get_logger().error("control cycle failed, engaging e-stop", throttle_duration_sec=1.0)
+            except Exception as e:
+                # Ctrl-C tears the rclpy context down from the signal handler
+                # while this thread is mid-cycle. A publish then fails with
+                # RCLError, which is shutdown, not a fault -- reporting it as an
+                # e-stop buried the real shutdown path in a traceback.
+                if not rclpy.ok() or isinstance(e, RCLError):
+                    break
+                self.get_logger().error("control cycle failed, engaging e-stop",
+                                        throttle_duration_sec=1.0)
                 self.get_logger().error(_tb(), throttle_duration_sec=1.0)
                 self.safety.engage_estop("control-loop exception")
                 try:
@@ -288,6 +297,8 @@ class RoboDogControlNode(Node):
             self.backend.step(self.dt)
 
         self._tick += 1
+        if not rclpy.ok():
+            return
         if self._tick % self._decim_js == 0:
             self._publish_joint_states(st)
         if self._tick % self._decim_state == 0:
@@ -697,6 +708,8 @@ class RoboDogControlNode(Node):
 
     # ------------------------------------------------------------------ #
     def destroy_node(self) -> None:
+        # Stop the control thread FIRST: it holds publishers that
+        # Node.destroy_node() is about to invalidate.
         self._running = False
         if self._thread.is_alive():
             self._thread.join(timeout=1.0)

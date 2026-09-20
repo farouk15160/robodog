@@ -31,7 +31,9 @@ colcon build --symlink-install && source install/setup.bash
 MUJOCO_GL=egl python3 -m pytest src/*/test -q
 ```
 
-All 195 must pass. New behaviour needs a test; the useful ones here are
+197 must pass and one is an expected failure, tracking the gait thermal gap
+(`test_trot_is_thermally_sustainable`) so it turns green on its own when the
+gait is fixed. New behaviour needs a test; the useful ones here are
 cross-checks rather than unit tests — the MuJoCo model is asserted against the
 URDF, the world geometry against the clearances the docstring claims, the CAN
 codec against the datasheet. Several tests exist because a bug got past a

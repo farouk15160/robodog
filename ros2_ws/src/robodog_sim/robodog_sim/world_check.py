@@ -73,8 +73,11 @@ class Gap:
 def narrow_gaps(world: World, *, body_band=(0.05, 0.40), limit=0.90) -> list[Gap]:
     """Every pair of static objects closer than `limit` whose vertical extents
     both overlap the band the robot's body occupies while walking."""
+    # Terrain tiles sit shoulder to shoulder by construction; the 20 mm seams
+    # between them are not passages and would bury everything that is.
     cand = [p for p in world.prims
-            if not p.movable and _overlaps(z_range(p), body_band)]
+            if not p.movable and p.tag != "terrain"
+            and _overlaps(z_range(p), body_band)]
     fps = {p.name: footprint(p) for p in cand}
     out: list[Gap] = []
     for i, p in enumerate(cand):

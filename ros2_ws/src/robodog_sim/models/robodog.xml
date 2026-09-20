@@ -6,7 +6,7 @@
   <statistic extent="1.0"/>
   <visual>
     <global offwidth="1920" offheight="1200" azimuth="140" elevation="-20"/>
-    <map znear="0.05" zfar="30.0"/>
+    <map znear="0.05" zfar="60.0"/>
     <quality shadowsize="2048" offsamples="4"/>
   </visual>
   <default>
