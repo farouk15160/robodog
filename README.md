@@ -251,6 +251,23 @@ expected-failure test so it turns green on its own once the gait is fixed.
 Short answer: barely, and not for the reason it seems. Run
 `python3 tools/design_study.py` to reproduce.
 
+<p align="center">
+  <img src="docs/images/why_torque.png" width="94%" alt="Joint torque is set by how bent the leg is">
+</p>
+
+**Torque is set by how bent the leg is, not by how long it is.** A joint torque
+is a force times a lever arm; the force is the robot's weight on that foot, and
+the lever arm is the horizontal distance from the joint axis to the foot. Bend
+the leg and that distance grows. So at a fixed ride height, *longer* legs must
+fold further to reach the ground and cost **more** torque, not less:
+
+| legs | total | knee bend | lever arm | torque | of continuous |
+|---|---|---:|---:|---:|---:|
+| 80 % | 344 mm | 59° | 84 mm | 2.02 N·m | 34 % |
+| **100 %** | **430 mm** | **92°** | **154 mm** | **3.78 N·m** | **63 %** |
+| 120 % | 516 mm | 109° | 210 mm | 5.29 N·m | 88 % |
+| 130 % | 559 mm | 115° | 236 mm | 6.01 N·m | 100 % |
+
 **Mass is not where the weight is.** Only the long parts of the thigh and shank
 scale with leg length — 320 g per leg out of 10 kg. Shortening the legs 20 %
 saves **256 g, or 2.6 %**. The actuators (4.56 kg) and the electronics
