@@ -31,7 +31,7 @@ states exactly what remains to be done.
 % =====================================================================
 \section{Scope and status}
 
-\paragraph{What exists.} Eight ROS 2 packages, 171 passing tests, a MuJoCo
+\paragraph{What exists.} Eight ROS 2 packages, 198 tests, a MuJoCo
 model generated from the same parameters as the URDF, a five-room test house,
 a modular web GUI, and the complete ROBSTRIDE02 CAN frame codec with 29 unit
 tests. The robot stands, holds pose and walks in simulation.
@@ -1037,20 +1037,79 @@ in Section~\ref{sec:actuator}.
 \midrule
 \code{robodog\_description} & 16 & URDF structure, conventions, limits, inertia validity \\
 \code{robodog\_hardware}    & 52 & CAN codec, backend contract, thermal, bus budget \\
-\code{robodog\_control}     & 40 & IK exactness, Jacobian, force signs, safety envelope \\
-\code{robodog\_sim}         & 46 & MJCF vs URDF consistency, world geometry, physics \\
+\code{robodog\_control}     & 59 & IK exactness, Jacobian, force signs, safety, balance \\
+\code{robodog\_sim}         & 54 & MJCF vs URDF consistency, world geometry, physics, thermal \\
 \code{robodog\_perception}  & 17 & intrinsics, deprojection, self-occlusion, noise model \\
 \midrule
-\textbf{Total}              & \textbf{171} & \\
+\textbf{Total}              & \textbf{198} & 197 pass, 1 expected failure \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 The most valuable are the cross-checks: the MJCF's per-link masses, joint
 origins, axes and ranges are asserted against the URDF, so the two descriptions
-cannot drift. Three tests exist specifically because a bug got past a weaker
-one --- the gravity-torque sign, the idle-command rate-limiter seed, and the
-camera self-occlusion fraction.
+cannot drift. Five tests exist specifically because a bug got past a weaker
+one: the gravity-torque sign, the idle-command rate-limiter seed, the camera
+self-occlusion fraction, the Euler-convention mismatch that left the rendered
+legs beside the body while every physics test passed, and the gait's thermal
+load. The last is an expected failure, so the gap is tracked in the suite
+rather than only in prose and turns green on its own when the gait is fixed.
+
+\subsection{Analysis tools}
+
+Everything quoted in this document is measurable, and the measurement is in the
+repository rather than in a notebook someone once ran.
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Tool} & \textbf{Answers} \\
+\midrule
+\code{cad\_to\_model.py}      & CAD $\to$ canonical model; prints the FK residual \\
+\code{prepare\_meshes.py}     & mesh decimation, 41\,MB $\to$ 2.3\,MB \\
+\code{torque\_report.py}      & peak and RMS torque per gait, and the winding temperature \\
+\code{capability\_report.py}  & jump, payload, step-up, slope and power envelope \\
+\code{design\_study.py}       & torque against leg length and stance height \\
+\code{optimise\_stance.py}    & the stance-pose search behind the named poses \\
+\code{make\_diagrams.py}      & the ten figures, as Draw.io and PDF \\
+\code{make\_torque\_figure.py} & why torque follows leg bend, not leg length \\
+\code{make\_doc\_facts.py}    & every number in this document \\
+\code{render\_previews.py}    & the MuJoCo preview renders \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Capability envelope}
+\label{sec:capability}
+
+Measured with \code{capability\_report.py}, using deliberately crude open-loop
+controllers so the result describes the machine rather than any particular
+control scheme. This is a separate question from whether the current gait
+works, which Section~\ref{sec:locomotion-status} answers.
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Capability} & \textbf{Measured} & \textbf{Limited by} \\
+\midrule
+Walking, 0.5\,m/s  & $\approx$49\,W net of 754\,W rated & nothing; 7\,\% of budget \\
+Stairs, 80\,mm     & needs 100\,mm lift, has 130\,mm & leg travel \\
+Maximum step       & 110\,mm standing, 190\,mm from a crouch & leg travel \\
+Vertical jump      & 277\,mm of flight, 308\,ms airborne & peak torque \\
+Landing            & falls over & \emph{controller}, not hardware \\
+Payload            & $\approx$5\,kg before stance exceeds continuous & continuous torque \\
+Slope              & 30$^\circ$ at 55\,\% of continuous & friction beyond 35$^\circ$ \\
+Peak power         & 2.19\,kW, 219\,W/kg & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The useful number is the first one. Steady walking costs about 7\,\% of the
+rated mechanical power, because almost all the torque a quadruped spends is
+holding itself up, which does no work. That is why the gait's
+\RdTorqueCont\,N$\cdot$m-exceeding draw in Section~\ref{sec:thermal-load} is
+diagnostic rather than a sizing problem: the machine is not working hard, the
+controller is wasting what it asks for.
 
 \archfig{domain_model}{Domain model: the value types that cross the hardware
 boundary and the entities that own them.}{0.94}

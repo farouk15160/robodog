@@ -33,8 +33,8 @@ def system_architecture() -> Diagram:
     d.box("L2", 20, 200, 1140, 300, "ONBOARD COMPUTER", "ROS 2 Jazzy, Ubuntu 24.04",
           kind="layer", z=0)
     d.box("web", 60, 245, 230, 70, "robodog_web", "aiohttp + WebSocket", kind="package")
-    d.box("ctrl", 320, 245, 300, 110, "robodog_control", "400 Hz control loop,\nsafety, gait, estimator",
-          kind="package")
+    d.box("ctrl", 320, 245, 300, 110, "robodog_control",
+          "400 Hz loop, safety,\ngait, balance, estimator", kind="package")
     d.box("perc", 650, 245, 230, 70, "robodog_perception", "RGB-D, PointCloud2", kind="package")
     d.box("desc", 910, 245, 210, 70, "robodog_description", "URDF/Xacro, TF", kind="package")
     d.box("hw", 320, 390, 300, 75, "robodog_hardware", "JointBackend + RS02 CAN codec",
@@ -75,7 +75,8 @@ def software_architecture() -> Diagram:
                         "no package above depends on a simulation package.")
     d.box("bring", 430, 30, 300, 65, "robodog_bringup", "launch composition only")
     d.box("web", 60, 150, 230, 70, "robodog_web", "GUI server + protocol", kind="package")
-    d.box("ctrl", 330, 150, 250, 70, "robodog_control", "loop, safety, gait, IK", kind="package")
+    d.box("ctrl", 330, 150, 250, 70, "robodog_control",
+          "loop, safety, gait,\nbalance, IK, estimator", kind="package")
     d.box("perc", 620, 150, 230, 70, "robodog_perception", "camera + point cloud", kind="package")
     d.box("sim", 890, 150, 210, 70, "robodog_sim", "MJCF + worlds", kind="package")
     d.box("hw", 330, 300, 250, 70, "robodog_hardware", "backends + RS02 codec", kind="package")
@@ -176,7 +177,8 @@ def control_architecture() -> Diagram:
     d.box("l3", 40, 170, 1060, 110, "LAYER 3  GAIT AND POSE", "400 Hz", kind="layer", z=0)
     d.box("gait", 80, 210, 330, 55, "Gait generator", "phase, duty, swing / stance")
     d.box("ik", 440, 210, 280, 55, "Leg IK + Jacobian", "closed form, knee-back branch")
-    d.box("ff", 750, 210, 310, 55, "Gravity feed-forward", "tau = -J^T f, per stance leg")
+    d.box("ff", 750, 210, 310, 55, "Balance",
+          "body wrench -> per-foot force,\nfriction-cone projected")
 
     d.box("l2", 40, 310, 1060, 110, "LAYER 2  SAFETY", "400 Hz, every cycle", kind="layer", z=0)
     d.box("lim", 80, 350, 250, 55, "Position / velocity", "soft limits + rate limit")
@@ -253,7 +255,8 @@ def hardware_boundary() -> Diagram:
                 caption="Replacing simulation with hardware is a launch argument. "
                         "Nothing above the boundary changes.")
     d.box("above", 30, 30, 1120, 160, "UNCHANGED BY THE SWAP", "", kind="layer", z=0)
-    d.box("cn", 70, 75, 280, 85, "robodog_control_node", "loop, safety, gait, estimator")
+    d.box("cn", 70, 75, 280, 85, "robodog_control_node",
+          "loop, safety, gait,\nbalance, estimator")
     d.box("wn", 380, 75, 240, 85, "robodog_web_server", "GUI protocol")
     d.box("pn", 650, 75, 240, 85, "robodog_camera_node", "publishes RGB-D")
     d.box("rz", 920, 75, 200, 85, "RViz2 / rosbag2", "same topics", kind="external")
@@ -326,7 +329,7 @@ def state_machine() -> Diagram:
 
 
 def domain_model() -> Diagram:
-    d = Diagram("domain_model", "Domain model", w=1160, h=700,
+    d = Diagram("domain_model", "Domain model", w=1160, h=770,
                 caption="Value types crossing the hardware boundary and the entities "
                         "that own them.")
     d.box("robot", 440, 30, 280, 80, "Robot", "12 joints, 4 legs\n10.0 kg, base_link")
@@ -348,6 +351,8 @@ def domain_model() -> Diagram:
           "gait, frequency, duty,\nstep height, stance height,\nvelocity")
     d.box("sl", 440, 330, 280, 110, "SafetyLimits",
           "position soft limits\nvelocity, continuous/peak torque\ntemperature thresholds")
+    d.box("bg", 100, 620, 260, 70, "BalanceGains",
+          "height, roll, pitch, yaw,\nvelocity, friction cone", kind="store")
 
     d.edge("robot", "leg", "4", route="v")
     d.edge("leg", "joint", "3")
@@ -358,6 +363,7 @@ def domain_model() -> Diagram:
     d.edge("robot", "bs", "has", style="dashed")
     d.edge("leg", "gp", "driven by", style="dashed")
     d.edge("sl", "jc", "clamps", style="dashed")
+    d.edge("bg", "jc", "sizes tau_ff", style="dashed")
     return d
 
 

@@ -300,8 +300,12 @@ def to_pdf(d: Diagram, path: str, fmt: str = "pdf", dpi: int = 150) -> None:
                 fontsize=6.8, color="#6b7280", style="italic")
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    # Suppress the embedded creation date. Without it every regeneration
+    # rewrites all ten PDFs with identical content but a new timestamp, which
+    # makes `git status` useless for spotting a real change.
+    meta = {"CreationDate": None} if fmt == "pdf" else None
     fig.savefig(path, format=fmt, bbox_inches="tight", pad_inches=0.05,
-                dpi=dpi, facecolor="white")
+                dpi=dpi, facecolor="white", metadata=meta)
     plt.close(fig)
 
 
