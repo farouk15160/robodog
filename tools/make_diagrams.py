@@ -449,9 +449,86 @@ def perception_pipeline() -> Diagram:
     return d
 
 
+def gait_pipeline() -> Diagram:
+    d = Diagram("gait_pipeline", "Gait generator: one control cycle",
+                w=1180, h=900,
+                caption="The generator plans FEET, not torques. Everything it "
+                        "returns is a position, a velocity or a force; the "
+                        "impedance law runs two layers below.")
+
+    d.box("cmd", 40, 40, 300, 62, "cmd_vel -> GaitParams",
+          "vx, vy, wz, gait,\nfrequency, duty")
+    d.box("cfg", 370, 40, 280, 62, "gaits.yaml",
+          "offsets, duty, step height,\nstance height", kind="store")
+    d.box("fb", 680, 40, 460, 62, "BodyFeedback",
+          "height, vz, roll, pitch, omega, v_xy")
+
+    d.box("phase", 40, 150, 400, 68, "Phase clock",
+          "phi += f dt  (mod 1)\nphi_i = (phi + offset_i) mod 1")
+    d.box("raib", 680, 150, 460, 68, "Raibert foot placement",
+          "p = v_meas T/2 + k_v (v_meas - v*)\nclamped to max_placement_m")
+
+    d.box("sel", 40, 262, 400, 52, "Per leg:  phi_i < duty ?", "stance : swing",
+          kind="state")
+
+    d.box("stc", 40, 350, 540, 214, "STANCE  -  the foot is fixed in the world",
+          kind="layer", z=0)
+    d.box("st1", 62, 394, 496, 48, "Touchdown",
+          "resume from the LAST COMMANDED position")
+    d.box("st2", 62, 452, 496, 48, "Retract",
+          "p -= (v_meas + g_sweep (v* - v_meas)) dt")
+    d.box("st3", 62, 510, 496, 48, "Settle",
+          "decay touchdown_depth over the first 1/6")
+
+    d.box("swc", 600, 350, 540, 214, "SWING  -  interpolate two latched ends",
+          kind="layer", z=0)
+    d.box("sw1", 622, 394, 496, 48, "Lift-off",
+          "latch p0 = where stance actually left the foot")
+    d.box("sw2", 622, 452, 496, 48, "Land",
+          "p1 tracks Raibert through the swing")
+    d.box("sw3", 622, 510, 496, 48, "Arc",
+          "p0 + (p1-p0) sigma(u),   z += h sin^2(pi u)")
+
+    d.box("ik", 40, 600, 540, 62, "Leg IK + Jacobian",
+          "q = IK(p),   qd = J^+ v")
+    d.box("bal", 600, 600, 540, 62, "Balance",
+          "wrench -> per-foot force -> tau = -J^T f")
+
+    d.box("out", 40, 690, 1100, 104, "GaitOutput", kind="layer", z=0)
+    d.box("outk", 62, 730, 496, 50, "Joint targets",
+          "q[12]   qd[12]   foot_target[4]")
+    d.box("outf", 622, 730, 496, 50, "Forces and schedule",
+          "tau_ff[12]   foot_force[4]   contact[4]")
+
+    d.box("note", 40, 815, 1100, 62,
+          "Continuity is the invariant: neither transition may step.\n"
+          "Rebuilding the swing arc from the nominal foot position instead "
+          "cost 41 mm per lift-off, and stopped the robot walking.",
+          kind="note", dashed=True)
+
+    d.edge("cmd", "phase", route="v")
+    d.edge("cfg", "phase", route="v")
+    d.edge("fb", "raib", route="v")
+    d.edge("phase", "sel", route="v")
+    d.edge("sel", "st1", route="v")
+    d.edge("sel", "sw1", route="h")
+    d.edge("raib", "sw2", route="v")
+    d.edge("st1", "st2", route="v")
+    d.edge("st2", "st3", route="v")
+    d.edge("sw1", "sw2", route="v")
+    d.edge("sw2", "sw3", route="v")
+    d.edge("st3", "ik", route="v")
+    d.edge("sw3", "bal", route="v")
+    d.edge("ik", "outk", route="v")
+    d.edge("bal", "outf", route="v")
+    d.edge("fb", "bal", "body state", style="dashed", route="v")
+    return d
+
+
 DIAGRAMS = [system_architecture, software_architecture, node_topic_graph,
-            control_architecture, data_flow, hardware_boundary, state_machine,
-            domain_model, simulation_architecture, perception_pipeline]
+            control_architecture, gait_pipeline, data_flow, hardware_boundary,
+            state_machine, domain_model, simulation_architecture,
+            perception_pipeline]
 
 
 def main() -> int:

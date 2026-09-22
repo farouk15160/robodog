@@ -2,6 +2,14 @@
 ros2_ws/build/
 ros2_ws/install/
 ros2_ws/log/
+# colcon run from the repository root instead of ros2_ws/ lands here; it is
+# never the real workspace, and a stale copy shadows the real one confusingly
+/build/
+/install/
+/log/
+
+# Editors
+.vscode/
 
 # Python
 __pycache__/

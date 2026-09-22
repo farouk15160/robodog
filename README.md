@@ -9,7 +9,7 @@
   <img alt="ROS 2 Jazzy" src="https://img.shields.io/badge/ROS_2-Jazzy-22314E?logo=ros&logoColor=white">
   <img alt="MuJoCo" src="https://img.shields.io/badge/MuJoCo-3.x-ef6c00">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
-  <img alt="tests" src="https://img.shields.io/badge/tests-198_passing-3ecf8e">
+  <img alt="tests" src="https://img.shields.io/badge/tests-217_passing-3ecf8e">
   <img alt="licence" src="https://img.shields.io/badge/licence-Apache--2.0-blue">
 </p>
 
@@ -206,44 +206,84 @@ a designed challenge into a wall or an open field.
 | Safety layer | complete; runs in simulation and on hardware alike |
 | Web GUI | complete — live telemetry, commands, camera |
 | **Standing** | **solid** — 0.1° tilt, holds 320 mm, 5.5 N·m peak, no clamping |
-| **Balance while stepping** | **works** — a 0.3 m/s trot holds 3° tilt at the commanded height (25° without it) |
-| **Velocity tracking** | **not yet** — the robot steps in place; trot drifts backward ≈ 0.04 m/s |
+| **Walking and trotting** | **works** — tracks commanded velocity to within 7 mm/s |
+| **Course holding** | **works** — 54 mm lateral drift over 6 s at 0.5 m/s |
+| Pace and bound | **partial** — neither tracks velocity; neither is a travel gait |
 | Real actuators and camera | written, **unvalidated** — no hardware has been driven |
 
-The force-to-motion path is verified correct in isolation: commanding +30 N of
-ground reaction with all four feet planted moves the robot forward 0.52 m, and
-−30 N moves it backward. Locomotion is therefore a tuning and timing problem,
-not a sign or architecture error.
+Measured over 6 s from the standing keyframe, balance active:
 
-### The gait is not yet safe for hardware
+| Gait | commanded | actual | error | peak tilt | drift |
+|---|---:|---:|---:|---:|---:|
+| stand | 0.00 m/s | −0.001 | −0.001 | 0.1° | 0.000 m |
+| walk | 0.15 | +0.155 | +0.005 | 7.4° | 0.024 m |
+| walk | 0.30 | +0.300 | +0.000 | 10.9° | 0.040 m |
+| trot | 0.30 | +0.297 | −0.003 | 5.1° | 0.040 m |
+| trot | 0.50 | +0.493 | −0.007 | 7.2° | 0.054 m |
+| pace | 0.30 | +0.146 | −0.154 | 16.6° | 0.066 m |
+| bound | 0.30 | +0.193 | −0.107 | 18.4° | 0.001 m |
+
+### Thermal load
 
 Peak torque is the wrong question to ask of a motor — RMS is what decides
 whether a winding survives, because copper loss goes as current squared.
-Measured with `tools/torque_report.py`:
+Measured with `tools/torque_report.py`, worst joint:
 
 | Gait | peak | RMS | RMS / continuous | steady-state winding |
 |---|---:|---:|---:|---:|
 | stand | 3.9 N·m | 3.9 N·m | 65 % | 45 °C |
-| walk 0.15 | 17.0 | 8.5 | 141 % | 139 °C |
-| trot 0.30 | 17.0 | 10.4 | 173 % | 198 °C |
-| trot 0.50 | 17.0 | 12.0 | 201 % | 260 °C |
-| bound 0.30 | 17.0 | 11.2 | 187 % | 228 °C |
+| walk 0.15 | 17.0 | 5.5 | 91 % | 70 °C |
+| trot 0.30 | 14.3 | 5.4 | 90 % | 69 °C |
+| trot 0.50 | 14.5 | 5.5 | 92 % | 71 °C |
+| bound 0.30 | 17.0 | 7.9 | 131 % | 123 °C |
 
-Every travelling gait sits above the 6 N·m continuous rating in RMS and
-saturates at the 17 N·m peak a quarter to a third of the time. **Do not command
-a gait on real actuators yet.**
+Walk and trot are inside the 6 N·m continuous rating. Bound is not, and is not
+meant to be: it is the gait used to probe the peak-torque and I²t path in
+simulation and should not be commanded on hardware.
 
-The diagnosis is *not* undersized actuators — standing costs 3.9 N·m RMS and
-settles at a comfortable 45 °C. Walking a 10 kg robot should not cost three
-times the RMS of holding it still. The excess is the controller fighting
-itself: the same defect that stops the robot travelling is dissipating torque
-as heat instead of forward motion. The I²t limiter does catch it and derates to
-continuous after about two seconds, which is exactly what it is for — but a
-robot that derates mid-stride falls over.
+These numbers replace an earlier table in which every travelling gait sat
+between 141 % and 201 % of continuous. That table was accurate — about a robot
+with two of its twelve joints welded shut. See below.
 
-This is the strongest argument for doing hardware bring-up and system
-identification *before* chasing locomotion, and it is tracked as an
-expected-failure test so it turns green on its own once the gait is fixed.
+> **Still not validated against hardware.** The thermal model is first-order,
+> from datasheet resistance and an *assumed* thermal resistance. Read 90 % as
+> "plausibly inside the rating", not as a measurement of a real motor.
+
+### How locomotion was broken for most of this project
+
+The robot used to step in place and drift backwards at ≈ 0.04 m/s while drawing
+173 % of continuous torque. Both symptoms had the same two causes, and neither
+was in the balance layer or the gains — which is where the effort went first.
+
+**A 41 mm step at every lift-off.** Stance retracts the foot at the measured
+body velocity, but the swing arc was rebuilt each cycle assuming stance had
+swept back the full *commanded* stride. Whenever the robot was not already at
+the commanded speed the two disagreed, and the difference was commanded in a
+single 2.5 ms tick: 41 mm from a standstill at 0.3 m/s. That drove 0.33 rad of
+tracking error, saturating the hips at 17 N·m and destroying the force
+distribution the balance layer had just computed — so the robot could not
+accelerate, so the measured velocity stayed at zero, so the step never shrank.
+
+**Two hips welded shut.** The thigh capsule and the HAA actuator cylinder are
+both conservative bounding volumes around parts that clear each other in the
+CAD, and MuJoCo does not auto-filter the pair because the thigh is the base's
+*grandchild*, not its child. The front hips jammed 13 mrad above the standing
+pose and would not move under 16.6 N·m, while the rear hips swung 1.59 rad on
+3 N·m. The front legs could only lift with the knee.
+
+The lesson worth keeping: **a careful measurement of a broken system is still a
+measurement of a broken system.** The stance-height study was repeated at four
+heights, was internally consistent, and was wrong. So was the conclusion that
+lower stance impedance helped — with the hips free, the original `stance_kp` of
+90 turned out to be the best value tested. What found both bugs was per-joint
+instrumentation, not more tuning: printing commanded against measured position
+for one leg through one gait cycle showed a 40 mm jump in the target at
+lift-off, and a hip angle that did not change by 0.001 rad in four seconds
+under peak torque. A joint that will not move under 16 N·m is not a control
+problem.
+
+Both are now regression-tested: `test_the_foot_command_never_jumps` and
+`test_every_hip_can_swing_through_its_commanded_range`.
 
 <details>
 <summary><b>Design study: would shorter legs help?</b> (measured — click to expand)</summary>
@@ -289,10 +329,13 @@ travel left to lift a foot with — it could no longer climb its own 80 mm
 stairs. That is disqualifying for an indoor robot, and it is why quadrupeds
 stand at 60–75 % of leg extension rather than 85 %+.
 
-**And it would not fix the real problem.** A 20 % leg reduction buys roughly
-45 % less torque; the gait is drawing 173 % of continuous. You would land near
-95 % — still no margin — having permanently given up the stairs. The 3× excess
-is the controller, not the geometry.
+**And it would not have fixed the real problem.** This study was written while
+the gait was drawing 173 % of continuous, and the conclusion was that a 20 %
+leg reduction — worth roughly 45 % less torque — would land near 95 %, still
+without margin, having permanently given up the stairs. That reasoning held up:
+the excess was the controller, not the geometry. Two bugs later the same trot
+draws 90 % at full leg length, with all 130 mm of travel intact. Shortening the
+legs would have cost the stairs and fixed nothing.
 
 </details>
 
@@ -379,7 +422,7 @@ going into it:
 cd ros2_ws && MUJOCO_GL=egl python3 -m pytest src/*/test -q
 ```
 
-**198 tests** (197 pass, 1 expected failure tracking the gait thermal gap). The
+**217 tests**, all passing. The
 valuable ones are cross-checks rather than unit tests: the
 MuJoCo model's masses, joint origins, axes, ranges and visual-mesh orientations
 are asserted against the URDF, so the two descriptions cannot drift apart; the

@@ -31,14 +31,18 @@ states exactly what remains to be done.
 % =====================================================================
 \section{Scope and status}
 
-\paragraph{What exists.} Eight ROS 2 packages, 198 tests, a MuJoCo
+\paragraph{What exists.} Eight ROS 2 packages, 217 tests, a MuJoCo
 model generated from the same parameters as the URDF, a five-room test house,
 a modular web GUI, and the complete ROBSTRIDE02 CAN frame codec with 29 unit
-tests. The robot stands, holds pose and walks in simulation.
+tests. In simulation the robot stands, holds pose, and walks and trots at the
+commanded velocity --- 0.30\,m/s tracked to within 3\,mm/s at 90\,\% of the
+continuous torque rating.
 
 \paragraph{What does not.} No hardware has been driven. The CAN backend is
 written but unvalidated; per-joint direction and offset are unknown until the
-robot is assembled and calibrated. The camera depth path is a placeholder in
+robot is assembled and calibrated. Of the five gaits, pace and bound do not
+track velocity --- neither is intended for travel, but neither is finished
+either. Turning is implemented and untested beyond straight-line commands. The camera depth path is a placeholder in
 one respect only (how the HP60C delivers depth over USB). Estimated quantities
 --- rotor inertia, thermal constants, joint friction --- are marked as such
 throughout and listed in Section~\ref{sec:assumptions}.
@@ -534,16 +538,176 @@ bound & 0, 0, 0.50, 0.50        & 0.45 & 2.6 & front then rear; most demanding \
 \end{tabular}
 \end{center}
 
-Swing horizontal position follows $s - \sin(2\pi s)/2\pi$, whose derivative
-$1 - \cos(2\pi s)$ vanishes at both ends, so the foot lifts off and touches down
-with no horizontal velocity relative to the ground. Height follows
-$\sin^2(\pi s)$, likewise zero-slope at both ends, with a small
-\code{touchdown\_depth} subtracted late in swing so the foot seeks the ground
-rather than hovering over an uneven floor. Stride length is not configured: it
-follows from the commanded velocity and the stance duration, clamped to 45\,\%
-of leg reach.
+\subsubsection{What the generator actually does}
+
+The gait generator is a \emph{foot trajectory planner}. It does not compute
+torques and it does not know what a motor is. Once per control cycle it is
+given the elapsed time and the body's measured state, and it returns, for each
+of the four legs, where that foot should be, how fast it should be going, and
+how hard it should push. Everything else --- inverse kinematics, the impedance
+law, the actuator --- happens downstream.
+
+Concretely, \code{GaitGenerator.update(dt, feedback)} returns twelve joint
+positions, twelve joint velocities, twelve feed-forward torques, and a
+four-element contact flag. The joint values come from running each foot
+position through the closed-form leg IK; the torques come from the balance
+layer. A gait is therefore defined entirely by \emph{geometry and timing}, and
+adding one is a block in \code{gaits.yaml} plus a phase offset --- no new code.
+
+\archfig{gait_pipeline}{One control cycle of the gait generator. The
+generator plans feet, not torques: everything it returns is a position, a
+velocity or a force, and the impedance law runs two layers below. Continuity
+is the invariant --- stance resumes from the last commanded position and swing
+starts from where stance left the foot, so the command cannot step at either
+transition.}{1.0}
+
+\subsubsection{The phase model}
+
+One normalised phase $\phi \in [0,1)$ advances at the step frequency and wraps.
+Each leg $i$ reads the same clock through its own offset:
+\[
+  \phi_i = (\phi + \text{offset}_i) \bmod 1,
+  \qquad
+  \text{leg } i \text{ is in \textsc{stance} iff } \phi_i < D
+\]
+where $D$ is the duty factor. That single line is what distinguishes a walk
+from a trot: the offsets decide which feet are down together, and $D$ decides
+for how long. A duty of 0.75 with the walk offsets always leaves three feet
+down, so the robot is statically stable; a duty of 0.5 with the trot offsets
+leaves two, on a diagonal, so it is not.
+
+\subsubsection{Stance: the foot is a fixed point in the world}
+
+A planted foot does not move. It follows that in the \emph{body} frame it must
+translate backwards at exactly the body's velocity --- if the body advances
+10\,mm, the foot must appear 10\,mm further back, or the command is asking the
+leg to drag the robot through the contact.
+
+\[
+  \mathbf{p}^{\text{stance}}_i \mathrel{-}= \mathbf{v}\,\delta t,
+  \qquad
+  \mathbf{v} = \mathbf{v}_{\text{meas}}
+    + g_{\text{sweep}}\,(\mathbf{v}^{*} - \mathbf{v}_{\text{meas}})
+\]
+
+The sweep gain $g_{\text{sweep}}$ chooses which velocity to believe, and the
+default of 1.0 --- the \emph{commanded} velocity --- is the least obvious
+decision in the whole generator. It looks like it must scuff. In steady state
+it does not: once the body is travelling at the commanded speed, the target
+sweeps at exactly the rate the planted foot is already moving through the body
+frame, and the relative motion is zero. When the body is \emph{not} at speed,
+the target runs ahead of the foot and the leg impedance turns that gap into a
+tangential force.
+
+That is the point. Sweeping at the commanded velocity is proportional velocity
+feedback routed through the leg, and it is the dominant thing regulating speed.
+Sweeping at the measured velocity instead is self-consistent at any speed,
+including the wrong one: measured at $g_{\text{sweep}} = 0$, a walk commanded
+to 0.15\,m/s free-ran to 0.272\,m/s and then fell over.
+
+\subsubsection{Swing: interpolate between two latched endpoints}
+
+Swing carries the foot from where it left the ground to where it should next
+land. Both endpoints are explicit positions:
+
+\begin{itemize}
+  \item $\mathbf{p}_0$ is latched at lift-off --- wherever stance actually left
+    the foot, not where it was supposed to be;
+  \item $\mathbf{p}_1$ is the landing point, tracked continuously through the
+    swing so a foot in the air still reacts to the body accelerating.
+\end{itemize}
+
+\[
+  \mathbf{p}^{\text{swing}}(u)
+    = \mathbf{p}_0 + (\mathbf{p}_1 - \mathbf{p}_0)\,\sigma(u),
+  \qquad
+  \sigma(u) = u - \frac{\sin 2\pi u}{2\pi}
+\]
+
+$\sigma'(u) = 1 - \cos 2\pi u$ vanishes at both ends, so the foot leaves and
+arrives with no horizontal velocity relative to the ground --- it is placed,
+not dragged. The vertical profile $\sin^2(\pi u)$ is likewise zero-slope at
+both ends, with a small \code{touchdown\_depth} subtracted late in swing so the
+foot seeks the floor rather than hovering over it, and decayed again over the
+first sixth of stance so that seeking does not itself become a step.
+
+Interpolating between two latched endpoints is what makes the command
+continuous, and it is worth being explicit about why that is not a detail.
+Section~\ref{sec:locomotion-status} records what happened when it was not.
+
+\subsubsection{Foot placement: where velocity is really decided}
+
+Attitude control holds a robot up; it cannot make it go anywhere. A legged
+robot regulates velocity by \emph{where it puts its feet}. The landing point
+uses the Raibert heuristic:
+\[
+  \mathbf{p}_1 = \mathbf{p}_{\text{nom}}
+    + \underbrace{\mathbf{v}_{\text{meas}}\,\frac{T_{\text{stance}}}{2}}_{\text{neutral point}}
+    + \underbrace{k_v\,(\mathbf{v}_{\text{meas}} - \mathbf{v}^{*})}_{\text{correction}}
+\]
+The first term is the landing point that \emph{sustains} the current velocity:
+land half a stance-sweep ahead, sweep back a full stance-sweep, end half behind,
+and the stride is symmetric about the hip. The second term breaks that symmetry
+deliberately --- landing further ahead than neutral decelerates, further behind
+accelerates. The offset is clamped to \code{max\_placement\_m} so a large
+velocity error cannot ask for a footfall outside the workspace.
+
+\subsubsection{Three things regulate speed, and they are not interchangeable}
+
+\begin{center}\small
+\begin{tabular}{@{}llp{0.42\textwidth}@{}}
+\toprule
+\textbf{Mechanism} & \textbf{Acts through} & \textbf{Role} \\
+\midrule
+Stance sweep     & leg impedance & Dominant. Turns velocity error into
+                                   tangential force every cycle. \\
+Tangential wrench & feed-forward torque & Explicit force request,
+                                   $k_{p,v}(\mathbf{v}^{*}-\mathbf{v})$,
+                                   friction-cone limited. \\
+Foot placement   & next footfall & Sets the velocity the gait is stable
+                                   \emph{at}; acts once per step, not
+                                   continuously. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Removing any one degrades tracking; removing the first breaks it outright.
+
+\subsubsection{Force distribution}
+
+Positions alone do not hold a robot up. The contact flag from the phase model
+tells the balance layer which feet may push, and it solves for the ground
+reaction at each of them that best reproduces the desired body wrench
+(Section~\ref{sec:balance}). Those forces become feed-forward joint torques
+through $\boldsymbol{\tau} = -J^{\top}\mathbf{f}$. The gait generator supplies
+the geometry and the contact schedule; the balance layer supplies the forces;
+neither one alone walks.
+
+\subsubsection{Per-cycle summary}
+
+\begin{enumerate}\itemsep2pt
+  \item Advance $\phi$; for each leg compute $\phi_i$ and its stance/swing state.
+  \item Compute the Raibert landing offset from measured and commanded velocity.
+  \item \textsc{Stance}: on touchdown, resume from the last commanded position;
+        retract at the sweep velocity; decay the touchdown depth.
+  \item \textsc{Swing}: on lift-off, latch $\mathbf{p}_0$; interpolate
+        $\mathbf{p}_0 \to \mathbf{p}_1$ with the zero-endpoint-velocity profile
+        and the $\sin^2$ lift.
+  \item Run each foot position and velocity through the leg IK and Jacobian to
+        get $q$ and $\dot q$.
+  \item Ask the balance layer for the body wrench, distribute it over the
+        stance feet, convert to feed-forward torque.
+  \item Return $q$, $\dot q$, $\tau_{\text{ff}}$, contact.
+\end{enumerate}
+
+Stride length is never configured, and there is no stride parameter to
+configure. Swing interpolates between where the foot left the ground and where
+placement says it should land, so the stride is whatever those two points
+imply. The workspace cap is \code{max\_placement\_m}, which bounds the landing
+offset directly --- 0.12\,m against a 0.43\,m leg, comfortably inside reach.
 
 \subsection{Balance}
+\label{sec:balance}
 
 A foot-trajectory generator alone does not walk. With the open-loop gait and no
 balance term, a 0.3\,m/s trot in MuJoCo reached 25$^\circ$ of body tilt,
@@ -582,44 +746,109 @@ landing point at $v\,T_{\mathrm{stance}}/2 + k_v (v - v^{*})$.
 \subsection{Measured locomotion performance}
 \label{sec:locomotion-status}
 
+Six seconds of each gait from the standing keyframe, commanded in a straight
+line, with the balance layer active. Drift is the largest lateral excursion.
+
 \begin{center}\small
-\begin{tabular}{@{}lrrrrl@{}}
+\begin{tabular}{@{}lrrrrrl@{}}
 \toprule
-\textbf{Gait} & \textbf{$v^{*}_x$} & \textbf{travelled} & \textbf{height} &
-\textbf{peak tilt} & \textbf{Verdict} \\
- & (m/s) & (m in 6\,s) & (m) & (deg) & \\
+\textbf{Gait} & \textbf{$v^{*}_x$} & \textbf{actual} & \textbf{error} &
+\textbf{tilt} & \textbf{drift} & \textbf{Verdict} \\
+ & (m/s) & (m/s) & (m/s) & (deg) & (m) & \\
 \midrule
-stand & 0.00 & $-0.003$ & 0.320 & 0.1 & solid; 5.5\,N$\cdot$m peak, no clamping \\
-trot  & 0.30 & $-0.241$ & 0.320 & 3.0 & attitude held; steps in place \\
-trot  & 0.50 & $-0.292$ & 0.311 & 10.4 & attitude held; steps in place \\
-walk  & 0.15 & $+0.528$ & 0.256 & 17.0 & moves forward; attitude marginal \\
-walk  & 0.30 & $-0.433$ & 0.119 & 125 & falls \\
-bound & 0.30 & $-0.178$ & 0.240 & 14.7 & marginal \\
+stand & 0.00 & $-0.001$ & $-0.001$ &  0.1 & 0.000 & solid \\
+walk  & 0.15 & $+0.155$ & $+0.005$ &  7.4 & 0.024 & tracks \\
+walk  & 0.30 & $+0.300$ & $+0.000$ & 10.9 & 0.040 & tracks \\
+trot  & 0.30 & $+0.297$ & $-0.003$ &  5.1 & 0.040 & tracks; default \\
+trot  & 0.50 & $+0.493$ & $-0.007$ &  7.2 & 0.054 & tracks \\
+pace  & 0.30 & $+0.146$ & $-0.154$ & 16.6 & 0.066 & rolls; comparison only \\
+bound & 0.30 & $+0.193$ & $-0.107$ & 18.4 & 0.001 & probe gait only \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\begin{caveat}{Locomotion does not yet track commanded velocity}
-Standing is solid and the balance layer regulates attitude and height well
-during stepping --- a 0.3\,m/s trot holds 3$^\circ$ of tilt at the commanded
-\RdStandHeight\,mm, against 25$^\circ$ without it. But the robot steps in place
-rather than travelling: trot drifts backward at about 0.04\,m/s, and only the
-slow walk makes forward progress, at the cost of attitude.
+Walk and trot --- the two gaits intended for travel --- track commanded
+velocity to within 7\,mm/s. Pace and bound do not, which is consistent with
+what they are for: pace rolls a body only 120\,mm wide between hip
+pivots and is kept for comparison, and bound exists to probe the peak-torque
+and $I^2t$ limits in simulation before hardware ever sees them.
 
-The force-to-motion path is verified correct in isolation --- commanding
-$+30$\,N of ground reaction with all four feet planted moves the robot forward
-0.52\,m, and $-30$\,N moves it backward --- so this is a tuning and timing
-problem, not a sign or architecture error.
+\subsubsection{How it was broken, and what that cost}
+
+For most of this project the robot did not travel. It stepped in place and
+drifted backwards at roughly 0.04\,m/s, while every travelling gait drew 141
+to 201\,\% of the continuous torque rating. Both symptoms had the same two
+causes, and neither was in the balance layer or the gains, which is where the
+effort went first.
+
+\paragraph{A 41\,mm step at every lift-off.} Stance retracts the foot at the
+sweep velocity, but the swing arc was rebuilt from scratch each cycle as
+$\mathbf{p}_{\text{nom}} + \text{stride}\,(\sigma - \tfrac12)$ --- which
+assumes stance had swept the foot back by the full \emph{commanded} stride.
+Whenever the robot was not already at the commanded speed the two disagreed,
+and the difference was commanded in a single 2.5\,ms tick at every lift-off:
+41\,mm from a standstill at 0.30\,m/s. That step drove 0.33\,rad of tracking
+error, which saturated the hips at the \RdTorquePeak\,N$\cdot$m peak and so
+destroyed the force distribution the balance layer had just computed. The robot
+could not accelerate, so the measured velocity stayed at zero, so the step
+never shrank. The gait fought itself into a steady state.
+
+\paragraph{Two jammed hips.} The thigh capsule and the HAA actuator cylinder
+are both conservative bounding volumes around parts that clear each other in
+the CAD, and MuJoCo does not auto-filter the pair because the thigh is the
+base's \emph{grandchild} (base $\to$ hip $\to$ thigh), not its child. The
+front hips therefore jammed 13\,mrad above the standing pose and would not
+move under 16.6\,N$\cdot$m, while the rear hips swung 1.59\,rad on 3\,N$\cdot$m.
+The front legs could only lift with the knee, and the hip absorbed the entire
+impedance error as heat. The robot was, in the most literal sense, walking with
+two of its twelve joints welded shut.
+
+\begin{caveat}{A careful measurement of a broken system is still a measurement of a broken system}
+The stance-height study in \code{gaits.yaml} was repeated at four heights, was
+internally consistent, and was wrong --- it concluded that the balance layer
+stopped helping above 340\,mm, which was an artifact of the jam. So was the
+finding that lower stance impedance reduced torque: with the hips free, the
+original \code{stance\_kp} of 90 turned out to be the best value tested. The
+tuning was never the problem, and no amount of it would have helped.
+
+What eventually found both bugs was not more tuning but per-joint
+instrumentation: printing commanded against measured position for one leg
+through one gait cycle showed a 40\,mm jump in the target at lift-off, and a
+hip angle that did not change by 0.001\,rad across four seconds under peak
+torque. A joint that will not move under 16\,N$\cdot$m is not a control
+problem.
 \end{caveat}
 
-\subsection{Thermal load, and why the gait is not yet safe for hardware}
+Both are now covered by tests that fail if they return:
+\code{test\_the\_foot\_command\_never\_jumps} asserts the commanded foot
+position never moves more than 5\,mm in one tick, at four different measured
+velocities, and
+\code{test\_every\_hip\_can\_swing\_through\_its\_commanded\_range} drives each
+hip alone and requires all four to move, and to move alike.
+
+\subsubsection{What the balance layer is for, now}
+
+Fixing the trajectory changed the answer. The balance layer used to be what
+kept a 0.3\,m/s trot from reaching 25$^\circ$ of tilt; with the swing arc
+continuous and the hips free, the open-loop gait is well behaved on its own and
+the two are within a few tenths of a degree --- 5.1$^\circ$ with balance
+against 4.9$^\circ$ without. Tilt is no longer where the layer earns its place.
+
+Course holding is. Over six seconds at 0.5\,m/s the lateral drift is 0.054\,m
+with balance and 0.299\,m without, because the Raibert term is the only thing
+steering the feet back under the body, and velocity tracking degrades from
+$-0.007$ to $-0.018$\,m/s. A robot that wanders 0.3\,m sideways in six seconds
+does not get through a doorway. The regression test asserts those two things
+rather than tilt.
+
+\subsection{Thermal load}
 \label{sec:thermal-load}
 
 Peak torque is the wrong question to ask of a motor. What decides whether a
 winding survives is the RMS torque, because copper loss goes as current
 squared: a \RdTorquePeak\,N$\cdot$m spike lasting 20\,ms is harmless, and
-10\,N$\cdot$m sustained is not. Measured over six seconds of each gait, with
-the start-up transient discarded:
+10\,N$\cdot$m sustained is not. Measured over six seconds of each gait, worst
+joint, with the start-up transient discarded:
 
 \begin{center}\small
 \begin{tabular}{@{}lrrrrrl@{}}
@@ -628,39 +857,46 @@ the start-up transient discarded:
 \textbf{RMS / cont.} & \textbf{$T_\infty$} & \textbf{Verdict} \\
  & (N$\cdot$m) & (N$\cdot$m) & (N$\cdot$m) & & ($^\circ$C) & \\
 \midrule
-stand         &  3.9 &  3.9 &  3.9 & 65\,\%  &  45 & sustainable \\
-walk 0.15     & 17.0 & 15.0 &  8.5 & 141\,\% & 139 & over limit \\
-trot 0.30     & 17.0 & 17.0 & 10.4 & 173\,\% & 198 & over limit \\
-trot 0.50     & 17.0 & 17.0 & 12.0 & 201\,\% & 260 & over limit \\
-bound 0.30    & 17.0 & 17.0 & 11.2 & 187\,\% & 228 & over limit \\
+stand         &  3.9 &  3.9 &  3.9 &  65\,\% &  45 & sustainable \\
+walk 0.15     & 17.0 &  9.6 &  5.5 &  91\,\% &  70 & sustainable \\
+trot 0.30     & 14.3 &  8.7 &  5.4 &  90\,\% &  69 & sustainable \\
+trot 0.50     & 14.5 &  9.3 &  5.5 &  92\,\% &  71 & sustainable \\
+bound 0.30    & 17.0 & 16.7 &  7.9 & 131\,\% & 123 & over limit \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\begin{caveat}{The current gait would destroy the actuators}
-Every travelling gait sits above the \RdTorqueCont\,N$\cdot$m continuous
-rating in RMS, saturates at the \RdTorquePeak\,N$\cdot$m peak for a quarter to
-a third of the time, and implies steady-state winding temperatures from
-139 to 260\,$^\circ$C. Neodymium magnets begin to demagnetise well below the
-upper end of that range.
+These supersede an earlier table in which every travelling gait sat between 141
+and 201\,\% of continuous, implying winding temperatures from 139 to
+260\,$^\circ$C. That table was correct about a robot with two welded hips and a
+discontinuous swing arc.
 
-The diagnosis is \emph{not} that the actuators are undersized. Standing costs
-3.9\,N$\cdot$m RMS --- 65\,\% of continuous, settling at a comfortable
-45\,$^\circ$C --- and walking a 10\,kg robot should not cost three times the
-RMS of holding it still. The excess is the controller fighting itself: the same
-defect that stops the robot travelling is dissipating the torque as heat
-instead of as forward motion.
+The interpretation was correct then and remains the useful one: the actuators
+were never undersized. Standing costs 3.9\,N$\cdot$m RMS, and steady walking at
+0.5\,m/s needs about 49\,W of net mechanical work against 754\,W rated --- some
+7\,\% --- because almost all the torque a quadruped spends is holding itself up,
+which does no work at all. A travelling gait that costs three times the RMS of
+standing still is not doing three times the work; it is wasting the difference.
+With the waste removed, trot sits at 90\,\% of continuous and 69\,$^\circ$C,
+inside the \RdTempWarn\,$^\circ$C warning threshold.
 
-The safety layer does catch it. The $I^2t$ integrator exhausts its budget in
-about two seconds and derates the limit to continuous, which is exactly what it
-is for --- but a robot that derates mid-stride falls over. This is the
-strongest argument for the bring-up order in Section~\ref{sec:migration}:
-locomotion must be fixed, against identified dynamics, before a gait is ever
-commanded on hardware.
+Bound remains over limit, which is what it is for: it is the gait used to probe
+the peak-torque and $I^2t$ path in simulation, and it should not be commanded on
+hardware. Pace is not listed because it does not track velocity well enough for
+the number to mean anything.
 
-Tracked as an expected-failure test (\code{test\_trot\_is\_thermally\_sustainable})
-so it turns green on its own when the gait is fixed, and measurable at any time
-with \code{tools/torque\_report.py}.
+\begin{caveat}{Margin, not comfort}
+90\,\% of continuous is passing, not roomy. Trot buys its margin partly by
+standing 340\,mm tall rather than 320 --- a straighter leg has a shorter moment
+arm --- and that costs 20\,mm of the leg travel otherwise available for terrain
+and attitude correction. Walk stays at 320\,mm, where it is 91\,\%,
+because it is the gait for stairs and narrow passages and wants the travel.
+The per-gait stance heights in \code{gaits.yaml} carry the measured trade-off.
+
+None of this has been validated against hardware. The thermal model is a
+first-order estimate from datasheet resistance and an assumed thermal
+resistance; the friction and damping are estimates. Treat 90\,\% as
+``plausibly inside the rating'', not as a measurement of a real motor.
 \end{caveat}
 
 \subsection{State estimation}
@@ -1006,6 +1242,7 @@ Temperature thresholds    & estimate & from the above, plus vendor guidance \\
 Camera intrinsics, range  & placeholder & datasheet, then \code{camera\_calibration} \\
 HP60C depth transport     & unknown & determine with the device \\
 Joint limits              & design values & self-collision check on real geometry \\
+Thigh/base clearance      & contact excluded & confirm in CAD; see \S\ref{sec:locomotion-status} \\
 Battery model             & nominal voltage only & add a cell model and state of charge \\
 \bottomrule
 \end{tabular}
@@ -1037,23 +1274,31 @@ in Section~\ref{sec:actuator}.
 \midrule
 \code{robodog\_description} & 16 & URDF structure, conventions, limits, inertia validity \\
 \code{robodog\_hardware}    & 52 & CAN codec, backend contract, thermal, bus budget \\
-\code{robodog\_control}     & 59 & IK exactness, Jacobian, force signs, safety, balance \\
-\code{robodog\_sim}         & 54 & MJCF vs URDF consistency, world geometry, physics, thermal \\
+\code{robodog\_control}     & 73 & IK, Jacobian, force signs, safety, balance, gait continuity \\
+\code{robodog\_sim}         & 59 & MJCF vs URDF consistency, world geometry, physics, locomotion \\
 \code{robodog\_perception}  & 17 & intrinsics, deprojection, self-occlusion, noise model \\
 \midrule
-\textbf{Total}              & \textbf{198} & 197 pass, 1 expected failure \\
+\textbf{Total}              & \textbf{217} & all pass \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 The most valuable are the cross-checks: the MJCF's per-link masses, joint
 origins, axes and ranges are asserted against the URDF, so the two descriptions
-cannot drift. Five tests exist specifically because a bug got past a weaker
+cannot drift. Seven tests exist specifically because a bug got past a weaker
 one: the gravity-torque sign, the idle-command rate-limiter seed, the camera
 self-occlusion fraction, the Euler-convention mismatch that left the rendered
-legs beside the body while every physics test passed, and the gait's thermal
-load. The last is an expected failure, so the gap is tracked in the suite
-rather than only in prose and turns green on its own when the gait is fixed.
+legs beside the body while every physics test passed, the swing arc's
+discontinuity at lift-off, the self-collision that welded the front hips, and
+the gait's thermal load.
+
+The last three are worth noting together. The thermal test spent most of the
+project as an expected failure at 173\,\% of continuous, and it did not turn
+green by being tuned --- it turned green when the two bugs above it were
+fixed, and it now reads 90\,\%. An expected-failure test is a good way to hold
+a known gap where a counter will find it, but it says nothing about
+\emph{why} the gap exists: the reason sat two layers below where the test
+pointed, in the simulation model.
 
 \subsection{Analysis tools}
 

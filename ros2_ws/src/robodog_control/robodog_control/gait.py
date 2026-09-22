@@ -61,20 +61,38 @@ class GaitParams:
     vx: float = 0.0
     vy: float = 0.0
     wz: float = 0.0
-    # Cap on how far a foot may travel in one stride, as a fraction of the
-    # nominal leg reach. Prevents a large velocity request from asking for a
-    # stride the workspace cannot deliver.
-    max_stride_fraction: float = 0.45
+    # NOTE: there is deliberately no stride-length parameter. Swing
+    # interpolates between where the foot left the ground and where Raibert
+    # says it should land, so the stride is whatever those two points imply --
+    # there is no separate stride vector left to clamp. The workspace cap is
+    # BalanceGains.max_placement_m, which bounds the landing offset directly;
+    # at 0.12 m against a 0.43 m leg it keeps the foot well inside reach.
+    # A max-stride fraction used to live here and clamped a vector nothing read.
     # How the stance foot sweeps through the body frame:
-    #   0.0 -> at the MEASURED body velocity: the foot stays planted in the
-    #          world and all propulsion comes from the tangential ground force;
-    #   1.0 -> at the COMMANDED velocity: the foot sweeps back regardless, and
-    #          the impedance term drags the body forward.
-    # Neither extreme works alone. At 0 there is no push-off and the feet march
-    # out from under the body; at 1 the command walks away from a planted foot
-    # and the stance legs fight the ground (measured: 0.17 rad of joint error,
-    # 20 N.m at kp = 120). The blend is the usable region.
-    stance_sweep_gain: float = 0.4
+    #   0.0 -> at the MEASURED body velocity;
+    #   1.0 -> at the COMMANDED velocity.
+    #
+    # 1.0 is correct and is the default, which is not obvious. Sweeping at the
+    # commanded velocity looks like it must scuff, and in steady state it does
+    # not: once the body is travelling at the commanded speed the target sweeps
+    # at exactly the speed the planted foot is already moving through the body
+    # frame, and the relative motion is zero. When the body is NOT at speed the
+    # target runs ahead of the foot, and the leg impedance turns that gap into
+    # a tangential force. That is proportional velocity feedback through the
+    # leg, and it is the main thing regulating speed -- the tangential term in
+    # the balance wrench alone is too weak.
+    #
+    # Measured, after the lift-off discontinuity and the jammed hip were fixed:
+    #
+    #   sweep   walk 0.15 m/s          trot 0.30 m/s
+    #    0.0    0.272 m/s, FELL OVER   0.296 m/s,  98% cont, 1.4 deg
+    #    1.0    0.146 m/s,  84% cont   0.296 m/s, 100% cont, 3.3 deg
+    #
+    # At 0.0 the walk free-ran to 0.272 m/s against a 0.15 command and then
+    # tipped: with a 0.625 s stance there is nothing holding the body to the
+    # commanded speed for most of the cycle. Trot is nearly indifferent, so
+    # 1.0 is the value that serves both.
+    stance_sweep_gain: float = 1.0
 
 
 @dataclass
@@ -122,17 +140,15 @@ class GaitGenerator:
         # pose. The gait perturbs this; it never re-derives it.
         self.nominal = {leg: forward(geometry, leg, nominal_q) for leg in LEGS}
         self._last_q = np.concatenate([nominal_q] * 4)
-        # Foot placement offset LATCHED per leg at touchdown. The offset must
-        # not change while a foot is planted: the foot is on the ground, and
-        # moving its commanded position under it is asking the leg to drag the
-        # robot sideways through the contact. Without this latch the command
-        # jumps by the full offset the instant the foot lands, which saturated
-        # the actuators on every touchdown.
-        self._offset = {leg: np.zeros(2) for leg in LEGS}
         self._was_stance = {leg: True for leg in LEGS}
-        #: latched stance target per leg, in the hip frame
+        #: latched stance target per leg, in the hip frame, swept each cycle
         self._stance_pos = {leg: self.nominal[leg].copy() for leg in LEGS}
-        self._touchdown = {leg: self.nominal[leg].copy() for leg in LEGS}
+        #: where the foot left the ground, latched at lift-off
+        self._liftoff = {leg: self.nominal[leg].copy() for leg in LEGS}
+        #: where the foot is heading, tracked through the swing
+        self._land = {leg: self.nominal[leg].copy() for leg in LEGS}
+        #: last position actually commanded, so touchdown resumes from it
+        self._last_cmd = {leg: self.nominal[leg].copy() for leg in LEGS}
 
     def set_params(self, p: GaitParams) -> None:
         if p.gait not in GAIT_OFFSETS:
@@ -144,9 +160,11 @@ class GaitGenerator:
     def reset(self) -> None:
         self.phase = 0.0
         for leg in LEGS:
-            self._offset[leg][:] = 0.0
             self._was_stance[leg] = True
             self._stance_pos[leg] = self.nominal[leg].copy()
+            self._liftoff[leg] = self.nominal[leg].copy()
+            self._land[leg] = self.nominal[leg].copy()
+            self._last_cmd[leg] = self.nominal[leg].copy()
 
     # ---------------- per-cycle update ----------------
     def update(self, dt: float, feedback: BodyFeedback | None = None) -> GaitOutput:
@@ -167,16 +185,11 @@ class GaitGenerator:
             nom = self.nominal[leg].copy()
             nom[2] = -(p.stance_height_m - self.g.foot_radius)
 
-            # Stride vector for this foot: body velocity plus the tangential
+            # Commanded foot velocity: body velocity plus the tangential
             # component from the yaw rate at this foot's radius.
             r = np.array([nom[0] + self.g.haa_x * (1 if leg[0] == "F" else -1),
                           nom[1] + self.g.haa_y * (1 if leg[1] == "L" else -1)])
             v = np.array([p.vx - p.wz * r[1], p.vy + p.wz * r[0]])
-            stride = v * t_stance
-            max_stride = p.max_stride_fraction * self.g.reach_max
-            n = float(np.linalg.norm(stride))
-            if n > max_stride:
-                stride *= max_stride / n
 
             # Raibert foot placement: a legged robot regulates velocity by
             # where it puts its feet, not by body attitude alone.
@@ -187,17 +200,16 @@ class GaitGenerator:
 
             if s_leg < p.duty_factor:                      # ---- stance ----
                 # A planted foot does not move in the WORLD, so in the body
-                # frame it must translate at the MEASURED body velocity. Driving
-                # it at the commanded velocity instead is what made the stance
-                # legs fight the ground: the command walked away from the foot
-                # at up to 0.17 rad of joint error, which at kp = 120 is 20 N.m
-                # of pure disagreement with reality. Propulsion comes from the
-                # tangential ground force in the wrench, not from dragging the
-                # foot through the contact.
+                # frame it must translate backwards at the body's velocity.
+                # Which velocity -- measured or commanded -- is the sweep
+                # gain's decision, and the default of 1.0 (commanded) is what
+                # turns a velocity error into a tangential force through the
+                # leg impedance. See GaitParams.stance_sweep_gain.
                 if not self._was_stance[leg]:
-                    self._offset[leg][:] = raibert     # latch on touchdown
+                    # Touchdown: start stance from the last position swing
+                    # actually commanded, never from a freshly recomputed one.
+                    self._stance_pos[leg] = self._last_cmd[leg].copy()
                     self._was_stance[leg] = True
-                    self._stance_pos[leg] = self._touchdown[leg].copy()
                 if feedback is None:
                     v_body = v
                 else:
@@ -206,34 +218,61 @@ class GaitGenerator:
                 sp_pos = self._stance_pos[leg]
                 sp_pos[0] -= float(v_body[0]) * dt
                 sp_pos[1] -= float(v_body[1]) * dt
-                sp_pos[2] = nom[2]
+                # Swing presses touchdown_depth_m below the nominal plane so
+                # the foot seeks the ground on an uneven floor. Snapping that
+                # back the instant contact is declared would be a step in the
+                # command -- small, 5 mm, but in the stiffest direction the leg
+                # has -- so it decays over the first sixth of stance instead.
+                # The window is a compromise, measured with torque_report.py:
+                #   0.04 -> walk 90%, bound 142% of continuous
+                #   0.15 -> walk 91%, bound 131%      <- here
+                #   0.30 -> walk 94%, bound 170%
+                # Too short and the foot is still pressing when the leg loads;
+                # too long and it presses for a sizeable part of the stance.
+                held = min(1.0, (s_leg / max(p.duty_factor, 1e-9)) / 0.15)
+                sp_pos[2] = nom[2] - p.touchdown_depth_m * (1.0 - held)
                 pos = sp_pos.copy()
                 vel = np.array([-float(v_body[0]), -float(v_body[1]), 0.0])
                 out.contact[i] = True
             else:                                          # ---- swing ----
-                self._was_stance[leg] = False
+                # Swing interpolates between two explicit endpoints: where the
+                # foot actually left the ground, and where it should land. Both
+                # are positions, not offsets from the nominal foot, which is
+                # what makes the command continuous through BOTH transitions.
+                #
+                # The previous version rebuilt the arc each cycle as
+                # `nom + stride * (s - 0.5)`, i.e. it assumed stance had swept
+                # the foot back by the full commanded stride. Stance sweeps at
+                # the MEASURED velocity, so whenever the robot was not already
+                # travelling at the commanded speed the two disagreed, and the
+                # difference -- 41 mm at 0.3 m/s from a standstill -- was
+                # commanded in a single tick at every lift-off. That step
+                # drove 0.33 rad of tracking error, which saturated the hip
+                # actuators at 17 N.m and destroyed the force distribution the
+                # balance layer had just computed. The robot could not move,
+                # so the measured velocity stayed at zero, so the step never
+                # shrank: the gait fought itself into a steady state.
+                if self._was_stance[leg]:
+                    self._liftoff[leg] = self._stance_pos[leg].copy()
+                    self._was_stance[leg] = False
                 u = (s_leg - p.duty_factor) / max(1.0 - p.duty_factor, 1e-9)
                 t_swing = period * (1.0 - p.duty_factor)
                 sp, sv = _smoothstep(u)
-                pos = nom + np.array([stride[0] * (sp - 0.5), stride[1] * (sp - 0.5), 0.0])
-                # Blend from the offset this foot was standing on to the one it
-                # will land with, so the path is continuous at BOTH lift-off
-                # and touchdown.
-                prev = self._offset[leg]
-                pos[0] += prev[0] + (raibert[0] - prev[0]) * sp
-                pos[1] += prev[1] + (raibert[1] - prev[1]) * sp
+                # The landing point keeps tracking Raibert through the swing,
+                # so a foot in the air still reacts to the body accelerating.
+                land = np.array([nom[0] + raibert[0], nom[1] + raibert[1], nom[2]])
+                self._land[leg] = land
+                p0 = self._liftoff[leg]
+                d_xy = land[:2] - p0[:2]
+                pos = np.array([p0[0] + d_xy[0] * sp, p0[1] + d_xy[1] * sp, nom[2]])
                 pos[2] += p.step_height_m * np.sin(np.pi * u) ** 2
                 pos[2] -= p.touchdown_depth_m * u ** 3     # seek the ground late in swing
-                vel = np.array([stride[0] * sv / t_swing, stride[1] * sv / t_swing,
+                vel = np.array([d_xy[0] * sv / t_swing, d_xy[1] * sv / t_swing,
                                 p.step_height_m * np.pi * np.sin(2 * np.pi * u) / (2 * t_swing)])
                 out.contact[i] = False
-                # remember where this foot is heading, so stance starts exactly
-                # where swing ended
-                self._touchdown[leg] = np.array([
-                    nom[0] + stride[0] * 0.5 + raibert[0],
-                    nom[1] + stride[1] * 0.5 + raibert[1], nom[2]])
 
             out.foot_target[i] = pos
+            self._last_cmd[leg] = pos.copy()
             q = inverse(self.g, leg, pos)
             J = jacobian(self.g, leg, q)
             qd = np.linalg.lstsq(J, vel, rcond=1e-6)[0]

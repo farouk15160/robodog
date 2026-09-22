@@ -384,6 +384,8 @@ def _run_gait(models_dir, RS, P, gait_name, vx, seconds=4.0, balance=True):
     dt = 1 / 400.0
     tilt = 0.0
     min_h = 9.9
+    drift = 0.0
+    x0 = float(b.base_state().position[0])
     for _ in range(int(seconds / dt)):
         bs = b.base_state()
         fb = None
@@ -407,10 +409,13 @@ def _run_gait(models_dir, RS, P, gait_name, vx, seconds=4.0, balance=True):
         tilt = max(tilt, float(np.degrees(2 * np.arcsin(
             np.clip(np.hypot(q[0], q[1]), 0, 1)))))
         min_h = min(min_h, float(bs.position[2]))
+        drift = max(drift, abs(float(bs.position[1])))
     bs = b.base_state()
     out_h = float(bs.position[2])
+    travel = float(bs.position[0]) - x0
     b.shutdown()
-    return dict(tilt=tilt, height=out_h, min_height=min_h)
+    return dict(tilt=tilt, height=out_h, min_height=min_h, drift=drift,
+                travel=travel, vx=travel / seconds)
 
 
 def test_stand_gait_holds_height_and_attitude(models_dir, RS, P):
@@ -423,9 +428,6 @@ def test_balance_layer_keeps_the_body_up_while_trotting(models_dir, RS, P):
     """The measured value of the balance layer. Without it the same trot
     reaches 25 deg of tilt and saturates the actuators; with it the body stays
     within a few degrees of level at the commanded height.
-
-    Note what this does NOT assert: that the robot travels. It does not yet --
-    see the locomotion status section of the documentation.
     """
     r = _run_gait(models_dir, RS, P, "trot", 0.30, balance=True)
     assert r["tilt"] < 12.0, f"tilted {r['tilt']:.1f} deg"
@@ -433,12 +435,104 @@ def test_balance_layer_keeps_the_body_up_while_trotting(models_dir, RS, P):
 
 
 def test_trotting_without_balance_is_measurably_worse(models_dir, RS, P):
-    """Guards the balance layer against being quietly disabled or broken."""
-    with_b = _run_gait(models_dir, RS, P, "trot", 0.30, balance=True)
-    without = _run_gait(models_dir, RS, P, "trot", 0.30, balance=False)
-    assert with_b["tilt"] < without["tilt"], (
-        f"balance made attitude no better: {with_b['tilt']:.1f} vs "
-        f"{without['tilt']:.1f} deg")
+    """Guards the balance layer against being quietly disabled or broken.
+
+    What this asserts CHANGED once the robot could walk, and the change is
+    worth recording. This test used to compare body tilt, because without
+    balance the old gait reached 25 degrees and saturated the actuators. With
+    the swing arc continuous and the hips free, the open-loop gait is well
+    behaved on its own and the two are now within a few tenths of a degree of
+    each other -- 5.1 with balance against 4.9 without. Tilt is no longer where
+    the layer earns its place.
+
+    Velocity tracking and course holding are. Measured over 6 s at 0.5 m/s, the
+    lateral drift is 0.054 m with balance and 0.299 m without, because the
+    Raibert term is the only thing steering the feet back under the body. A
+    robot that wanders 0.3 m sideways in 6 s does not get through a doorway.
+    """
+    fast = 0.50
+    with_b = _run_gait(models_dir, RS, P, "trot", fast, seconds=6.0, balance=True)
+    without = _run_gait(models_dir, RS, P, "trot", fast, seconds=6.0, balance=False)
+    assert with_b["drift"] < without["drift"] * 0.6, (
+        f"balance did not hold course: drifted {with_b['drift']:.3f} m vs "
+        f"{without['drift']:.3f} m without it")
+    assert abs(with_b["vx"] - fast) < abs(without["vx"] - fast), (
+        f"balance tracked velocity no better: {with_b['vx']:+.3f} vs "
+        f"{without['vx']:+.3f} against a {fast:+.2f} command")
+
+
+# --------------------------------------------------------------------------- #
+# locomotion
+# --------------------------------------------------------------------------- #
+def test_the_trot_actually_travels(models_dir, RS, P):
+    """The robot must go somewhere, at roughly the speed it was asked for.
+
+    For most of this project it did not: it stepped in place and drifted
+    backwards at 0.04 m/s. Two bugs, both now covered by their own tests
+    below -- a discontinuous swing arc and a jammed front hip.
+    """
+    r = _run_gait(models_dir, RS, P, "trot", 0.30, seconds=6.0)
+    assert r["vx"] > 0.20, f"trot managed {r['vx']:+.3f} m/s against a 0.30 command"
+    assert abs(r["vx"] - 0.30) < 0.10, f"poor tracking: {r['vx']:+.3f} m/s"
+
+
+def test_the_walk_actually_travels(models_dir, RS, P):
+    r = _run_gait(models_dir, RS, P, "walk", 0.15, seconds=6.0)
+    assert abs(r["vx"] - 0.15) < 0.07, f"walk managed {r['vx']:+.3f} m/s vs 0.15"
+
+
+def test_commanded_speed_changes_actual_speed(models_dir, RS, P):
+    """Velocity tracking, not just motion: asking for more must deliver more.
+    A gait that free-runs at whatever speed its geometry settles at would pass
+    the two tests above and fail this one."""
+    slow = _run_gait(models_dir, RS, P, "trot", 0.20, seconds=6.0)
+    fast = _run_gait(models_dir, RS, P, "trot", 0.50, seconds=6.0)
+    assert fast["vx"] > slow["vx"] + 0.15, (
+        f"0.20 -> {slow['vx']:+.3f} m/s but 0.50 -> {fast['vx']:+.3f} m/s")
+
+
+def test_every_hip_can_swing_through_its_commanded_range(models_dir, RS, P):
+    """Regression: the thigh capsule and the HAA actuator cylinder are both
+    conservative bounding volumes of parts that clear each other in the CAD,
+    and MuJoCo does not auto-filter the pair because the thigh is the base's
+    grandchild. Left in, the FRONT hips jammed 13 mrad above the standing pose
+    and would not move under 16.6 N.m, while the rear hips swung 1.59 rad on
+    3 N.m. The robot could not walk and no amount of gain tuning would have
+    fixed it.
+
+    Drives each hip alone and requires them all to move, and to move ALIKE --
+    the front/rear asymmetry is the signature of the bug.
+    """
+    from robodog_hardware.registry import create_backend
+    from robodog_hardware.types import ControlMode, JointCommand
+
+    swept = {}
+    for i, leg in enumerate(("FL", "FR", "RL", "RR")):
+        b = create_backend("mujoco", dict(
+            model_path=os.path.join(models_dir, "robodog.xml"),
+            peak_torque_nm=RS["performance"]["peak_torque_nm"],
+            no_load_speed_rad_s=RS["performance"]["no_load_speed_rad_s"]))
+        b.configure()
+        b.enable()
+        j = 3 * i + 1                       # <leg>_hfe
+        q0 = float(b.read().position[j])
+        c = JointCommand()
+        c.mode[:] = int(ControlMode.TORQUE)
+        c.kp[:] = 0.0
+        c.kd[:] = 0.0
+        c.effort[:] = 0.0
+        c.effort[j] = 3.0
+        for _ in range(200):
+            b.write(c)
+            b.step(1 / 400.0)
+        swept[leg] = float(b.read().position[j]) - q0
+        b.shutdown()
+    for leg, d in swept.items():
+        assert d > 1.0, (
+            f"{leg}_hfe moved only {d:.3f} rad under 3 N.m -- it is jammed "
+            f"against something. All four: {swept}")
+    spread = max(swept.values()) - min(swept.values())
+    assert spread < 0.20, f"front/rear hips behave differently: {swept}"
 
 
 # --------------------------------------------------------------------------- #
@@ -512,20 +606,28 @@ def test_standing_is_thermally_sustainable(models_dir, RS, P):
         f"standing would settle at {temp:.0f} C")
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "Known gap: the gait draws far more torque than the work requires because "
-    "it does not yet track velocity -- the legs fight the ground instead of "
-    "propelling the body. Standing needs 3.9 N.m RMS; a 0.3 m/s trot needs "
-    "10.4, which is 173% of the continuous rating and would settle near 200 C. "
-    "Tracked here rather than only in prose so it turns green on its own when "
-    "locomotion is fixed. See the locomotion status section of the docs."))
 def test_trot_is_thermally_sustainable(models_dir, RS, P):
+    """This was an expected failure for most of the project's life, at 173% of
+    continuous. It did not turn green by being tuned: the gait was commanding a
+    41 mm backward step at every lift-off, and the front hips were jammed
+    against a spurious self-collision. Both are fixed, and the same measurement
+    now reads 91%."""
     peak, rms = _rms_torque(models_dir, RS, P, "trot", 0.30)
     cont = RS["operational_limits"]["continuous_torque_nm"]
     temp = _steady_temp(rms, RS)
     assert rms < cont, (
         f"trot draws {rms:.2f} N.m RMS ({rms/cont:.0%} of continuous), peak "
         f"{peak:.1f}, implying {temp:.0f} C steady state")
+    assert temp < RS["operational_limits"]["temperature_warn_c"], (
+        f"trot would settle at {temp:.0f} C")
+
+
+def test_walk_is_thermally_sustainable(models_dir, RS, P):
+    """The gait for stairs and narrow passages, so it is the one most likely to
+    be held for a long time."""
+    _, rms = _rms_torque(models_dir, RS, P, "walk", 0.15)
+    cont = RS["operational_limits"]["continuous_torque_nm"]
+    assert rms < cont, f"walk draws {rms:.2f} N.m RMS ({rms/cont:.0%})"
 
 
 def test_the_thermal_model_agrees_with_the_datasheet(RS):

@@ -7,30 +7,36 @@
 # step_height_m      peak foot lift during swing
 # stance_height_m    base_link height above the contact plane
 #
-# Stride length is NOT configured: it follows from the commanded velocity and
-# the stance duration, and is clamped to 45% of leg reach by the generator.
+# Stride length is NOT configured. Swing interpolates between where the foot
+# left the ground and where foot placement says it should land, so the stride
+# is whatever those two points imply. The workspace cap is max_placement_m in
+# the balance gains, which bounds the landing offset directly.
 #
 # STANCE HEIGHT IS THE CHEAPEST TORQUE LEVER THERE IS -- and it is not free.
 # Holding a load costs torque proportional to the horizontal distance from the
 # knee to the foot, and standing taller straightens the leg and shrinks it.
-# But a straighter leg also has a worse-conditioned Jacobian, so the balance
-# layer has less authority to correct attitude with. Measured over a 0.3 m/s
-# trot (tools/design_study.py, tools/torque_report.py):
+# The cost is leg travel: what is left for terrain, and for the balance layer
+# to correct attitude with. Measured with tools/torque_report.py, worst joint,
+# after the lift-off discontinuity and the jammed front hips were fixed:
 #
-#     stance   RMS torque   of continuous   body tilt   leg travel left
-#      300 mm     13.9 N.m        231%         2.5 deg       150 mm
-#      320 mm     10.4 N.m        173%         2.6 deg       130 mm   <- default
-#      340 mm      8.0 N.m        134%         5.2 deg       110 mm
-#      360 mm      5.9 N.m         99%         4.0 deg        90 mm
+#            walk 0.15     trot 0.30     trot 0.50    leg travel left
+#   300 mm        --          103%           --            150 mm
+#   320 mm        91%         100%          101%           130 mm
+#   340 mm        92%          90%           92%           110 mm
+#   360 mm        85%          83%           85%            90 mm
 #
-# 360 mm reaches the continuous rating outright, which is tempting. It is not
-# the default, for two reasons. At 340 mm and above the balance layer stops
-# measurably improving attitude over no balance at all, so the gain is bought
-# by stiffening the leg rather than by controlling it. And the gait is known
-# not to track velocity yet: choosing a posture to flatter a controller that is
-# about to be rewritten is fitting to a fiction.
+# These supersede an earlier table that read 173% for a 320 mm trot. That
+# measurement was real but it was measuring a jammed robot: the front hips
+# could not move, so the front legs lifted with the knee alone and the hips
+# absorbed the whole impedance error. It is left here as a warning that a
+# careful measurement of a broken system is still a measurement of a broken
+# system.
 #
-# Raising this is the FIRST thing to try once locomotion works.
+# Walk and trot pull in opposite directions -- walk is cheapest at 320 mm and
+# trot at 360 mm -- which is why this is per-gait rather than global. Trot runs
+# at 340 mm: 92% of continuous with 110 mm of travel still in hand. Walk stays
+# at 320 mm, where it is 91%, because it is the gait for stairs and
+# narrow passages and wants the travel.
 gaits:
   stand:
     step_frequency_hz: 0.0
@@ -56,7 +62,7 @@ gaits:
     step_frequency_hz: 2.2
     duty_factor: 0.50
     step_height_m: 0.06
-    stance_height_m: 0.320
+    stance_height_m: 0.340
     description: >
       Diagonal pairs. Dynamically stable rather than statically stable, and the
       default travelling gait: the diagonal support line passes close to the

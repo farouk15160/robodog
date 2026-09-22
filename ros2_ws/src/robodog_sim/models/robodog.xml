@@ -198,6 +198,12 @@
       </body>
     </body>
   </worldbody>
+  <contact>
+    <exclude name="FL_thigh_base" body1="base_link" body2="FL_thigh"/>
+    <exclude name="FR_thigh_base" body1="base_link" body2="FR_thigh"/>
+    <exclude name="RL_thigh_base" body1="base_link" body2="RL_thigh"/>
+    <exclude name="RR_thigh_base" body1="base_link" body2="RR_thigh"/>
+  </contact>
   <actuator>
     <motor name="FL_haa_joint" joint="FL_haa_joint" gear="1" class="robot"/>
     <motor name="FL_hfe_joint" joint="FL_hfe_joint" gear="1" class="robot"/>

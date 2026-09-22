@@ -295,6 +295,12 @@
     <geom type="box" size="0.11 0.11 0.055" name="debris4" rgba="0.78 0.45 0.15 1" group="0" friction="0.9 0.02 0.001" condim="3" solref="0.004 1" solimp="0.95 0.99 0.001" pos="8.3 6.4 0.055" quat="1 0 0 0"/>
     <geom type="box" size="0.11 0.11 0.03" name="debris5" rgba="0.78 0.45 0.15 1" group="0" friction="0.9 0.02 0.001" condim="3" solref="0.004 1" solimp="0.95 0.99 0.001" pos="9.12 6.18 0.03" quat="1 0 0 0"/>
   </worldbody>
+  <contact>
+    <exclude name="FL_thigh_base" body1="base_link" body2="FL_thigh"/>
+    <exclude name="FR_thigh_base" body1="base_link" body2="FR_thigh"/>
+    <exclude name="RL_thigh_base" body1="base_link" body2="RL_thigh"/>
+    <exclude name="RR_thigh_base" body1="base_link" body2="RR_thigh"/>
+  </contact>
   <actuator>
     <motor name="FL_haa_joint" joint="FL_haa_joint" gear="1" class="robot"/>
     <motor name="FL_hfe_joint" joint="FL_hfe_joint" gear="1" class="robot"/>

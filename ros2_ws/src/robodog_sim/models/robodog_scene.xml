@@ -461,6 +461,12 @@
     <geom type="cylinder" size="0.06 0.35" name="slalom_3" rgba="0.78 0.45 0.15 1" group="0" friction="0.9 0.02 0.001" condim="3" solref="0.004 1" solimp="0.95 0.99 0.001" pos="-5.5 -6.2 0.35" quat="1 0 0 0"/>
     <geom type="cylinder" size="0.06 0.35" name="slalom_4" rgba="0.78 0.45 0.15 1" group="0" friction="0.9 0.02 0.001" condim="3" solref="0.004 1" solimp="0.95 0.99 0.001" pos="-4.6 -7 0.35" quat="1 0 0 0"/>
   </worldbody>
+  <contact>
+    <exclude name="FL_thigh_base" body1="base_link" body2="FL_thigh"/>
+    <exclude name="FR_thigh_base" body1="base_link" body2="FR_thigh"/>
+    <exclude name="RL_thigh_base" body1="base_link" body2="RL_thigh"/>
+    <exclude name="RR_thigh_base" body1="base_link" body2="RR_thigh"/>
+  </contact>
   <actuator>
     <motor name="FL_haa_joint" joint="FL_haa_joint" gear="1" class="robot"/>
     <motor name="FL_hfe_joint" joint="FL_hfe_joint" gear="1" class="robot"/>

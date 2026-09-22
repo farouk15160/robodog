@@ -266,6 +266,29 @@ def build_robot(root: ET.Element, params: dict, *, spawn=(0.0, 0.0), yaw=0.0) ->
         _sub(calf, "site", name=f"{leg}_foot_site", pos=_f(0, 0, -g["shank_length_m"]),
              size=_f(g["foot_radius_m"] * 1.02), type="sphere", rgba="0 0 0 0")
 
+    # ---------------- contact exclusions ----------------
+    # The thigh capsule and the HAA actuator cylinder on the base are both
+    # CONSERVATIVE bounding volumes around parts that are adjacent by design:
+    # a 30 mm capsule standing in for a flat thigh plate, and the 78.5 mm
+    # actuator can it swings past. Their bounds overlap where the real parts
+    # clear each other, and MuJoCo does not auto-filter this pair because the
+    # thigh is the base's GRANDCHILD (base -> hip -> thigh), not its child.
+    #
+    # Left in, it welds the robot shut. Measured: the front hips jammed at
+    # 0.823 rad -- 13 mrad above the standing pose -- and stayed there under
+    # 16.6 N.m, so the front legs could only lift with the knee while the hip
+    # absorbed the full impedance error. The rear hips, whose actuator cans sit
+    # behind them, swung the full 1.59 rad on the same torque. That asymmetry
+    # was the whole reason the robot could not walk.
+    #
+    # The body box (base_col0) is NOT excluded: a leg folding into the body
+    # shell is a real collision and still registers. Only the actuator-can
+    # pair, which the joint limits are what actually guard, is dropped.
+    con = _sub(root, "contact")
+    for leg in LEGS:
+        _sub(con, "exclude", name=f"{leg}_thigh_base",
+             body1="base_link", body2=f"{leg}_thigh")
+
     # ---------------- actuators ----------------
     act = _sub(root, "actuator")
     for leg in LEGS:
