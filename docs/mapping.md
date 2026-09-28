@@ -70,14 +70,14 @@ This adds mapping, not autonomous navigation, obstacle avoidance or a new locomo
 
 Validated on 2026-09-28 with ROS Humble, MuJoCo 3.13.0, RTAB-Map ROS 0.23.7 and OctoMap server 2.3.1. Both runs used headless simulation, registered 640 × 480 images and 5 cm occupancy cells. [Recorded measurements](mapping_validation.json) include calibration, timestamps, TF checks and export checksums.
 
-The full regression suite passed: 338 tests, including 39 perception tests. Mapping policy coverage is 100%; camera tests include reconstructing the rendered floor using the published calibration.
+The initial mapping integration passed 338 regression tests, including 39 perception tests. After enabling mapping by default and adding GUI diagnostics, the full suite passed 364 tests; the mapping policy has 100% statement coverage. Camera tests include reconstructing the rendered floor using the published calibration. The later [GUI validation](gui_telemetry.md#verification) also confirmed default mapping startup in both worlds.
 
 | World | Distance walked | Occupied 3D points, start → finish | Known 2D cells, start → finish | Final real-time factor |
 |---|---:|---:|---:|---:|
 | House | 0.500 m | 687 → 1,053 | 519 → 523 | 0.608 |
 | Flat | 0.501 m | 1,837 → 4,163 | 3,607 → 4,262 | 0.617 |
 
-Both runs produced new maps during motion, acknowledged database backup and finished with zero velocity and a stand command. Neither recorded actuator clamp events. Flat-world occupied 3D points include the ground; its nearby 2D obstacle count was zero. The reported real-time factors mean these runs were slower than real time on this workstation.
+Both short mapping runs produced new maps during motion, acknowledged database backup and finished with zero velocity and a stand command. Neither recorded actuator clamp events during those checks. Later, longer GUI walk-to-stand tests reported `TORQUE_LIMIT` in both worlds; a stand acknowledgement does not establish a sustained fault-free stance. See [the recorded limitation](gui_telemetry.md#verification). Flat-world occupied 3D points include the ground; its nearby 2D obstacle count was zero. The reported real-time factors mean these runs were slower than real time on this workstation.
 
 The house database reloaded successfully: the known 2D cells remained at 523 before any new walking, and stored observations increased from 18 before restart to 24 afterward. Full colored OctoMap exports succeeded for both worlds: 7,964 tree nodes for the house and 27,567 for the flat world. Tree nodes and occupied point-cloud points count different things.
 

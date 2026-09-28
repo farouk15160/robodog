@@ -11,9 +11,9 @@ Top-level launch for the robodog quadruped.
     ros2 launch robodog_bringup robot.launch.py backend:=robstride06_can \
         camera_backend:=nuwa_hp60c
 
-The SAME node graph runs in every case. `backend` and `camera_backend` choose
-implementations behind the hardware and camera boundaries; no topic, service,
-frame or controller changes between simulation and hardware.
+Core command and telemetry contracts are shared across backends. The default
+mapping:=auto adds RTAB-Map only for MuJoCo with the simulated camera enabled;
+hardware depth and base odometry still require integration.
 """
 import os
 

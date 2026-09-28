@@ -6,7 +6,7 @@
 \large Software architecture for a 12-DOF quadruped\\
 \normalsize 12 $\times$ ROBSTRIDE06 QDD actuators \textbullet\ \RdMassTotal\,kg \textbullet\ ROS 2 (Humble local validation)}
 \author{\small Generated from the Onshape CAD export \texttt{\RdCadSha}}
-\date{\small Revision 0.2 --- RS06 model migration; hardware unvalidated}
+\date{\small Revision 0.3 --- RGB-D mapping and joint diagnostics; 28 September 2026}
 
 \begin{document}
 \maketitle
@@ -20,6 +20,9 @@ derived programmatically from the CAD assembly; the control stack runs at
 implementations, two simulated and one for the real CAN bus. The current RS06 configuration is evaluated in simulation. The shared
 interfaces preserve command and telemetry semantics across backends; hardware
 calibration, sensor integration and physical validation remain outstanding.
+RTAB-Map with its built-in OctoMap now starts by default for the supported
+MuJoCo camera pipeline. The GUI reports time-weighted joint-load statistics
+and identifies measured, simulated and estimated telemetry sources.
 Section~\ref{sec:migration} records the original migration design.
 \end{abstract}
 
@@ -165,12 +168,25 @@ separately accounting for Robodog's knee belt.
 shutdown; it is not a clean runtime pass. The headless benchmark completes
 normally. The shutdown failure remains unresolved.
 
+\paragraph{Latest integration status.} The subsequent GUI and default-mapping
+checks passed all 364 regression tests and exercised the diagnostics in a live
+browser. A separate requirement for a fault-free stand after walking
+\textbf{did not pass}: both house and flat runs reported
+\code{TORQUE\_LIMIT} after the transition, with increasing aggregate limiter
+counts. The house capture identifies the rear-right hip-roll joint at its
+configured continuous budget. This unresolved controller/load issue is a
+different scenario from the successful sustained-gait benchmarks above;
+those benchmarks do not establish comfortable margins for every transition.
+\href{gui_telemetry_validation.json}{The GUI validation record} retains both
+the passing interface checks and the failed transition assertion.
+
 % =====================================================================
 \section{System overview}
 
 \archfig{system_architecture}{System architecture. The red band is the
 hardware/software boundary: two abstract interfaces, \code{JointBackend} and
-\code{CameraBackend}. Simulation and hardware differ only below it.}{1.0}
+\code{CameraBackend}. Core contracts are shared; mapping is an optional
+extension currently supported only in MuJoCo.}{1.0}
 
 \subsection{Design targets}
 
@@ -211,6 +227,9 @@ of the whole-robot center of mass in an arbitrary pose.
 frame for the estimated base pose and the test-world markers. Camera optical
 frames follow the ROS optical convention ($z$ forward, $x$ right, $y$ down),
 related to their body frames by $\mathrm{rpy} = (-\pi/2,\, 0,\, -\pi/2)$.
+When mapping is active, control owns \code{odom}$\to$\code{base\_link}
+and RTAB-Map owns \code{map}$\to$\code{odom}; the mapper does not replace
+the base-state source. ROS uses wall timestamps without a \code{/clock} topic.
 
 \paragraph{Joint naming.} \code{\{FL,FR,RL,RR\}\_\{haa,hfe,kfe\}\_joint}.
 HAA is hip abduction/adduction, HFE hip flexion/extension, KFE the knee.
@@ -450,8 +469,8 @@ recognisable posture rather than a diagonal collapse.
 \section{Software architecture}
 
 \archfig{software_architecture}{ROS 2 package graph. Arrows point from
-dependant to dependency. No package above the hardware layer depends on a
-simulation package.}{0.96}
+dependant to dependency. The joint backend isolates control from the physics
+engine; launch composition selects simulation assets and mapping support.}{0.96}
 
 \subsection{Packages}
 
@@ -465,8 +484,8 @@ simulation package.}{0.96}
 \code{robodog\_hardware}    & ament\_python & \code{JointBackend} + RS06 CAN codec \\
 \code{robodog\_control}     & ament\_python & control loop, safety, gait, IK, estimator \\
 \code{robodog\_sim}         & ament\_python & MJCF generator, test worlds, markers \\
-\code{robodog\_perception}  & ament\_python & \code{CameraBackend}, depth, point cloud \\
-\code{robodog\_web}         & ament\_python & GUI server and protocol \\
+\code{robodog\_perception}  & ament\_python & camera, depth, cloud, mapping launch \\
+\code{robodog\_web}         & ament\_python & GUI server, protocol, rolling diagnostics \\
 \code{robodog\_bringup}     & ament\_cmake  & launch composition only \\
 \bottomrule
 \end{tabular}
@@ -479,11 +498,12 @@ implementation dependency.
 \subsection{The hardware boundary}
 \label{sec:boundary}
 
-\archfig{hardware_boundary}{Everything above the boundary is unchanged by the
-swap to hardware. The per-joint direction and offset map is the only place where
-motor coordinates and canonical joint coordinates differ.}{1.0}
+\archfig{hardware_boundary}{The command and telemetry contracts survive the
+swap to hardware. Hardware sensor integration remains outstanding; optional
+mapping is disabled there. The direction and offset map translates motor and
+canonical joint coordinates.}{1.0}
 
-\code{JointBackend} is a six-method abstract class:
+\code{JointBackend} declares configuration, command, feedback and base-state methods:
 
 \begin{lstlisting}[language=Python]
 class JointBackend(ABC):
@@ -508,15 +528,16 @@ integration path; it does not establish a working hardware balance loop.
 
 Three implementations exist. \code{KinematicBackend} models each joint as an
 independent second-order system with the reflected rotor inertia --- no physics
-engine, no contact, no gravity --- so the entire stack above the boundary is
-runnable and testable with nothing installed. \code{MujocoBackend} adds
+engine, no contact, no gravity --- so core control can be exercised without a
+physics engine. Mapping is disabled in this mode. \code{MujocoBackend} adds
 rigid-body dynamics and contact. \code{RobStride06Backend} drives the real
 motors.
 
 \subsection{Interfaces}
 
-\archfig{node_topic_graph}{Node and topic graph. Identical in simulation and on
-hardware; only the implementations behind the two backends differ.}{1.0}
+\archfig{node_topic_graph}{Core node and topic graph. The supported MuJoCo
+camera pipeline additionally launches RTAB-Map by default; hardware depth and
+odometry integration remain prerequisites for enabling mapping there.}{1.0}
 
 \begin{center}\small
 \begin{tabular}{@{}llrl@{}}
@@ -598,9 +619,8 @@ one old RS02 inertia calculation cannot characterize every current joint.
 \textbf{Context} & $k_p$ & $k_d$ & \textbf{Rationale} \\
 \midrule
 Named pose, joint test & 80  & 2.0 & moderate, unloaded \\
-Stance leg             & 120 & 2.5 & stiff enough to hold the body up \\
-Swing leg              & 45  & 1.2 & compliant: an unexpected contact during
-                                     swing must not lever the robot over \\
+Stance leg             & 90  & 2.0 & feedback around balance feed-forward \\
+Swing leg              & 60  & 1.5 & tracks the unloaded trajectory \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1182,6 +1202,13 @@ collides with in MuJoCo; two hand-maintained files would drift, and the drift
 would look like a perception bug.
 \end{decision}
 
+Both worlds include a static standing human mannequin, exactly 1.90\,m from
+soles to crown, beside the robot's spawn and clear of its forward travel lane.
+Its feet rest on the floor; the same primitive geometry appears in MuJoCo and
+RViz. It provides a size reference rather than a human dynamics model. The
+\href{images/human_reference_flat.png}{flat-world} and
+\href{images/human_reference_house.png}{house} images show the comparison.
+
 Two worlds ship. \code{flat} is an open-air proving ground, 24\,$\times$\,24\,m,
 with eight independent lanes radiating from the spawn so that each locomotion
 problem can be attempted on its own: a measured run with metre markers for
@@ -1221,29 +1248,33 @@ the test environment out from under the experiment.
 % =====================================================================
 \section{Perception}
 
-\archfig{perception_pipeline}{One configuration file drives both backends, so
-the simulated camera has the real device's intrinsics and range.}{1.0}
+\archfig{perception_pipeline}{Camera and depth pipeline. Simulated calibration
+is derived from the renderer; the real camera still requires calibration and
+depth integration. Mapping uses registered RGB and depth.}{1.0}
 
 The Yahboom NUWA HP60C is mounted on the body's front face on a bracket at
 $z = 175$\,mm, pitched 0.26\,rad down.
 
-\begin{decision}{The camera mount height is set by self-occlusion}
-The front hip assemblies occupy roughly $x = 0.11 \ldots 0.26$\,m and reach
+\begin{decision}{Historical camera mount study}
+The original camera-mount study predates the revised RS06 geometry and mapping
+calibration. In that study the front hip assemblies occupied roughly
+$x = 0.11 \ldots 0.26$\,m and reached
 $z = +0.05$\,m, leaving only a 42\,mm slot between them on the centreline.
 Rendering the simulated depth image from $z = 20$\,mm put \textbf{95\,\%} of the
 frame on the robot's own legs at 74\,mm; $z = 90$\,mm still left 48\,\%. Clearing
 the hip corner with the bottom edge of the frustum requires $z > 155$\,mm, so
-the camera sits on a mast --- as it does on every production quadruped. At
-175\,mm the self-view is 0\,\% and 98.5\,\% of the depth image is usable.
+the selected mount was raised. At 175\,mm the recorded self-view was
+0\,\% and 98.5\,\% of the depth image was usable. These percentages are
+historical results, not fresh measurements of the current model.
 \end{decision}
 
 \begin{decision}{The simulated camera loads its own MuJoCo model}
 The physics instance lives in the control node's backend. Rather than reach into
 it, the camera backend loads the same scene read-only and drives it from the
-published robot state. The camera is then a separate node with a separate
-lifecycle --- exactly as the real USB camera will be --- so the node graph does
-not change on hardware, rendering never steals time from the
-\RdControlRate\,Hz loop, and a camera crash cannot take the control loop down.
+published robot state. The camera has a separate node and lifecycle, keeping
+rendering outside the control callback and camera failures isolated from the
+control process. Rendering and mapping still compete for workstation resources;
+the mapping runs below operated slower than real time.
 \end{decision}
 
 Depth crosses the backend boundary as float32 metres with NaN for invalid,
@@ -1258,12 +1289,79 @@ datasheet maximum.
 Resolution, field of view, range and baseline in
 \code{config/nuwa\_hp60c.yaml} are plausible for a device of this class but have
 \emph{not} been read from the datasheet; each is marked \code{[VERIFY]}. The
-architecture does not depend on them --- they are configuration, and both
-backends read the same file. How the HP60C delivers depth over USB (a second UVC
+simulated camera instead publishes calibration derived from its rendered field
+of view and image dimensions; this does not validate the physical device.
+How the HP60C delivers depth over USB (a second UVC
 stream, a side-by-side frame, or only through the vendor SDK) is the one thing
 that cannot be determined without the device, and is marked \code{HW-CHECK} in
 \code{backends/nuwa\_hp60c.py}.
 \end{caveat}
+
+\subsection{RGB-D SLAM and 3D occupancy}
+\label{sec:mapping}
+
+SLAM estimates a trajectory and corrects the map when places are revisited;
+OctoMap represents occupied, free and unknown 3D space using those poses.
+RTAB-Map supplies both the SLAM graph and its built-in OctoMap here, without a
+separate OctoMap mapping server. The default \code{mapping:=auto} enables it
+for \code{backend:=mujoco}, \code{camera\_backend:=sim} and
+\code{use\_camera:=true}. It disables mapping for the other sensor pipelines.
+\code{mapping:=none} disables processing explicitly; \code{mapping:=rtabmap}
+requires a supported configuration and fails early otherwise.
+
+Mapping mode renders registered $640\times480$ RGB and depth from one optical
+origin. Both images and their calibration use
+\code{camera\_color\_optical\_frame} and the acquisition timestamp of the
+robot state used to render them. Intrinsics follow the rendered camera's
+vertical field of view and image dimensions. ROS depth remains
+\code{16UC1} millimetres. Matching best-effort QoS and exact synchronization
+preserve this camera contract; repeated stale poses are not republished.
+
+The initial map settings are 5\,cm cells, a 4\,m depth range and 2\,Hz
+processing. Cell size is resolution, not sensor accuracy. The namespace
+\code{/robodog/mapping} contains \code{map} (2D occupancy),
+\code{octomap\_occupied\_space} (3D points), \code{octomap\_full},
+\code{octomap\_binary} and \code{mapData}. Outputs are generated when
+subscribed; the map cache remains when viewers disconnect. Mapping RViz uses
+the \code{map} frame and shows both 2D and 3D occupancy.
+
+\paragraph{Persistence and export.} Databases are preserved separately by world:
+\begin{lstlisting}
+$ROS_HOME/robodog/maps/<world>.db
+# When ROS_HOME is unset:
+~/.ros/robodog/maps/<world>.db
+\end{lstlisting}
+Restarting reuses the database. To select another file without deleting the
+previous session, pass this launch argument:
+\begin{lstlisting}
+mapping_database:=/absolute/path/session.db
+\end{lstlisting}
+The \code{/robodog/mapping/rtabmap/backup} service flushes a \code{.back} copy.
+
+The official \code{octomap\_saver\_node} exports a full colored
+\code{ColorOcTree} to \code{.ot} via the node's \code{octomap\_full} service;
+the database retains the graph and observations, whereas \code{.ot} is an
+occupancy snapshot. Exact service remapping and installation commands are in
+\href{mapping.md}{the mapping runbook}.
+
+\paragraph{Validation and scope.} Recorded 0.500\,m house and 0.501\,m flat
+walks grew occupied point clouds from 687 to 1,053 and 1,837 to 4,163 points,
+respectively. Final real-time factors were 0.608 and 0.617. House database
+reload retained 523 known 2D cells before moving; stored observations increased
+from 18 to 24 after restart. Full exports contained 7,964 house and 27,567 flat
+tree nodes, a different count from occupied points. These short integration
+checks acknowledged stop/stand commands and observed no clamp events during
+their measurement window; they do not supersede the later failed post-walk
+stand checks. \href{mapping_validation.json}{The mapping record} preserves
+the measurements and export hashes.
+
+MuJoCo supplies exact odometry, so these runs do not establish real visual
+odometry accuracy or loop-closure performance. Kinematic mode has no moving
+base odometry or world spawn placement. The real NUWA backend does not yet
+provide depth, and real base odometry is not integrated. Hardware mapping needs
+calibrated registered depth and a validated odometry source with exclusive
+ownership of \code{odom}$\to$\code{base\_link}. This integration does not add
+autonomous navigation or obstacle avoidance.
 
 % =====================================================================
 \section{Web GUI}
@@ -1271,8 +1369,9 @@ that cannot be determined without the device, and is marked \code{HW-CHECK} in
 A single process holds an rclpy node and an aiohttp server; rclpy spins in a
 background thread while aiohttp owns the asyncio loop. They meet at two
 dictionaries: the ROS callbacks write the latest state, the web tasks read it.
-No queue --- a GUI only ever wants the newest value, and buffering telemetry for
-a browser that fell behind is how a monitoring tool ends up showing the past.
+The browser receives the newest snapshot rather than a backlog. A separate,
+bounded server-side history computes diagnostics from each received telemetry
+sample before display throttling.
 
 \begin{decision}{A purpose-built protocol rather than rosbridge}
 rosbridge would re-serialise every field at the full publish rate and expose the
@@ -1287,7 +1386,60 @@ removing or reordering a panel is a change to \code{config/web.yaml} alone.
 Panels cover robot state, controller state, per-joint telemetry with tracking
 error and load bars, foot contact and forces, safety and thermal state,
 simulation state and real-time factor, an event log, camera streams, pose and
-gait commands, and emergency stop.
+gait commands, and emergency stop. Expanded robot information describes the
+configured mass, geometry and actuator/transmission limits; it is not a
+measurement of the assembled machine.
+
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth]{images/joint_diagnostics.png}
+\caption{Live joint diagnostics with rolling torque, thermal and tracking
+summaries. The displayed values are a mixed-motion interface check, not a
+steady-gait motor-sizing result.}
+\label{fig:joint-diagnostics}
+\end{figure}
+
+\subsection{Joint load and history conventions}
+
+Each of the twelve joints reports live position, velocity, tracking error,
+signed joint and motor torque, estimated current and temperature. The rolling
+20-second summary adds joint/motor RMS and absolute peak torque, motor speed
+at that peak sample, exposure above the 8\,N$\cdot$m continuous-stall and
+11\,N$\cdot$m rotating references, maximum temperature, tracking-error RMS
+and mean signed mechanical power. Exposure is descriptive, not an allowed
+overload duration or prediction of failure.
+
+The RS06 internal gearbox is already included in ``motor-output torque.'' For
+the external knee belt, $g=2\times0.95=1.9$, so
+$\tau_m=\tau_j/1.9$ and $\dot q_m=2\dot q_j$; the hips have no external
+reduction. A feed-forward command is only one term of impedance control, so
+its difference from feedback is not a clipping measurement.
+
+The server normally receives telemetry at 50\,Hz and updates the browser at
+20\,Hz. It integrates a sample over its following valid interval:
+\[
+ \tau_{\mathrm{RMS}}=
+ \sqrt{\frac{\sum_i\tau_i^2\,\Delta t_i}{\sum_i\Delta t_i}}.
+\]
+MuJoCo statistics use simulation time; other backends use message timestamps.
+Thus a slow renderer does not inflate exposure. Partial windows show their
+valid coverage. Gaps over 0.25\,s or invalid joint data restart coverage;
+duplicate and slightly reversed timestamps are rejected. A reversal over one
+second or clock-source change resets the timeline. The GUI reports these
+events and leaves missing history unavailable. Browser refresh preserves the
+server history; server restart resets it. Peaks are telemetry-sampled and can
+miss contact impacts between messages; the physics-step sizing reports remain
+the appropriate source for those peaks.
+
+\paragraph{Source provenance.} MuJoCo effort is applied physics actuator torque
+sampled into telemetry; CAN effort is actuator feedback; kinematic effort is
+synthetic. Current is a torque/$K_t$ equivalent phase-RMS estimate, not measured
+phase, battery or $i_q$ current, and excludes high-current saturation.
+Simulation temperature is an uncalibrated copper-loss model; CAN uses the
+maximum of reported temperature and its thermal observer. Bus voltage is an
+assumption and electrical power an estimate. Mechanical power is signed
+$\tau_j\dot q_j$, not battery power. Clamp counts are aggregate command-limiter
+events, not per-joint actuator clipping. These distinctions are retained in
+the display and explained in \href{gui_telemetry.md}{the diagnostics guide}.
 
 Operator limits are configuration, not constants in JavaScript: maximum
 commanded velocity, gait confirmation, and joint jogging --- which is disabled
@@ -1316,7 +1468,10 @@ Launch  & \code{backend:=mujoco} & \code{backend:=robstride06\_can} \\
 \end{tabular}
 \end{center}
 
-Nothing else: not a topic, a service, a frame, a message, a controller or a gain.
+Core command and telemetry interfaces remain shared. Hardware still requires
+physical commissioning, base-state integration and camera calibration. The
+optional mapping node stays disabled until registered depth and odometry are
+available; simulation gains and limits do not certify hardware operation.
 
 \subsection{Bring-up sequence}
 
@@ -1384,8 +1539,18 @@ in Section~\ref{sec:actuator}.
 % =====================================================================
 \section{Verification}
 
-Run the regression suite for the current checkout; the historical count of
-217 tests is not a current validation claim. The key checks cover URDF/MJCF
+The latest recorded regression run on 28 September 2026 passed all 364 tests.
+The statistics module has 100\,\% statement coverage, including irregular
+timing, belt conversion, partial windows, invalid samples, resets and bounded
+history; browser tests keep unavailable values distinct from zero. Camera
+tests reconstruct the rendered floor using published calibration. Live Chrome
+checks populated a full 20-second history at approximately 50\,Hz without
+browser errors or telemetry gaps and verified default mapping in both worlds.
+The separate fault-free post-walk stand assertion failed with
+\code{TORQUE\_LIMIT}; passing regression tests do not resolve that load issue.
+All launched integration-test nodes exited cleanly.
+
+Run the suite again for a changed checkout. The key checks cover URDF/MJCF
 consistency, joint-to-motor conversion, CAN scaling, bounded commands, free hip
 motion, continuous gait targets and actual simulated displacement. Tests must
 compare knee motor load after the belt conversion, not directly against joint
@@ -1400,18 +1565,49 @@ legs beside the body while every physics test passed, the swing arc's
 discontinuity at lift-off, the self-collision that welded the front hips, and
 the gait's thermal load.
 
-The last three are worth noting together. The thermal test spent most of the
-project as an expected failure at 173\,\% of continuous, and it did not turn
+The last three describe historical RS02 regression work. That thermal test
+spent most of the project as an expected failure at 173\,\% of continuous, and it did not turn
 green by being tuned --- it turned green when the two bugs above it were
-fixed, and it now reads 90\,\%. An expected-failure test is a good way to hold
+fixed, and that historical run read 90\,\%. An expected-failure test is a good way to hold
 a known gap where a counter will find it, but it says nothing about
 \emph{why} the gap exists: the reason sat two layers below where the test
 pointed, in the simulation model.
 
+\subsection{Simulation quick start}
+
+With ROS 2 Humble installed and from the repository root:
+\begin{lstlisting}[language=bash]
+source /opt/ros/humble/setup.bash
+python3 -m pip install --user mujoco aiohttp
+sudo apt-get install ros-humble-rtabmap-slam \
+  ros-humble-rtabmap-util ros-humble-rtabmap-sync \
+  ros-humble-octomap-server
+cd ros2_ws
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install
+source install/setup.bash
+ros2 run robodog_sim generate_models
+ros2 launch robodog_bringup robot.launch.py \
+  backend:=mujoco world:=house
+\end{lstlisting}
+Open \url{http://localhost:8080} for diagnostics. Additional launch arguments:
+\begin{itemize}
+\item \code{world:=flat}: use the proving ground.
+\item \code{mujoco\_viewer:=true}: open the physics viewer.
+\item \code{mapping:=none}: measure control without mapping load.
+\end{itemize}
+The OctoMap server package supplies the export utility; no independent
+OctoMap mapping server starts. \code{colcon build} does not install missing
+Python packages: \code{python3 -c 'import aiohttp, mujoco'} must succeed in
+the sourced terminal. See \href{mapping.md}{the mapping runbook} for database
+backup and export, and \href{gui_telemetry.md}{the diagnostics guide} for
+measurement interpretation.
+
 \subsection{Analysis tools}
 
-Everything quoted in this document is measurable, and the measurement is in the
-repository rather than in a notebook someone once ran.
+Repository tools produce the simulation measurements and generated configuration
+facts quoted here. Manufacturer ratings retain their source audit; estimates
+and hardware gaps remain explicitly identified.
 
 \begin{center}\small
 \begin{tabular}{@{}ll@{}}

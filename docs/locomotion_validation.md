@@ -4,7 +4,11 @@ The normal launch dependency and command-ordering paths were repaired. The exper
 
 The normal ROS viewer launch also passed a direct `/cmd_vel` smoke test: a 0.2 m/s command moved the robot 0.616 m in 3 simulated seconds, with finite applied-torque telemetry on all 12 joints and an acknowledged return to standing. The browser walking test advanced 0.806 m, verified all 12 torque/current/temperature rows and the simulation slider range. [Live test evidence](live_launch_validation.json) records both checks.
 
+**Later walk-to-stand limitation:** the expanded GUI validation on 2026-09-28 reproduced `TORQUE_LIMIT` after stopping in both house and flat worlds. The captured house run identifies the rear-right hip-roll joint at the configured continuous budget, with aggregate safety-clamp counts increasing. Acknowledged stand commands and the successful standing-keyframe benchmark below do not validate this transition. The GUI's 20-second, 50 Hz sampled statistics and [validation record](gui_telemetry_validation.json) expose this condition; they do not replace the 2 kHz applied-torque measurements below.
+
 **Remaining lifecycle issue:** an interrupt-driven viewer shutdown produced teardown errors, including a controller SIGSEGV. The official Unitree viewer also crashed during shutdown. Their causes remain unresolved; the successful walking checks do not establish clean viewer shutdown.
+
+The later headless GUI/mapping test processes shut down cleanly. That result does not resolve the interactive viewer shutdown issue.
 
 ## Speed sweep
 

@@ -6,8 +6,8 @@ them, so that a parameter has exactly one authoritative source:
     robodog_control/config/control.yaml                rates and impedance gains
     robodog_control/config/gaits.yaml                  gait library
     robodog_hardware/config/robstride_bus.yaml         CAN topology, motor map
-    robodog_perception/config/nuwa_hp60c.yaml          camera intrinsics, range
-    robodog_perception/config/rtabmap.yaml             optional RGB-D SLAM and OctoMap
+    robodog_perception/config/nuwa_hp60c.yaml          camera defaults, range, hardware calibration placeholders
+    robodog_perception/config/rtabmap.yaml             RGB-D SLAM and OctoMap; automatic in supported simulation
     robodog_sim/config/simulation.yaml                 physics fidelity
     robodog_web/config/web.yaml                        GUI panels and limits
 
@@ -28,9 +28,11 @@ The default `mapping:=auto` enables RTAB-Map RGB-D SLAM and its graph-corrected
 OctoMap with `backend:=mujoco`, `camera_backend:=sim`, and `use_camera:=true`.
 It disables mapping for kinematic or hardware backends and absent or unsupported
 cameras. Explicit `mapping:=rtabmap` reports an error for unsupported pipelines.
-Mapping selects calibrated, registered 640×480 simulated
+Mapping selects renderer-calibrated, registered 640×480 simulated
 RGB-D streams and an RViz view containing the occupancy grid and occupied voxels.
-Install `ros-humble-rtabmap-ros` before enabling it. Use `mapping:=none` to disable
+Install `ros-humble-rtabmap-slam`, `ros-humble-rtabmap-util` and
+`ros-humble-rtabmap-sync` before enabling it. `ros-humble-octomap-server` supplies
+the optional export utility. Use `mapping:=none` to disable
 mapping and launch without an RTAB-Map runtime. Both `world:=flat` and
 `world:=house` are supported.
 

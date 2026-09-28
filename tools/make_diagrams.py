@@ -24,8 +24,8 @@ def system_architecture() -> Diagram:
                 caption="Physical and computational stack. Everything above the red "
                         "boundary shares commands and telemetry; hardware travel is gated.")
     d.box("L1", 20, 20, 1140, 150, "OPERATOR", "off-board", kind="layer", z=0)
-    d.box("gui", 60, 60, 240, 80, "Web GUI", "localhost browser", kind="external")
-    d.box("rviz", 330, 60, 200, 80, "RViz2", "3D state + sensors", kind="external")
+    d.box("gui", 60, 60, 240, 80, "Web GUI", "joint RMS / peaks / thermal history", kind="external")
+    d.box("rviz", 330, 60, 200, 80, "RViz2", "robot + 2D / 3D maps", kind="external")
     d.box("cli", 560, 60, 200, 80, "ros2 CLI / tools", "pose, joint_test, param", kind="external")
     d.box("rec", 790, 60, 330, 80, "rosbag2 / diagnostics", "recording and replay",
           kind="external", dashed=True)
@@ -37,6 +37,8 @@ def system_architecture() -> Diagram:
           "400 Hz loop, safety,\ngait, balance, estimator", kind="package")
     d.box("perc", 650, 245, 230, 70, "robodog_perception", "RGB-D, PointCloud2", kind="package")
     d.box("desc", 910, 245, 210, 70, "robodog_description", "URDF/Xacro, TF", kind="package")
+    d.box("map", 60, 390, 230, 75, "RTAB-Map + OctoMap",
+          "default for supported MuJoCo;\nmap -> odom", kind="package")
     d.box("hw", 320, 390, 300, 75, "robodog_hardware", "JointBackend + RS06 CAN codec",
           kind="package")
     d.box("sim", 650, 390, 230, 75, "robodog_sim", "MuJoCo model + worlds",
@@ -51,7 +53,7 @@ def system_architecture() -> Diagram:
           kind="hardware")
     d.box("can1", 285, 630, 200, 85, "CAN bus 1", "1 Mbit/s, rear legs\n6 x RS06, 72% load",
           kind="hardware")
-    d.box("cam", 510, 630, 200, 85, "NUWA HP60C", "USB3, RGB + depth", kind="hardware")
+    d.box("cam", 510, 630, 200, 85, "NUWA HP60C", "USB3 RGB; depth unavailable", kind="hardware")
     d.box("imu", 735, 630, 180, 85, "IMU", "integration unavailable", kind="hardware")
     d.box("pwr", 940, 630, 180, 85, "44.4 V battery", "2 x 6S series, 2.50 kg", kind="hardware")
 
@@ -61,6 +63,7 @@ def system_architecture() -> Diagram:
     d.edge("web", "ctrl", "cmd / telemetry")
     d.edge("ctrl", "hw", "read() / write()", style="thick")
     d.edge("perc", "sim", "render", style="dashed")
+    d.edge("perc", "map", "registered RGB-D", style="dashed")
     d.edge("ctrl", "perc", "robot_state", style="dashed")
     d.edge("hw", "can0", "motion frames", style="thick")
     d.edge("hw", "can1", "motion frames", style="thick")
@@ -71,16 +74,18 @@ def system_architecture() -> Diagram:
 
 def software_architecture() -> Diagram:
     d = Diagram("software_architecture", "Software architecture", w=1160, h=700,
-                caption="ROS 2 package graph. Arrows point from dependant to dependency; "
-                        "no package above depends on a simulation package.")
+                caption="ROS 2 package graph. Arrows point from dependant to dependency. "
+                        "RTAB-Map runs by default for the supported MuJoCo RGB-D pipeline.")
     d.box("bring", 430, 30, 300, 65, "robodog_bringup", "launch composition only")
     d.box("web", 60, 150, 230, 70, "robodog_web", "GUI server + protocol", kind="package")
     d.box("ctrl", 330, 150, 250, 70, "robodog_control",
           "loop, safety, gait,\nbalance, IK, estimator", kind="package")
-    d.box("perc", 620, 150, 230, 70, "robodog_perception", "camera + point cloud", kind="package")
+    d.box("perc", 620, 150, 230, 70, "robodog_perception", "camera + point cloud\nmapping launch", kind="package")
     d.box("sim", 890, 150, 210, 70, "robodog_sim", "MJCF + worlds", kind="package")
     d.box("hw", 330, 300, 250, 70, "robodog_hardware", "backends + RS06 codec", kind="package")
     d.box("desc", 620, 300, 230, 70, "robodog_description", "URDF, meshes, RViz", kind="package")
+    d.box("map", 890, 300, 210, 70, "rtabmap_slam",
+          "SLAM + built-in OctoMap", kind="package")
     d.box("msgs", 380, 440, 210, 65, "robodog_msgs", "msg / srv definitions", kind="package")
 
     d.box("gen", 60, 440, 300, 65, "tools/cad_to_model.py", "CAD -> robot_parameters.yaml",
@@ -96,6 +101,7 @@ def software_architecture() -> Diagram:
     d.edge("ctrl", "msgs")
     d.edge("web", "msgs")
     d.edge("perc", "msgs")
+    d.edge("perc", "map", "mapping launch")
     d.edge("hw", "msgs")
     d.edge("ctrl", "desc")
     d.edge("sim", "desc")
@@ -110,9 +116,9 @@ def software_architecture() -> Diagram:
 
 
 def node_topic_graph() -> Diagram:
-    d = Diagram("node_topic_graph", "ROS node and topic graph", w=1260, h=820,
+    d = Diagram("node_topic_graph", "ROS node and topic graph", w=1260, h=1080,
                 caption="Nodes (green), topics (amber), services (red). "
-                        "Travel requires valid base feedback; hardware IMU integration is pending.")
+                        "Mapping is automatic for the supported MuJoCo camera pipeline.")
     d.box("ctrl", 480, 330, 290, 90, "robodog_control_node", "400 Hz loop", kind="node")
     d.box("rsp", 480, 60, 290, 60, "robot_state_publisher", kind="node")
     d.box("camn", 60, 330, 250, 70, "robodog_camera_node", "15 Hz", kind="node")
@@ -121,14 +127,16 @@ def node_topic_graph() -> Diagram:
     d.box("rviz", 940, 60, 260, 60, "rviz2", kind="external")
 
     d.box("t_js", 480, 190, 290, 46, "/joint_states", "sensor_msgs/JointState  100 Hz", kind="topic")
-    d.box("t_tf", 830, 190, 250, 46, "/tf", "odom -> base_link", kind="topic")
+    d.box("t_tf", 830, 185, 250, 60, "/tf",
+          "control: odom -> base_link\nRTAB-Map: map -> odom", kind="topic")
     d.box("t_wm", 60, 190, 250, 46, "/robodog/world_markers", "MarkerArray (latched)", kind="topic")
 
     # inputs on the left, outputs on the right, services in the middle
     d.box("t_jc", 60, 470, 270, 46, "/robodog/joint_command", "JointCommandArray", kind="topic")
     d.box("t_gc", 60, 530, 270, 46, "/robodog/gait_command", "GaitCommand", kind="topic")
     d.box("t_cv", 60, 590, 270, 46, "/cmd_vel", "geometry_msgs/Twist", kind="topic")
-    d.box("t_col", 60, 660, 270, 42, "camera/color/image_raw", kind="topic")
+    d.box("t_col", 60, 654, 270, 48, "camera/color/image_raw",
+          "+ camera/color/camera_info", kind="topic")
     d.box("t_dep", 60, 710, 270, 42, "camera/depth/image_rect_raw", kind="topic")
     d.box("t_pc", 60, 760, 270, 42, "camera/depth/points", "PointCloud2  10 Hz", kind="topic")
 
@@ -140,9 +148,24 @@ def node_topic_graph() -> Diagram:
           "set_named_pose\nset_gait\nset_control_mode\nenable_joints\nemergency_stop",
           kind="service")
 
+    d.box("mapn", 480, 850, 290, 75, "/robodog/mapping/rtabmap",
+          "RGB-D SLAM + OctoMap, 2 Hz", kind="node")
+    d.box("t_map", 60, 960, 330, 70, "/robodog/mapping/map",
+          "2D occupancy, 5 cm cells", kind="topic")
+    d.box("t_oct", 450, 960, 330, 70, "mapping/octomap_occupied_space",
+          "PointCloud2; full / binary trees also available", kind="topic")
+    d.box("mapdb", 870, 850, 330, 75, "Per-world map database",
+          "preserved across restarts; .ot export", kind="store")
+    d.edge("t_col", "mapn", style="dashed")
+    d.edge("t_dep", "mapn", style="dashed")
+    d.edge("mapn", "t_map", route="v")
+    d.edge("mapn", "t_oct", route="v")
+    d.edge("mapn", "mapdb")
+    d.edge("mapn", "t_tf", style="dashed")
+    d.edge("ctrl", "t_tf")
     d.edge("ctrl", "t_js", route="v")
     d.edge("t_js", "rsp", route="v")
-    d.edge("rsp", "t_tf")
+    d.edge("rsp", "t_tf", "robot links")
     d.edge("ctrl", "t_rs", route="v")
     d.edge("ctrl", "t_ss")
     d.edge("ctrl", "t_imu")
@@ -414,38 +437,44 @@ def simulation_architecture() -> Diagram:
 
 
 def perception_pipeline() -> Diagram:
-    d = Diagram("perception_pipeline", "Perception pipeline", w=1250, h=500,
-                caption="One configuration file drives both backends, so the simulated "
-                        "camera has the real device's intrinsics and range.")
-    d.box("cfg", 30, 30, 250, 70, "nuwa_hp60c.yaml", "resolution, FOV, range, baseline",
-          kind="store")
-    d.box("simb", 30, 160, 250, 90, "SimCameraBackend", "MuJoCo render\n+ range limits + z^2 noise",
-          kind="package", dashed=True)
-    d.box("realb", 30, 290, 250, 90, "NuwaHP60CBackend", "UVC / vendor SDK", kind="hardware")
-    d.box("frame", 340, 210, 210, 90, "Frame", "colour uint8 RGB\ndepth float32 m, NaN",
-          kind="store")
-    d.box("node", 610, 210, 230, 90, "robodog_camera_node", "15 Hz")
-    d.box("conv", 610, 60, 230, 90, "metres -> 16UC1 mm", "0 means invalid\n(ROS convention)")
-    d.box("dep", 610, 340, 230, 90, "deproject + filter", "drop beyond\nmax_usable_range_m")
-
-    d.box("t1", 920, 40, 290, 50, "camera/color/image_raw + info", kind="topic")
-    d.box("t2", 920, 110, 290, 50, "camera/depth/image_rect_raw", kind="topic")
-    d.box("t3", 920, 180, 290, 50, "camera/depth/points", kind="topic")
-    d.box("fr", 920, 260, 290, 170, "Frame tree",
-          "camera_link\n  camera_color_frame\n    camera_color_optical_frame\n"
-          "  camera_depth_frame\n    camera_depth_optical_frame\n\n"
-          "optical: z fwd, x right, y down", kind="note", dashed=True)
-
-    d.edge("cfg", "simb", route="v")
-    d.edge("cfg", "realb", route="v")
-    d.edge("simb", "frame")
-    d.edge("realb", "frame")
+    d = Diagram("perception_pipeline", "RGB-D perception and mapping", w=1280, h=900,
+                caption="Simulation uses renderer-derived calibration and exact base odometry. "
+                        "Depth mapping tests do not validate hardware localization or loop closure.")
+    d.box("cfg", 30, 30, 270, 80, "nuwa_hp60c.yaml",
+          "range + noise + normal-mode sizes;\nreal calibration remains device-specific", kind="store")
+    d.box("simb", 340, 30, 270, 80, "SimCameraBackend",
+          "MuJoCo RGB-D render;\nK derived from rendered FOV", kind="package")
+    d.box("realb", 30, 160, 270, 90, "NuwaHP60CBackend",
+          "RGB capture only today;\ndepth / hardware odometry unavailable", kind="hardware")
+    d.box("frame", 340, 170, 270, 100, "Registered simulation Frame",
+          "mapping: RGB + depth 640 x 480\nsame origin, K and acquisition stamp\nRGB uint8; internal depth float32 m", kind="store")
+    d.box("node", 680, 170, 260, 100, "robodog_camera_node",
+          "15 Hz; depth -> 16UC1 millimetres\n0 depth means invalid", kind="node")
+    d.box("topics", 680, 340, 260, 110, "ROS camera outputs",
+          "color/image_raw + camera_info\ndepth/image_rect_raw + camera_info\ndepth/points (PointCloud2)", kind="topic")
+    d.box("optical", 980, 170, 270, 190, "Simulation camera frame",
+          "RGB, depth and point cloud all use\ncamera_color_optical_frame\n\noptical: z forward, x right, y down\n\nNo depth-frame baseline is applied\nto the co-located simulated images.", kind="note")
+    d.box("policy", 30, 340, 580, 110, "mapping:=auto (default)",
+          "RTAB-Map on: MuJoCo + sim camera + use_camera:=true\nOff for unsupported backends / cameras; mapping:=none disables\nExplicit mapping:=rtabmap rejects unsupported pipelines", kind="note")
+    d.box("odom", 30, 520, 290, 90, "Control node owns odometry",
+          "odom -> base_link\nMuJoCo ground truth; wall timestamps", kind="node")
+    d.box("map", 390, 520, 290, 110, "RTAB-Map + built-in OctoMap",
+          "exact RGB-D synchronization, 2 Hz\n5 cm cells; 4 m depth range\nowns map -> odom", kind="node")
+    d.box("rviz", 790, 520, 350, 110, "Mapping RViz view",
+          "map: 2D occupancy grid\noctomap_occupied_space: 3D cells\nrobot + world markers in map frame", kind="external")
+    d.box("store", 390, 710, 290, 105, "Per-world database",
+          "$ROS_HOME/robodog/maps/<world>.db\notherwise ~/.ros/robodog/maps/<world>.db\nrestart preserves graph + observations", kind="store")
+    d.box("export", 790, 710, 350, 105, "Backup and export",
+          "rtabmap/backup: database .back\noctomap_saver_node: full ColorOcTree .ot\nNo separate mapping server required", kind="store")
+    d.edge("cfg", "simb")
+    d.edge("simb", "frame", route="v")
     d.edge("frame", "node")
-    d.edge("node", "conv", route="v")
-    d.edge("node", "dep", route="v")
-    d.edge("conv", "t1")
-    d.edge("conv", "t2")
-    d.edge("dep", "t3")
+    d.edge("node", "topics", route="v")
+    d.edge("topics", "map", route="v")
+    d.edge("odom", "map")
+    d.edge("map", "rviz")
+    d.edge("map", "store", route="v")
+    d.edge("store", "export")
     return d
 
 

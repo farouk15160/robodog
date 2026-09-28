@@ -8,15 +8,16 @@ into it, this backend loads the same scene read-only and drives it from the
 published robot state (base pose + joint angles), then calls mj_forward and
 renders. Consequences, all of them wanted:
 
-  * the camera is a separate node with a separate lifecycle, exactly as the
-    real USB camera will be -- so the node graph does not change on the real
-    robot, and a camera crash cannot take the control loop down;
-  * rendering cost never steals time from the 400 Hz control loop;
+  * the camera has a separate node and lifecycle, isolating a camera crash
+    from the control process; mapping support still depends on the backend;
+  * rendering stays outside the control callback, although the processes
+    share workstation resources and can reduce simulation real-time factor;
   * the camera sees the world at the robot state it was told about, which makes
     latency explicit and measurable instead of hidden.
 
-The cost is a second copy of the scene in memory, and rendering being one
-control cycle behind. Both are the right trade for a 10-30 Hz sensor.
+The cost is a second copy of the scene in memory and the age of the latest
+received robot state. Images carry that state's timestamp so consumers can
+associate the rendered pose with its transform history.
 """
 from __future__ import annotations
 

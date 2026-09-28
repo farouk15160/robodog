@@ -8,7 +8,7 @@
 <p align="center">
   <img alt="ROS 2 Humble" src="https://img.shields.io/badge/ROS_2-Humble-22314E?logo=ros&logoColor=white">
   <img alt="MuJoCo" src="https://img.shields.io/badge/MuJoCo-3.x-ef6c00">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="Python 3.10 validated" src="https://img.shields.io/badge/Python-3.10_validated-3776AB?logo=python&logoColor=white">
   <img alt="tests" src="https://img.shields.io/badge/tests-regression_suite-3ecf8e">
   <img alt="licence" src="https://img.shields.io/badge/licence-Apache--2.0-blue">
 </p>
@@ -45,8 +45,10 @@ class JointBackend(ABC):
 
 Three implementations exist — ideal-kinematic, MuJoCo, and RobStride-over-CAN
 — and the camera has the same arrangement. Switching from simulation to the
-real robot is a launch argument. Not a topic, service, frame, message,
-controller or gain changes.
+real robot selects a backend through launch arguments. Core joint command and
+telemetry contracts stay the same. Camera registration and mapping availability
+depend on the selected sensor pipeline; real depth and base odometry are not
+integrated yet.
 
 `JointCommand` is deliberately the actuator's **native impedance frame**, which
 is exactly one CAN message, because the RS06 closes
@@ -63,6 +65,7 @@ is precisely what the two-bus CAN budget allows.
 python3 -m pip install --user mujoco  # physics and the simulated camera
 python3 -m pip install --user aiohttp # web GUI HTTP and WebSocket server
 python3 -m pip install --user python-can # only needed for real hardware
+sudo apt-get install ros-humble-rtabmap-slam ros-humble-rtabmap-util ros-humble-rtabmap-sync ros-humble-octomap-server
 
 git clone https://github.com/farouk15160/robodog.git
 cd robodog/ros2_ws
@@ -104,7 +107,7 @@ If MuJoCo cannot open a GL context, set `MUJOCO_GL=egl` (or `osmesa`).
   <img src="docs/images/gui.png" width="92%" alt="The robodog web GUI">
 </p>
 
-Live telemetry at 20 Hz over a small versioned JSON protocol — per-joint
+The browser receives telemetry at up to 20 Hz over a small versioned JSON protocol — per-joint
 position, tracking error, torque, current and temperature; foot contact and
 forces; safety and thermal state; simulation real-time factor; the camera
 stream; pose and gait commands; and an emergency stop.
@@ -112,8 +115,15 @@ stream; pose and gait commands; and an emergency stop.
 Joint diagnostics also show a rolling 20-second RMS and sampled-peak torque
 summary, transmission-aware motor loads, exposure above torque references,
 tracking error and thermal history. Coverage and data sources are labelled;
-these telemetry samples can miss brief physics-step peaks. See
+statistics use the received 50 Hz robot telemetry before browser throttling and
+can miss brief physics-step peaks. See
 [how to read the diagnostics](docs/gui_telemetry.md).
+
+The latest GUI tests also exposed `TORQUE_LIMIT` after walking and returning to
+stand in both worlds. The dashboard reports that condition; the successful
+display tests do not establish a fault-free transition or comfortable motor
+margins. [Recorded GUI validation](docs/gui_telemetry_validation.json) preserves
+the results separately from the steady-gait benchmarks.
 
 The browser builds itself from `robodog_web/config/web.yaml`, so adding,
 removing or reordering a panel is a configuration change. Operator limits —
@@ -148,9 +158,9 @@ odometry; real-camera depth and real odometry remain prerequisites for hardware.
   <img src="docs/images/system_architecture.png" width="94%" alt="System architecture">
 </p>
 
-The red band is the hardware/software boundary. Everything above it is
-identical whether the joints are integers in a simulator or real motors on a
-CAN bus.
+The red band is the hardware/software boundary. The control and joint telemetry
+interfaces above it are shared by simulation and CAN hardware. Mapping is
+currently supported only with MuJoCo's registered depth and base odometry.
 
 <p align="center">
   <img src="docs/images/control_architecture.png" width="88%" alt="Control architecture">
@@ -415,11 +425,22 @@ Geometry, named poses and inertias are generated in
 ## Tests
 
 ```bash
-cd ros2_ws && MUJOCO_GL=egl python3 -m pytest src/*/test -q
+source /opt/ros/humble/setup.bash
+source ros2_ws/install/setup.bash
+cd ros2_ws
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 MUJOCO_GL=egl python3 -m pytest src/*/test ../tools/test_go2_benchmark.py -q
 ```
 
+The latest recorded run passed **364 tests**. The pure GUI statistics module and
+mapping policy each have 100% statement coverage; this is not a repository-wide
+coverage claim. [GUI verification](docs/gui_telemetry.md#verification) distinguishes
+passing display checks from the remaining walk-to-stand torque-limit condition.
+
 With the MuJoCo GUI running, `python3 tools/gui_smoke.py` from the repository
-root exercises actual browser commands and all twelve telemetry rows. It needs
+root exercises actual browser commands, all twelve live/statistics rows and the
+robot model panel, and saves screenshots plus JSON. It commands a short walk,
+then requests zero velocity and stand; it does not assert a sustained fault-free
+stand. It needs
 Python Playwright and Google Chrome and refuses a hardware backend. On Humble,
 use `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` if an unrelated ROS pytest plugin fails
 to load; GUI access tests also require permission to open local sockets.
@@ -452,19 +473,20 @@ body while every physics test passed. Each of those says so in its docstring.
    constants; validate the published equivalent output inertia in the assembly. They are marked `[ESTIMATE]` in the selected `robstride06.yaml`, and the
    safety margins currently carry that uncertainty.
 
-§11 of the documentation has the full bring-up sequence and the list of open
-items.
+The architecture document's **Migration to hardware** section has the full
+bring-up sequence and the list of open items.
 
 ---
 
 ## Documentation
 
-[**`docs/robodog_architecture.pdf`**](docs/robodog_architecture.pdf) — architecture and historical measurements
+[**`docs/robodog_architecture.pdf`**](docs/robodog_architecture.pdf) — current architecture, validation limits and historical measurements
 covering the system and software architecture, ROS node and topic structure,
 control and simulation architecture, the hardware/software boundary, coordinate
-and joint conventions, safety limits, and the migration path to hardware. Every
-number in it is generated from the robot model, so the prose cannot drift from
-the code.
+and joint conventions, safety limits, RGB-D mapping, GUI diagnostics and the
+migration path to hardware. Configuration macros are generated from the robot
+model; measured results retain their test conditions and source reports.
+Rebuilding the PDF does not rerun simulations or validate hardware.
 
 ```bash
 cd docs && make
