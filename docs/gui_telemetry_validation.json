@@ -1,0 +1,300 @@
+{
+  "date": "2026-09-28",
+  "launch": "ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house rviz:=false web_port:=8081 mujoco_viewer:=false mapping_database:=<temporary database>",
+  "browser_errors": [],
+  "walking_frames": 170,
+  "gui_commanded_walk_speed_m_s": 0.12,
+  "walking_displacement_x_m": 1.0679038235041327,
+  "full_window_diagnostics": {
+    "window_s": 20.0,
+    "covered_s": 20.0,
+    "samples": 1002,
+    "clock": "mujoco:sim_time",
+    "sample_rate_hz": 50.05,
+    "resets": 0,
+    "dropped_samples": 0,
+    "gaps": 0,
+    "max_gap_s": 0.25,
+    "stats_basis": "Received telemetry; sampled peaks, not physics-step peaks",
+    "integration": "Time weighted, previous sample held until next valid sample",
+    "mechanical_power_w": 0.01268196030350979,
+    "source_time_s": 20.23999999999818,
+    "source_stamp_s": 1790599974.2804558,
+    "received_seq": 1012,
+    "torque_source": "MuJoCo applied actuator torque, telemetry sampled",
+    "thermal_source": "Uncalibrated thermal estimate",
+    "current_source": "Motor RMS phase current estimated from torque / Kt",
+    "power_source": "Estimated power; mechanical plus modelled copper losses",
+    "voltage_source": "Configured supply voltage assumption",
+    "clamp_source": "Cumulative aggregate limiter modifications; not per-joint clipping"
+  },
+  "full_window_joints": [
+    {
+      "name": "FL_haa_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 3.2764057962058346,
+        "joint_torque_peak_nm": 10.108528083285494,
+        "motor_torque_rms_nm": 3.2764057962058346,
+        "motor_torque_peak_nm": 10.108528083285494,
+        "motor_speed_at_peak_rad_s": 0.25198416790082145,
+        "above_continuous_s": 1.4400000000005164,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.19211996841556,
+        "tracking_error_rms_rad": 0.035789965923733076,
+        "mechanical_power_mean_w": -0.03033789321098685
+      }
+    },
+    {
+      "name": "FL_hfe_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 1.6453964211157115,
+        "joint_torque_peak_nm": 6.856363313992319,
+        "motor_torque_rms_nm": 1.6453964211157115,
+        "motor_torque_peak_nm": 6.856363313992319,
+        "motor_speed_at_peak_rad_s": -0.23512249158878984,
+        "above_continuous_s": 0.0,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.05063105269756,
+        "tracking_error_rms_rad": 0.020172309548200755,
+        "mechanical_power_mean_w": 0.0013305345005375536
+      }
+    },
+    {
+      "name": "FL_kfe_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 6.40960993866902,
+        "joint_torque_peak_nm": 12.85744031841904,
+        "motor_torque_rms_nm": 3.3734789150889584,
+        "motor_torque_peak_nm": 6.767073851799495,
+        "motor_speed_at_peak_rad_s": 0.6493124504671292,
+        "above_continuous_s": 0.0,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.20537871027641,
+        "tracking_error_rms_rad": 0.05503427807811501,
+        "mechanical_power_mean_w": 0.5531791931182137
+      }
+    },
+    {
+      "name": "FR_haa_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 2.982113867653166,
+        "joint_torque_peak_nm": 9.62686214148914,
+        "motor_torque_rms_nm": 2.982113867653166,
+        "motor_torque_peak_nm": 9.62686214148914,
+        "motor_speed_at_peak_rad_s": 0.04887405356904939,
+        "above_continuous_s": 1.200000000000685,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.158400935870695,
+        "tracking_error_rms_rad": 0.03842821890304101,
+        "mechanical_power_mean_w": 0.009669906297388411
+      }
+    },
+    {
+      "name": "FR_hfe_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 1.8530766951263047,
+        "joint_torque_peak_nm": 6.897931734946447,
+        "motor_torque_rms_nm": 1.8530766951263047,
+        "motor_torque_peak_nm": 6.897931734946447,
+        "motor_speed_at_peak_rad_s": -0.23269670254463273,
+        "above_continuous_s": 0.0,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.06314218435074,
+        "tracking_error_rms_rad": 0.022131871230469877,
+        "mechanical_power_mean_w": 0.012197740869664683
+      }
+    },
+    {
+      "name": "FR_kfe_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 6.25092325242001,
+        "joint_torque_peak_nm": 13.54764143380395,
+        "motor_torque_rms_nm": 3.289959606536847,
+        "motor_torque_peak_nm": 7.130337596738921,
+        "motor_speed_at_peak_rad_s": -0.9102134751497072,
+        "above_continuous_s": 0.0,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.195314757575506,
+        "tracking_error_rms_rad": 0.05576654749068382,
+        "mechanical_power_mean_w": 0.6293476364156189
+      }
+    },
+    {
+      "name": "RL_haa_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 5.720253594701989,
+        "joint_torque_peak_nm": 10.401094838341336,
+        "motor_torque_rms_nm": 5.720253594701989,
+        "motor_torque_peak_nm": 10.401094838341336,
+        "motor_speed_at_peak_rad_s": 0.09943268536446355,
+        "above_continuous_s": 2.620000000002527,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.595646396004604,
+        "tracking_error_rms_rad": 0.05172762991657555,
+        "mechanical_power_mean_w": 0.21577031275517006
+      }
+    },
+    {
+      "name": "RL_hfe_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 3.6341856650105697,
+        "joint_torque_peak_nm": 7.861141591699928,
+        "motor_torque_rms_nm": 3.6341856650105697,
+        "motor_torque_peak_nm": 7.861141591699928,
+        "motor_speed_at_peak_rad_s": -0.015176132191043884,
+        "above_continuous_s": 0.0,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.23966157162123,
+        "tracking_error_rms_rad": 0.04293819597709087,
+        "mechanical_power_mean_w": 0.3369697294693929
+      }
+    },
+    {
+      "name": "RL_kfe_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 8.089628636175535,
+        "joint_torque_peak_nm": 15.261650135937533,
+        "motor_torque_rms_nm": 4.25769928219765,
+        "motor_torque_peak_nm": 8.032447439967124,
+        "motor_speed_at_peak_rad_s": -0.37260705673531896,
+        "above_continuous_s": 0.06000000000007333,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.32760779854123,
+        "tracking_error_rms_rad": 0.06189892153662715,
+        "mechanical_power_mean_w": 1.4008642236042124
+      }
+    },
+    {
+      "name": "RR_haa_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 6.1478136603832905,
+        "joint_torque_peak_nm": 10.451797640623447,
+        "motor_torque_rms_nm": 6.1478136603832905,
+        "motor_torque_peak_nm": 10.451797640623447,
+        "motor_speed_at_peak_rad_s": -0.0012144525111522136,
+        "above_continuous_s": 5.460000000000845,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.689777877551688,
+        "tracking_error_rms_rad": 0.06779824498323979,
+        "mechanical_power_mean_w": 0.22983138838552403
+      }
+    },
+    {
+      "name": "RR_hfe_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 2.9927199207327213,
+        "joint_torque_peak_nm": 7.536258262127536,
+        "motor_torque_rms_nm": 2.9927199207327213,
+        "motor_torque_peak_nm": 7.536258262127536,
+        "motor_speed_at_peak_rad_s": 0.07270616551292323,
+        "above_continuous_s": 0.0,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.16211126538066,
+        "tracking_error_rms_rad": 0.03517740123176646,
+        "mechanical_power_mean_w": 0.30393659694236297
+      }
+    },
+    {
+      "name": "RR_kfe_joint",
+      "stats": {
+        "window_s": 20.0,
+        "covered_s": 20.0,
+        "samples": 1002,
+        "joint_torque_rms_nm": 7.027635856331809,
+        "joint_torque_peak_nm": 15.066615297247242,
+        "motor_torque_rms_nm": 3.6987557138588474,
+        "motor_torque_peak_nm": 7.92979752486697,
+        "motor_speed_at_peak_rad_s": -0.39836393209136645,
+        "above_continuous_s": 0.0,
+        "above_vendor_rotating_s": 0.0,
+        "temperature_max_c": 20.246143467766238,
+        "tracking_error_rms_rad": 0.05924544672482108,
+        "mechanical_power_mean_w": 1.2186706006649561
+      }
+    }
+  ],
+  "default_mapping_passed": true,
+  "default_mapping_known_cells": 521,
+  "default_mapping_occupied_points": 1018,
+  "final_state": "FAULT",
+  "final_aggregate_clamp_count": 2450,
+  "scope": "GUI integration with pose transitions, walking then standing; not steady-gait motor sizing or thermal validation.",
+  "limitations": [
+    "Statistics use sampled 50 Hz telemetry, not physics substeps.",
+    "The final house camera view was close to a wall; RTAB-Map reported depth clouds with no valid points late in the run. Previously built map outputs remained available.",
+    "After walk-to-stand, TORQUE_LIMIT persisted at the configured continuous budget; the independent fault-free state assertion failed in the flat world too. No safety limits or gait behavior were modified."
+  ],
+  "shutdown": "All launched nodes exited cleanly.",
+  "verification_result": {
+    "regression_tests_passed": 364,
+    "browser_panels_passed": true,
+    "full_20s_window_populated": true,
+    "fault_free_walk_to_stand_passed": false
+  },
+  "flat_repeat": {
+    "browser_errors": [],
+    "walking_displacement_x_m": 1.057748767924649,
+    "diagnostics_during_walk": {
+      "window_s": 20.0,
+      "covered_s": 12.340000000003615,
+      "samples": 618,
+      "clock": "mujoco:sim_time",
+      "sample_rate_hz": 49.999999999985356,
+      "resets": 0,
+      "dropped_samples": 0,
+      "gaps": 0,
+      "max_gap_s": 0.25,
+      "stats_basis": "Received telemetry; sampled peaks, not physics-step peaks",
+      "integration": "Time weighted, previous sample held until next valid sample",
+      "mechanical_power_w": 37.318567405376044,
+      "source_time_s": 12.360000000003614,
+      "source_stamp_s": 1790600119.2948287,
+      "received_seq": 618,
+      "torque_source": "MuJoCo applied actuator torque, telemetry sampled",
+      "thermal_source": "Uncalibrated thermal estimate",
+      "current_source": "Motor RMS phase current estimated from torque / Kt",
+      "power_source": "Estimated power; mechanical plus modelled copper losses",
+      "voltage_source": "Configured supply voltage assumption",
+      "clamp_source": "Cumulative aggregate limiter modifications; not per-joint clipping"
+    },
+    "default_mapping_passed": true,
+    "default_mapping_occupied_points": 5806,
+    "end_state_check": "Failed: TORQUE_LIMIT after stand",
+    "final_aggregate_clamps": 2853,
+    "final_max_torque_utilisation": 1.0000000000000109,
+    "shutdown": "All launched nodes exited cleanly."
+  }
+}

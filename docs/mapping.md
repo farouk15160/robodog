@@ -15,10 +15,10 @@ The OctoMap server package supplies the export utility below; no separate mappin
 ```bash
 source /opt/ros/humble/setup.bash
 source ros2_ws/install/setup.bash
-ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house mapping:=rtabmap
+ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house
 ```
 
-Use `world:=flat` for the proving ground. Add `mujoco_viewer:=true` for the physics viewer. Ordinary launches default to `mapping:=none`, so the mapper adds no processing load until selected. The mapping RViz view shows the robot, 2D occupancy and occupied 3D voxels in the `map` frame.
+Use `world:=flat` for the proving ground. Add `mujoco_viewer:=true` for the physics viewer. The default `mapping:=auto` enables RTAB-Map with MuJoCo, `camera_backend:=sim` and `use_camera:=true`. It leaves mapping disabled for kinematic or hardware backends and absent or unsupported cameras. Set `mapping:=none` to disable mapping and its processing load explicitly. The mapping RViz view shows the robot, 2D occupancy and occupied 3D voxels in the `map` frame.
 
 Mapping mode uses registered 640 × 480 RGB and depth from the same simulated optical origin, with calibration derived from the rendered camera and a common acquisition timestamp. Depth remains 16-bit millimetres on ROS. Camera data is best effort; RTAB-Map uses matching QoS and exact image synchronization.
 
@@ -62,7 +62,7 @@ The service includes the `rtabmap` node name; the corresponding topic does not. 
 
 ## Hardware and navigation boundary
 
-This integration currently supports MuJoCo simulation. Kinematic mode is rejected because it has no moving base odometry or world spawn placement. The existing real NUWA backend does not yet deliver depth, and real base odometry is not integrated. Mapping mode rejects that unsupported combination instead of manufacturing depth or identity odometry. Hardware needs calibrated registered depth and an independent odometry source, or a separately validated RGB-D odometry node with exclusive ownership of `odom → base_link`.
+This integration currently supports MuJoCo simulation. The default `mapping:=auto` disables mapping on unsupported sensor pipelines; an explicit `mapping:=rtabmap` rejects them with an error. Kinematic mode has no moving base odometry or world spawn placement. The existing real NUWA backend does not yet deliver depth, and real base odometry is not integrated. Hardware needs calibrated registered depth and an independent odometry source, or a separately validated RGB-D odometry node with exclusive ownership of `odom → base_link`.
 
 This adds mapping, not autonomous navigation, obstacle avoidance or a new locomotion controller. Featureless or repetitive scenes can prevent reliable visual loop closure even while depth occupancy updates succeed.
 

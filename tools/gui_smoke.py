@@ -49,11 +49,18 @@ with sync_playwright() as playwright:
     page.goto(url, wait_until="domcontentloaded")
     joint_panel = page.locator("section.panel").filter(
         has=page.locator(".ptitle", has_text="Joint Torque & Temperature"))
+    stats_panel = page.locator("section.panel").filter(
+        has=page.locator(".ptitle", has_text="Joint RMS, Peaks & Exposure"))
+    robot_panel = page.locator("section.panel").filter(
+        has=page.locator(".ptitle", has_text="Robot Model & Motor Ratings"))
     joint_panel.locator("tbody tr").last.wait_for(timeout=30000)
     page.wait_for_function(
         "document.querySelector('#top-backend').textContent === 'mujoco'", timeout=30000)
     assert "ROBSTRIDE06" in page.locator("#brand-sub").inner_text()
     assert joint_panel.locator("tbody tr").count() == 12
+    assert stats_panel.locator(".joint-statistics tbody tr").count() == 12
+    assert "19.719 kg" in robot_panel.inner_text()
+    assert "384 × 220 × 120 mm" in robot_panel.inner_text()
     assert float(page.locator("#vx").get_attribute("max")) == 2.0
     gait_panel = page.locator("section.panel").filter(
         has=page.locator(".ptitle", has_text="Gait & Velocity"))
@@ -78,6 +85,8 @@ with sync_playwright() as playwright:
         page.wait_for_timeout(8000)
         assert "vx=0.12" in page.locator("#command-status").inner_text()
         joint_panel.screenshot(path=str(output) + "_joints.png")
+        stats_panel.locator("summary").click()
+        stats_panel.screenshot(path=str(output) + "_statistics.png")
         page.screenshot(path=str(output) + ".png", full_page=True)
         rows = joint_panel.locator("tbody tr").evaluate_all(
             "rows => rows.map(row => [...row.cells].map(cell => cell.textContent))")
@@ -85,6 +94,17 @@ with sync_playwright() as playwright:
             for index in (5, 6, 9, 10):
                 assert math.isfinite(float(row[index])), row
         caption = joint_panel.locator(".joint-note").inner_text()
+        stats_rows = stats_panel.locator(".joint-statistics tbody tr").evaluate_all(
+            "rows => rows.map(row => [...row.cells].map(cell => cell.textContent))")
+        for row in stats_rows:
+            assert all(math.isfinite(float(value)) for value in row[1:]), row
+            assert float(row[2]) >= float(row[1]), row  # sampled abs peak >= RMS
+        diagnostic = frames[-1]["diagnostics"]
+        assert diagnostic["samples"] > 2, diagnostic
+        assert 0 < diagnostic["covered_s"] <= diagnostic["window_s"], diagnostic
+        assert "sampled peaks" in stats_panel.inner_text().lower()
+        assert "not total requested or applied torque" in stats_panel.inner_text()
+        assert "not a time-window RMS" in caption
         assert "thermal estimate (uncalibrated), not measured" in caption
         assert "Knee belt 2:1, 95% assumed efficiency" in caption
         assert not errors, errors
@@ -98,6 +118,8 @@ with sync_playwright() as playwright:
             "walk_displacement_x_m": displacement,
             "final_state": frames[-1]["state"], "caption": caption,
             "joint_rows": rows, "acks": acks, "page_errors": errors,
+            "statistics_rows": stats_rows, "diagnostics": diagnostic,
+            "robot_model": robot_panel.inner_text(),
             "peak_joint_torque_nm": max(abs(j["eff"]) for s in walk for j in s["joints"]),
             "temperature_range_c": [min(j["temp"] for s in walk for j in s["joints"]),
                                      max(j["temp"] for s in walk for j in s["joints"])],

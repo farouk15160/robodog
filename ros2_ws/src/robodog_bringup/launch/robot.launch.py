@@ -44,7 +44,8 @@ ARGS = [
     ("control_rate_hz", "400.0", None, "control loop rate"),
     ("web_port", "8080", None, "web GUI port"),
     ("use_camera", "true", None, "include the camera in the robot model"),
-    ("mapping", "none", ["none", "rtabmap"], "optional RGB-D SLAM and OctoMap (simulation)"),
+    ("mapping", "auto", ["auto", "none", "rtabmap"],
+     "auto enables RTAB-Map and OctoMap for MuJoCo with a simulated camera"),
     ("mapping_database", "", None, "map database path; default preserves a separate database per world"),
 ]
 
@@ -64,7 +65,7 @@ def _setup(context, *a, **kw):
             get_package_share_directory("rtabmap_slam")
         except PackageNotFoundError as exc:
             raise RuntimeError("Mapping requires ros-humble-rtabmap-ros. Install it "
-                               "before launching with mapping:=rtabmap.") from exc
+                               "or use mapping:=none to disable mapping.") from exc
 
     model = os.path.join(get_package_share_directory("robodog_sim"), "models",
                          "robodog_house.xml" if world == "house" else "robodog_scene.xml")
@@ -72,7 +73,8 @@ def _setup(context, *a, **kw):
         raise RuntimeError(f"{model} is missing. Run: ros2 run robodog_sim generate_models")
 
     banner = (f"robodog: backend={backend} camera={cam_backend} world={world} "
-              f"rate={cfg('control_rate_hz')} Hz")
+              f"rate={cfg('control_rate_hz')} Hz "
+              f"mapping={'rtabmap' if mapping.enabled else 'none'}")
     if not is_sim:
         banner += "\n  *** REAL HARDWARE: confirm the calibration in " \
                   "robodog_hardware/config/robstride_bus.yaml before enabling ***"

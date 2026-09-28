@@ -63,3 +63,7 @@ assert.match(body.children[0].textContent, /not measured phase\/battery\/iq/i);
 assert.match(body.children[0].textContent, /copper-loss model/i);
 panel.update({ joints, simulation: { active: false } });
 assert.match(body.children[0].textContent, /reported motor temperature.*thermal estimate/i);
+panel.update({ joints: joints.map(j => ({ ...j, eff: null, util: null })), simulation: { active: true } });
+assert.equal(rows[2].children[5].textContent, "--");
+assert.equal(rows[2].children[6].textContent, "--");
+assert.equal(rows[2].children[8].children[0].textContent, "--");

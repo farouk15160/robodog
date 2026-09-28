@@ -20,6 +20,23 @@ def test_disabled_mapping_needs_no_camera_or_odometry():
     assert result.database_path is None
 
 
+def test_auto_mapping_enables_supported_simulation():
+    assert plan(mode="auto").enabled
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"backend": "kinematic"},
+    {"backend": "robstride06_can"},
+    {"camera_backend": "none"},
+    {"camera_backend": "nuwa_hp60c"},
+    {"use_camera": False},
+])
+def test_auto_mapping_disables_unsupported_sensor_pipelines(kwargs):
+    result = plan(mode="auto", **kwargs)
+    assert not result.enabled
+    assert result.database_path is None
+
+
 def test_simulation_maps_are_named_by_world_without_creating_files(tmp_path):
     flat = plan(world="flat", ros_home=str(tmp_path))
     house = plan(ros_home=str(tmp_path))
@@ -82,6 +99,28 @@ def test_regular_bringup_never_looks_up_optional_rtabmap(bringup, monkeypatch):
 
     monkeypatch.setattr(bringup, "get_package_share_directory", without_rtabmap)
     actions = bringup._setup(launch_context(bringup))
+    assert not any(isinstance(action, IncludeLaunchDescription) for action in actions)
+
+
+def test_mujoco_bringup_enables_mapping_by_default(bringup, monkeypatch):
+    from launch.actions import IncludeLaunchDescription
+    lookup = bringup.get_package_share_directory
+    monkeypatch.setattr(bringup, "get_package_share_directory",
+                        lambda name: "/optional/rtabmap" if name == "rtabmap_slam" else lookup(name))
+    actions = bringup._setup(launch_context(bringup, backend="mujoco"))
+    assert any(isinstance(action, IncludeLaunchDescription) for action in actions)
+
+
+def test_mujoco_mapping_can_be_explicitly_disabled(bringup, monkeypatch):
+    from launch.actions import IncludeLaunchDescription
+    lookup = bringup.get_package_share_directory
+
+    def without_rtabmap(package):
+        assert package != "rtabmap_slam"
+        return lookup(package)
+
+    monkeypatch.setattr(bringup, "get_package_share_directory", without_rtabmap)
+    actions = bringup._setup(launch_context(bringup, backend="mujoco", mapping="none"))
     assert not any(isinstance(action, IncludeLaunchDescription) for action in actions)
 
 

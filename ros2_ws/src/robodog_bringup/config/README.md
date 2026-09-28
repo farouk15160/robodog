@@ -24,12 +24,15 @@ The GUI binds localhost and validates WebSocket origins by default. Changing
 network exposure is a separate deployment decision, not a requirement for local
 simulation use.
 
-`mapping:=rtabmap` enables RTAB-Map RGB-D SLAM and its graph-corrected OctoMap.
-Use `backend:=mujoco`, `camera_backend:=sim`, and
-`use_camera:=true`. Mapping selects calibrated, registered 640×480 simulated
+The default `mapping:=auto` enables RTAB-Map RGB-D SLAM and its graph-corrected
+OctoMap with `backend:=mujoco`, `camera_backend:=sim`, and `use_camera:=true`.
+It disables mapping for kinematic or hardware backends and absent or unsupported
+cameras. Explicit `mapping:=rtabmap` reports an error for unsupported pipelines.
+Mapping selects calibrated, registered 640×480 simulated
 RGB-D streams and an RViz view containing the occupancy grid and occupied voxels.
-Install `ros-humble-rtabmap-ros` before enabling it. `mapping:=none` is the default
-and needs no RTAB-Map runtime. Both `world:=flat` and `world:=house` are supported.
+Install `ros-humble-rtabmap-ros` before enabling it. Use `mapping:=none` to disable
+mapping and launch without an RTAB-Map runtime. Both `world:=flat` and
+`world:=house` are supported.
 
 The control node supplies simulation ground-truth `odom → base_link`; RTAB-Map
 supplies `map → odom`, using wall time because the stack publishes no `/clock`.

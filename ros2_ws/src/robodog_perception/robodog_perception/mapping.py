@@ -15,7 +15,9 @@ def mapping_plan(*, mode: str, backend: str, camera_backend: str,
                  ros_home: str | None = None) -> MappingPlan:
     if mode == "none":
         return MappingPlan(False)
-    if mode != "rtabmap":
+    if mode == "auto" and (backend != "mujoco" or camera_backend != "sim" or not use_camera):
+        return MappingPlan(False)
+    if mode not in ("auto", "rtabmap"):
         raise ValueError(f"Unsupported mapping mode: {mode}")
     if backend == "robstride06_can":
         raise ValueError("RTAB-Map currently supports simulation only. Real hardware "

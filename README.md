@@ -85,8 +85,9 @@ in the sourced terminal before launch. No temporary `PYTHONPATH` is needed.
 | Command | What it does |
 |---|---|
 | `ros2 launch robodog_bringup robot.launch.py` | ideal joints, no physics — fastest way to exercise the stack |
-| `… backend:=mujoco world:=flat` | full physics on the calibration course |
-| `… backend:=mujoco world:=house` | full physics in the five-room house |
+| `… backend:=mujoco world:=flat` | full physics and RGB-D mapping on the calibration course |
+| `… backend:=mujoco world:=house` | full physics and RGB-D mapping in the five-room house |
+| `… backend:=mujoco mapping:=none` | full physics without SLAM processing |
 | `… backend:=robstride06_can camera_backend:=nuwa_hp60c` | the real robot |
 | `ros2 launch robodog_bringup display.launch.py` | inspect the URDF with joint sliders |
 | `ros2 run robodog_sim viewer --world house` | MuJoCo viewer, no control stack |
@@ -108,6 +109,12 @@ position, tracking error, torque, current and temperature; foot contact and
 forces; safety and thermal state; simulation real-time factor; the camera
 stream; pose and gait commands; and an emergency stop.
 
+Joint diagnostics also show a rolling 20-second RMS and sampled-peak torque
+summary, transmission-aware motor loads, exposure above torque references,
+tracking error and thermal history. Coverage and data sources are labelled;
+these telemetry samples can miss brief physics-step peaks. See
+[how to read the diagnostics](docs/gui_telemetry.md).
+
 The browser builds itself from `robodog_web/config/web.yaml`, so adding,
 removing or reordering a panel is a configuration change. Operator limits —
 maximum commanded velocity, gait confirmation, whether joint jogging is allowed
@@ -120,15 +127,18 @@ much smaller surface from a web page that can move a 19.72 kg machine.
 
 ## SLAM and 3D mapping
 
-Optional RTAB-Map SLAM provides a 2D occupancy map and a 3D OctoMap from the
-simulated depth camera. SLAM estimates the trajectory; OctoMap represents
-occupied and free space. They are used together.
+RTAB-Map SLAM starts by default for MuJoCo with the simulated camera enabled,
+providing a 2D occupancy map and a 3D OctoMap. SLAM estimates the trajectory;
+OctoMap represents occupied and free space. They are used together.
 
 ```bash
-ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house mapping:=rtabmap
+ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house
 ```
 
 Use `world:=flat` for the proving ground. Maps persist separately per world.
+The default `mapping:=auto` leaves mapping off for kinematic mode, hardware and
+launches without the simulated camera. Use `mapping:=none` to turn it off, or
+`mapping:=rtabmap` to require mapping and report unsupported configurations.
 See [mapping setup, outputs and export](docs/mapping.md). Simulation uses exact
 odometry; real-camera depth and real odometry remain prerequisites for hardware.
 

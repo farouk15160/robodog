@@ -36,6 +36,8 @@ robodog_web:
     - {id: pose,        title: "Poses",            enabled: true,  order: 50, width: 1}
     - {id: gait,        title: "Gait & Velocity",  enabled: true,  order: 60, width: 2}
     - {id: joints,      title: "Joint Torque & Temperature", enabled: true, order: 70, width: 4}
+    - {id: jointstats,  title: "Joint RMS, Peaks & Exposure", enabled: true, order: 72, width: 4}
+    - {id: robot,       title: "Robot Model & Motor Ratings", enabled: true, order: 75, width: 2}
     - {id: feet,        title: "Feet & Contact",   enabled: true,  order: 80, width: 2}
     - {id: camera,      title: "Camera",           enabled: true,  order: 90, width: 2}
     - {id: simulation,  title: "Simulation",       enabled: true,  order: 100, width: 1}

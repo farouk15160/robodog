@@ -45,7 +45,7 @@ import yaml
 from aiohttp import WSMsgType, web
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Twist
-from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
@@ -54,7 +54,8 @@ from sensor_msgs.msg import Image
 from robodog_msgs.msg import GaitCommand, JointCommand, JointCommandArray, RobotState
 from robodog_msgs.srv import (EmergencyStop, EnableJoints, SetControlMode, SetGait,
                               SetNamedPose)
-from robodog_web.telemetry import joint_actuator_info
+from robodog_web.telemetry import (RollingTelemetry, STATS_WINDOW_S, finite_json,
+                                    joint_actuator_info)
 
 PROTOCOL_VERSION = 1
 SENSOR_QOS = QoSProfile(reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -76,9 +77,11 @@ def decode_faults(flags: int) -> list[str]:
 class WebBridgeNode(Node):
     """ROS side: caches the latest telemetry, forwards commands."""
 
-    def __init__(self, cfg: dict) -> None:
+    def __init__(self, cfg: dict, robot_info: dict | None = None) -> None:
         super().__init__("robodog_web_server")
         self.cfg = cfg
+        self.robot_info = robot_info if robot_info is not None else _robot_info()
+        self._rolling = RollingTelemetry(self.robot_info["joint_actuators"])
         self.state: dict[str, Any] | None = None
         self.state_seq = 0
         self.jpeg: bytes | None = None
@@ -88,8 +91,11 @@ class WebBridgeNode(Node):
         self._last_faults = 0
 
         cb = ReentrantCallbackGroup()
+        # A state callback updates rolling history and publishes one atomic snapshot.
+        # Keep it serialized even while camera and services use reentrant callbacks.
+        self._state_callbacks = MutuallyExclusiveCallbackGroup()
         self.create_subscription(RobotState, "robodog/robot_state", self._on_state, 10,
-                                 callback_group=cb)
+                                 callback_group=self._state_callbacks)
         self.create_subscription(Image, "robodog/camera/color/image_raw",
                                  self._on_image, SENSOR_QOS, callback_group=cb)
 
@@ -126,7 +132,25 @@ class WebBridgeNode(Node):
                  "pos": [f.position_in_base.x, f.position_in_base.y, f.position_in_base.z]}
                 for f in m.feet]
         s, c, sim = m.safety, m.controller, m.simulation
-        self.state = {
+        stamp = m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
+        physics = sim.active and sim.backend == "mujoco"
+        source_time = sim.sim_time_s if physics else stamp
+        clock = f"{sim.backend}:" + ("sim_time" if physics else "ros_header")
+        joints, diagnostics = self._rolling.update(source_time, clock, joints)
+        diagnostics = {
+            **diagnostics, "source_time_s": source_time, "source_stamp_s": stamp,
+            "received_seq": self.state_seq + 1,
+            "torque_source": ("MuJoCo applied actuator torque, telemetry sampled" if physics
+                              else "Kinematic estimate; not physical load" if sim.active
+                              else "Actuator feedback torque, converted to joint side"),
+            "thermal_source": ("Uncalibrated thermal estimate" if sim.active
+                               else "Maximum of CAN feedback and thermal observer"),
+            "current_source": "Motor RMS phase current estimated from torque / Kt",
+            "power_source": "Estimated power; mechanical plus modelled copper losses",
+            "voltage_source": "Configured supply voltage assumption",
+            "clamp_source": "Cumulative aggregate limiter modifications; not per-joint clipping",
+        }
+        self.state = finite_json({
             "state": STATE_NAMES.get(m.state, "?"),
             "state_code": m.state,
             "joints": joints,
@@ -162,7 +186,8 @@ class WebBridgeNode(Node):
                 "rtf": sim.realtime_factor, "timestep": sim.timestep_s, "steps": sim.steps,
             },
             "camera": self.camera_meta,
-        }
+            "diagnostics": diagnostics,
+        })
         self.state_seq += 1
         self._track_events(s.active_faults, s.messages)
 
@@ -494,6 +519,12 @@ def _robot_info() -> dict:
         "protocol": PROTOCOL_VERSION,
         "robot": "robodog",
         "actuator": RS["model"],
+        "actuator_revision": RS["revision"],
+        "performance": RS["performance"],
+        "electrical": RS["electrical"],
+        "thermal": RS["thermal"],
+        "mass_budget": P["mass_budget"],
+        "stats_window_s": STATS_WINDOW_S,
         "joints": names,
         "joint_actuators": joint_actuator_info(RS, names),
         "legs": ["FL", "FR", "RL", "RR"],
@@ -526,13 +557,14 @@ def main(argv=None) -> None:
     cfg = {**cfg, "host": host}
     www = os.path.join(get_package_share_directory("robodog_web"), "www")
 
-    node = WebBridgeNode(cfg)
+    robot_info = _robot_info()
+    node = WebBridgeNode(cfg, robot_info)
     ex = MultiThreadedExecutor(num_threads=3)
     ex.add_node(node)
     spin = threading.Thread(target=ex.spin, name="robodog-web-ros", daemon=True)
     spin.start()
 
-    app = WebApp(node, cfg, www, _robot_info())
+    app = WebApp(node, cfg, www, robot_info)
     node.get_logger().info(f"web GUI on http://{host}:{port}  "
                            f"(protocol v{PROTOCOL_VERSION}, "
                            f"{len([p for p in cfg['panels'] if p.get('enabled')])} panels)")

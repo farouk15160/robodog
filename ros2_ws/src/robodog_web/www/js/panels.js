@@ -18,10 +18,12 @@ const el = (tag, cls, text) => {
   if (text !== undefined) n.textContent = text;
   return n;
 };
-const fmt = (v, d = 3) => (v === undefined || v === null || Number.isNaN(v))
+const fmt = (v, d = 3) => (v === undefined || v === null || !Number.isFinite(Number(v)))
   ? "--" : Number(v).toFixed(d);
-const deg = (r) => fmt(r * 180 / Math.PI, 1);
-const pct = (v) => fmt(v * 100, 0) + "%";
+const finite = v => typeof v === "number" && Number.isFinite(v);
+const scaled = (v, factor, digits) => fmt(finite(v) ? v * factor : null, digits);
+const deg = r => scaled(r, 180 / Math.PI, 1);
+const pct = v => finite(v) ? fmt(v * 100, 0) + "%" : "--";
 
 function kv(pairs) {
   const dl = el("dl", "kv");
@@ -41,7 +43,7 @@ function bar(cls) {
   const b = el("div", "bar " + (cls || "")); b.appendChild(el("i")); return b;
 }
 function setBar(b, frac, cls) {
-  b.firstChild.style.width = Math.max(0, Math.min(1, frac)) * 100 + "%";
+  b.firstChild.style.width = Math.max(0, Math.min(1, finite(frac) ? frac : 0)) * 100 + "%";
   b.className = "bar " + (cls || "");
 }
 
@@ -79,8 +81,10 @@ Panels.state = {
   render(body) {
     const badge = el("div", "badge idle", "--");
     badge.style.fontSize = "15px";
-    const dl = kv([["height", "--"], ["vx", "--"], ["vy", "--"], ["yaw rate", "--"],
-                   ["roll", "--"], ["pitch", "--"], ["est power", "--"], ["assumed bus", "--"]]);
+    const dl = kv([["height", "--"], ["position xyz", "--"], ["speed", "--"],
+                   ["velocity xyz", "--"], ["roll / pitch / yaw", "--"], ["yaw rate", "--"],
+                   ["feet touching", "--"], ["joints enabled", "--"],
+                   ["est electrical power", "--"], ["assumed bus", "--"]]);
     const wrap = el("div", "stack"); wrap.append(badge, dl); body.appendChild(wrap);
     return {
       update(s) {
@@ -88,15 +92,51 @@ Panels.state = {
         badge.className = "badge " + ({ FAULT: "alarm", ESTOP: "alarm", IDLE: "idle",
                                         MOVING: "ok", STANDING: "ok", READY: "ok" }[s.state] || "idle");
         const q = s.base.quat;
-        const roll = Math.atan2(2 * (q[3] * q[0] + q[1] * q[2]), 1 - 2 * (q[0] ** 2 + q[1] ** 2));
-        const pitch = Math.asin(Math.max(-1, Math.min(1, 2 * (q[3] * q[1] - q[2] * q[0]))));
-        setKv(dl, [fmt(s.base.height * 1000, 0) + " mm",
-                   fmt(s.base.vel[0], 2) + " m/s", fmt(s.base.vel[1], 2) + " m/s",
+        const validRotation = q.length === 4 && q.every(finite) && Math.hypot(...q) > 0;
+        const roll = validRotation ? Math.atan2(2 * (q[3] * q[0] + q[1] * q[2]), 1 - 2 * (q[0] ** 2 + q[1] ** 2)) : null;
+        const pitch = validRotation ? Math.asin(Math.max(-1, Math.min(1, 2 * (q[3] * q[1] - q[2] * q[0])))) : null;
+        const yaw = validRotation ? Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] ** 2 + q[2] ** 2)) : null;
+        const speed = s.base.vel.length === 3 && s.base.vel.every(finite) ? Math.hypot(...s.base.vel) : null;
+        setKv(dl, [scaled(s.base.height, 1000, 0) + " mm",
+                   s.base.pos.map(v => fmt(v)).join(", ") + " m",
+                   fmt(speed, 2) + " m/s",
+                   s.base.vel.map(v => fmt(v, 2)).join(", ") + " m/s",
+                   [roll, pitch, yaw].map(deg).join(" / ") + "°",
                    fmt(s.base.omega[2], 2) + " rad/s",
-                   deg(roll) + "°", deg(pitch) + "°",
+                   `${s.feet.filter(f => f.contact).length} / ${s.feet.length}`,
+                   `${s.joints.filter(j => j.enabled).length} / ${s.joints.length}`,
                    fmt(s.power.watts, 1) + " W", fmt(s.power.voltage, 1) + " V"]);
       }
     };
+  }
+};
+
+/* ============================= ROBOT MODEL ============================= */
+Panels.robot = {
+  render(body, ctx) {
+    const info = ctx.info, g = info.geometry || {}, p = info.performance || {};
+    const e = info.electrical || {}, mass = info.mass_budget || {};
+    const knee = info.joint_actuators?.FL_kfe_joint;
+    const mm = values => values?.length ? values.map(v => fmt(v * 1000, 0)).join(" × ") + " mm" : "--";
+    const heatSink = p.vendor_curve?.heat_sink_dimensions_mm;
+    const dl = kv([
+      ["model / motors", `${info.robot || "--"} / ${info.joints.length} × ${info.actuator || "--"}`],
+      ["working mass / weight", `${fmt(info.mass_kg)} kg / ${fmt(info.mass_kg * 9.81, 1)} N`],
+      ["body collision box", mm(g.body_box_m)],
+      ["nominal footprint", g.nominal_footprint_m ? mm([g.nominal_footprint_m.length, g.nominal_footprint_m.width]) : "--"],
+      ["thigh / shank", `${fmt(g.thigh_length_m * 1000, 1)} / ${fmt(g.shank_length_m * 1000, 1)} mm`],
+      ["motor stall / rated / peak", `${fmt(p.stall_continuous_torque_nm, 1)} / ${fmt(p.rated_torque_nm, 1)} / ${fmt(p.peak_torque_nm, 1)} N·m`],
+      ["rated rotating point", `${fmt(p.rated_speed_rpm, 0)} rpm; ${heatSink ? heatSink.join(" × ") + " mm heat sink" : "see motor specification"}`],
+      ["knee belt / efficiency", knee ? `${fmt(knee.ratio, 0)}:1 / ${pct(knee.efficiency)} assumed` : "--"],
+      ["nominal bus / motor rated", `${fmt(e.supply_voltage_v, 1)} / ${fmt(e.rated_voltage_v, 1)} V`],
+      ["output torque constant", `${fmt(e.torque_constant_nm_per_arms, 2)} N·m/A rms`],
+      ["CAD export / motors", `${fmt(mass.cad_export_kg)} / ${fmt(mass.actuators_kg)} kg`],
+      ["electronics / payload", `${fmt(mass.electronics_payload_kg)} kg`],
+    ]);
+    const wrap = el("div", "stack");
+    wrap.append(dl, el("div", "muted", "Configured model values; payload placement and installed motor cooling remain unverified. The rotating rating is conditional; it is not a continuous stall allowance."),
+      el("div", "muted", info.actuator_revision || "Motor specification revision unavailable."));
+    body.append(wrap);
   }
 };
 
@@ -112,7 +152,7 @@ Panels.controller = {
         const c = s.controller, sf = s.safety;
         setKv(dl, [c.active, c.mode, c.gait || "--", c.pose || "--",
                    fmt(c.rate_hz, 0) + " Hz",
-                   fmt(sf.loop_jitter * 1000, 2) + " ms",
+                   scaled(sf.loop_jitter, 1000, 2) + " ms",
                    c.traj_active ? pct(c.traj_progress) : "idle"]);
         setBar(prog, c.traj_active ? c.traj_progress : 0, "ok");
       }
@@ -124,13 +164,14 @@ Panels.controller = {
 Panels.safety = {
   render(body, ctx) {
     const dl = kv([["max temp", "--"], ["hottest", "--"], ["max torque", "--"],
-                   ["most loaded", "--"], ["clamps", "--"], ["watchdog", "--"],
+                   ["most loaded", "--"], ["aggregate safety clamps", "--"], ["watchdog", "--"],
                    ["cmd age", "--"]]);
     const tbar = bar(), qbar = bar();
     const faults = el("div", "btnrow");
     const wrap = el("div", "stack");
     wrap.append(dl, el("div", "muted", "torque"), qbar,
-                el("div", "muted", "temperature"), tbar, faults);
+                el("div", "muted", "temperature"), tbar, faults,
+                el("div", "muted", "Clamps are the cumulative safety-controller count across all joints, not per-joint actuator clipping."));
     body.appendChild(wrap);
     return {
       update(s) {
@@ -138,7 +179,7 @@ Panels.safety = {
         setKv(dl, [fmt(sf.max_temp, 1) + " °C", sf.hottest || "--",
                    pct(sf.max_util), sf.most_loaded || "--", sf.clamps,
                    sf.watchdog_ok ? "ok" : "STALE",
-                   fmt(sf.command_age * 1000, 0) + " ms"]);
+                   scaled(sf.command_age, 1000, 0) + " ms"]);
         setBar(qbar, sf.max_util, level(sf.max_util, th.torque_warn, th.torque_alarm));
         const tfrac = (sf.max_temp - 20) / (th.temperature_alarm_c - 20);
         setBar(tbar, tfrac, level(sf.max_temp, th.temperature_warn_c, th.temperature_alarm_c));
@@ -250,7 +291,7 @@ Panels.joints = {
     const head = el("thead");
     head.innerHTML = "<tr><th>joint</th><th>pos rad</th><th>cmd rad</th><th>err rad</th>" +
       "<th>vel rad/s</th><th>joint N·m</th><th>motor N·m</th>" +
-      "<th>cont limit / peak N·m</th><th>load % limit</th><th>est A rms</th><th>temp °C</th>" +
+      "<th>cont limit / peak N·m</th><th>load % limit</th><th>est phase A rms</th><th>temp °C</th>" +
       "<th>mode</th><th>status</th></tr>";
     const tbody = el("tbody");
     table.append(head, tbody);
@@ -278,7 +319,7 @@ Panels.joints = {
           `${pct(knee.efficiency)} assumed efficiency. ` : "";
         note.textContent = "Signed joint and motor-output torque; limits at the joint. " +
           belt + `Continuous limit: ${continuousBasis}. Load is instantaneous. ` +
-          "Current: τ/Kt estimate; excludes high-current saturation; not measured phase/battery/iq. " +
+          "Current: instantaneous τ/Kt estimate of phase-equivalent A rms, not a time-window RMS; excludes high-current saturation; not measured phase/battery/iq. " +
           "Temperature: " + (s.simulation.active
             ? "thermal estimate (uncalibrated), not measured; copper-loss model only."
             : "max(reported motor temperature, thermal estimate); observer is uncalibrated.");
@@ -292,7 +333,10 @@ Panels.joints = {
             ? "var(--warn)" : "";
           cells[4].textContent = fmt(j.vel, 2);
           cells[5].textContent = fmt(j.eff, 2);
-          cells[6].textContent = rating ? fmt(j.eff / rating.torque_gain, 2) : "--";
+          const motorTorque = "motor_eff_nm" in j ? j.motor_eff_nm
+            : rating && finite(j.eff) && finite(rating.torque_gain) && rating.torque_gain > 0
+              ? j.eff / rating.torque_gain : null;
+          cells[6].textContent = fmt(motorTorque, 2);
           load.textContent = pct(j.util);
           setBar(lbar, j.util, level(j.util, th.torque_warn, th.torque_alarm));
           cells[9].textContent = fmt(j.cur, 2);
@@ -305,6 +349,71 @@ Panels.joints = {
           else cells[12].appendChild(el("span", "badge " + (j.enabled ? "ok" : "idle"),
                                         j.enabled ? "on" : "off"));
         });
+      }
+    };
+  }
+};
+
+/* ======================= ROLLING JOINT DIAGNOSTICS ======================= */
+function jointTable(names, columns, className) {
+  const table = el("table", className), head = el("thead"), tbody = el("tbody");
+  // Headers are fixed UI strings; every telemetry value below uses textContent.
+  head.innerHTML = "<tr>" + columns.map(c => `<th>${c}</th>`).join("") + "</tr>";
+  const rows = Object.fromEntries(names.map((name, i) => {
+    const row = el("tr", i > 0 && i % 3 === 0 ? "leg-sep" : "");
+    const cells = columns.map(() => el("td", null, "--"));
+    cells[0].textContent = name.replace("_joint", "");
+    row.append(...cells); tbody.append(row);
+    return [name, cells];
+  }));
+  table.append(head, tbody);
+  return { table, rows };
+}
+
+Panels.jointstats = {
+  render(body, ctx) {
+    const status = el("div", "diagnostic-status", "Waiting for rolling statistics…");
+    const source = el("div", "muted"), health = el("div", "muted");
+    const torque = jointTable(ctx.info.joints, ["joint", "motor RMS N·m", "motor |peak| N·m",
+      "joint RMS N·m", "joint |peak| N·m", "motor rpm @ |peak|",
+      "above cont. s", "above 11 N·m s"], "joint-statistics");
+    const details = jointTable(ctx.info.joints, ["joint", "window max °C", "error RMS rad",
+      "mean mech. W", "live Kp N·m/rad", "live Kd N·m·s/rad", "live feedforward N·m",
+      "live cmd rad/s", "coverage s / samples"], "joint-control-details");
+    const expand = el("details", "joint-details");
+    const scroll = el("div", "table-scroll"); scroll.append(details.table);
+    expand.append(el("summary", null, "Temperature history, tracking and live controller commands"),
+      el("div", "muted joint-note", "Temperature is the reported observer/feedback value, not a calibrated prediction. Mechanical power is signed joint torque × speed; negative means mechanical absorption, not measured battery regeneration. Feedforward is not total requested or applied torque; Kp/Kd add feedback torque."), scroll);
+    const torqueScroll = el("div", "table-scroll"); torqueScroll.append(torque.table);
+    body.append(status, source, health,
+      el("div", "muted joint-note", "Time-weighted RMS and exposure use received telemetry. Absolute peaks can miss short impacts between samples. Exposure compares motor-output torque with the configured continuous limit and the conditional 11 N·m rotating reference. Motor speed at peak is signed. These rolling values do not establish thermal endurance."),
+      torqueScroll, expand);
+    return {
+      update(s) {
+        const d = s.diagnostics || {};
+        status.textContent = d.samples
+          ? `${fmt(d.covered_s, 2)} / ${fmt(d.window_s, 0)} s covered · ${d.samples} samples · ${fmt(d.sample_rate_hz, 1)} Hz · ${d.clock || "unknown clock"}`
+          : "Waiting for rolling statistics…";
+        source.textContent = `${d.torque_source || "Torque source unavailable"}. ${d.stats_basis || "Received telemetry; sampled peaks, not physics-step peaks"}.`;
+        health.textContent = `Window resets ${d.resets ?? "--"} · rejected samples ${d.dropped_samples ?? "--"} · sampling gaps ${d.gaps ?? "--"}`;
+        const joints = Object.fromEntries(s.joints.map(j => [j.name, j]));
+        for (const name of ctx.info.joints) {
+          const j = joints[name] || {};
+          const t = torque.rows[name], c = details.rows[name];
+          const st = j.stats || {};
+          const rpm = st.motor_speed_at_peak_rad_s == null ? null : st.motor_speed_at_peak_rad_s * 60 / (2 * Math.PI);
+          [st.motor_torque_rms_nm, st.motor_torque_peak_nm, st.joint_torque_rms_nm,
+            st.joint_torque_peak_nm, rpm, st.above_continuous_s, st.above_vendor_rotating_s]
+            .forEach((value, i) => { t[i + 1].textContent = fmt(value, i === 4 ? 1 : 2); });
+          [st.temperature_max_c, st.tracking_error_rms_rad, st.mechanical_power_mean_w,
+            j.kp, j.kd, j.eff_cmd, j.vel_cmd].forEach((value, i) => {
+              c[i + 1].textContent = fmt(value, i === 1 ? 3 : (i === 0 || i === 3 ? 1 : 2));
+            });
+          c[8].textContent = `${fmt(st.covered_s, 2)} / ${st.samples ?? "--"}`;
+          c[1].style.color = st.temperature_max_c >= ctx.cfg.thresholds.temperature_alarm_c ? "var(--alarm)"
+            : st.temperature_max_c >= ctx.cfg.thresholds.temperature_warn_c ? "var(--warn)" : "";
+          c[2].style.color = st.tracking_error_rms_rad > ctx.cfg.thresholds.tracking_error_warn_rad ? "var(--warn)" : "";
+        }
       }
     };
   }
