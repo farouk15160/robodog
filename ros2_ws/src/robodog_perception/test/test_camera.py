@@ -6,7 +6,13 @@ constraint on the robot, not on the camera, and it was violated by the first
 three mount positions tried -- at z = 0.020 the simulated camera saw nothing
 but its own hip actuators.
 """
+import copy
+import math
 import os
+import subprocess
+import sys
+import types
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import pytest
@@ -14,11 +20,85 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 from builtin_interfaces.msg import Time
 
-from robodog_perception.backend import Intrinsics
+from robodog_perception.backend import Frame, Intrinsics
 from robodog_perception.pointcloud import deproject, make_cloud
+from robodog_perception.camera_node import CameraNode
 from robodog_perception.registry import available, create_camera
 
 PERC = get_package_share_directory("robodog_perception")
+
+
+def _camera_fovy_from_model(model_path: str, camera_name: str = "depth_camera") -> float:
+    root = ET.parse(model_path).getroot()
+    for camera in root.iter("camera"):
+        if camera.attrib.get("name") == camera_name:
+            return float(camera.attrib["fovy"])
+    raise AssertionError(f"camera {camera_name!r} not found in {model_path}")
+
+
+def _mujoco_renderer_available(model_path: str) -> bool:
+    env = os.environ.copy()
+    env.setdefault("MUJOCO_GL", "egl")
+    code = (
+        "import sys, mujoco; "
+        "m = mujoco.MjModel.from_xml_path(sys.argv[1]); "
+        "r = mujoco.Renderer(m, height=8, width=8); "
+        "r.close()"
+    )
+    try:
+        result = subprocess.run([sys.executable, "-c", code, model_path], env=env,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                timeout=10, check=False)
+    except Exception:
+        return False
+    return result.returncode == 0
+
+
+class _Publisher:
+    def __init__(self):
+        self.messages = []
+
+    def publish(self, msg):
+        self.messages.append(msg)
+
+
+class _Logger:
+    def warn(self, *args, **kwargs):
+        pass
+
+
+class _Clock:
+    def now(self):
+        return types.SimpleNamespace(to_msg=lambda: Time(sec=99, nanosec=0))
+
+
+def _node_shell(camera, *, have_robot_state=True):
+    node = types.SimpleNamespace()
+    node.camera = camera
+    node.color_k = Intrinsics(2, 1, 1.0, 1.0, 1.0, 0.5)
+    node.depth_k = Intrinsics(2, 1, 1.0, 1.0, 1.0, 0.5)
+    node.color_frame = "camera_color_optical_frame"
+    node.depth_frame = "camera_color_optical_frame"
+    node.pc_frame = "camera_color_optical_frame"
+    node.pc_enabled = False
+    node.pc_decimation = 1
+    node.depth_scale = 0.001
+    node.max_usable = 4.0
+    node.min_range = 0.15
+    node._pc_decim = 1
+    node._tick = 0
+    node._errors = 0
+    node._have_robot_state = have_robot_state
+    node._latest_robot_state_stamp = Time(sec=7, nanosec=8) if have_robot_state else None
+    node._last_published_robot_state_stamp = None
+    node.pub_color = _Publisher()
+    node.pub_color_info = _Publisher()
+    node.pub_depth = _Publisher()
+    node.pub_depth_info = _Publisher()
+    node.pub_points = _Publisher()
+    node.get_clock = lambda: _Clock()
+    node.get_logger = lambda: _Logger()
+    return node
 
 
 @pytest.fixture(scope="module")
@@ -64,6 +144,18 @@ def test_both_backends_report_the_configured_resolution(cfg):
         ck, dk = cam.intrinsics()
         assert (ck.width, ck.height) == (cfg["color"]["width"], cfg["color"]["height"])
         assert (dk.width, dk.height) == (cfg["depth"]["width"], cfg["depth"]["height"])
+
+
+def test_mapping_mode_sim_backend_registers_rgbd_for_rtabmap(cfg):
+    mapping_cfg = copy.deepcopy(cfg)
+    mapping_cfg["mapping_mode"] = True
+
+    cam = create_camera("sim", mapping_cfg)
+
+    ck, dk = cam.intrinsics()
+    assert (ck.width, ck.height) == (640, 480)
+    assert (dk.width, dk.height) == (640, 480)
+    assert ck.K == pytest.approx(dk.K)
 
 
 def test_real_backend_declares_itself_not_a_simulation(cfg):
@@ -131,6 +223,178 @@ def test_render_produces_the_configured_image_sizes(sim_cam, cfg):
     assert f.color.shape == (cfg["color"]["height"], cfg["color"]["width"], 3)
     assert f.depth.shape == (cfg["depth"]["height"], cfg["depth"]["width"])
     assert f.color.dtype == np.uint8 and f.depth.dtype == np.float32
+
+
+def test_sim_intrinsics_follow_mujoco_camera_fovy_and_render_resize(sim_cam, cfg):
+    f = sim_cam.capture()
+    assert f.color.size and f.depth.size
+    ck, dk = sim_cam.intrinsics()
+    render_w, render_h = sim_cam.stats()["render_size"]
+    fovy = _camera_fovy_from_model(cfg["model_path"])
+    render_focal = render_h / (2.0 * math.tan(math.radians(fovy) / 2.0))
+
+    assert ck.fx == pytest.approx(render_focal * ck.width / render_w)
+    assert ck.fy == pytest.approx(render_focal * ck.height / render_h)
+    assert dk.fx == pytest.approx(render_focal * dk.width / render_w)
+    assert dk.fy == pytest.approx(render_focal * dk.height / render_h)
+
+
+
+def test_mapping_depth_reconstructs_segmented_ground_plane(cfg):
+    if not _mujoco_renderer_available(cfg["model_path"]):
+        pytest.skip("off-screen rendering unavailable")
+    code = r"""
+import copy
+import os
+import sys
+
+import numpy as np
+import yaml
+from ament_index_python.packages import get_package_share_directory
+
+from robodog_perception.pointcloud import deproject
+from robodog_perception.registry import create_camera
+
+os.environ.setdefault("MUJOCO_GL", "egl")
+perc = get_package_share_directory("robodog_perception")
+with open(os.path.join(perc, "config", "nuwa_hp60c.yaml")) as f:
+    cfg = yaml.safe_load(f)
+cfg["model_path"] = sys.argv[1]
+cfg["mapping_mode"] = True
+cfg["simulate_noise"] = False
+
+cam = create_camera("sim", cfg)
+cam.configure()
+try:
+    frame = cam.capture()
+    _, depth_k = cam.intrinsics()
+
+    ground_id = cam._mj.mj_name2id(cam._m, cam._mj.mjtObj.mjOBJ_GEOM, "ground")
+    assert ground_id >= 0
+    cam._r.update_scene(cam._d, camera=cam._cam_id)
+    cam._r.enable_segmentation_rendering()
+    try:
+        seg = cam._r.render().copy()
+    finally:
+        cam._r.disable_segmentation_rendering()
+
+    geom_type = int(cam._mj.mjtObj.mjOBJ_GEOM.value)
+    ground = (seg[:, :, 0] == ground_id) & (seg[:, :, 1] == geom_type)
+    interior = np.zeros_like(ground, dtype=bool)
+    interior[1:-1, 1:-1] = (ground[1:-1, 1:-1] & ground[:-2, 1:-1] & ground[2:, 1:-1] &
+                            ground[1:-1, :-2] & ground[1:-1, 2:])
+    pts_optical, _ = deproject(np.where(interior, frame.depth, np.nan), depth_k,
+                               decimation=4, min_range=0.15, max_range=4.0)
+    assert len(pts_optical) > 100, len(pts_optical)
+
+    pts_mujoco_camera = np.column_stack((pts_optical[:, 0],
+                                         -pts_optical[:, 1],
+                                         -pts_optical[:, 2]))
+    cam_pos = cam._d.cam_xpos[cam._cam_id]
+    cam_rot = cam._d.cam_xmat[cam._cam_id].reshape(3, 3)
+    pts_world = cam_pos + pts_mujoco_camera @ cam_rot.T
+    z_error = np.abs(pts_world[:, 2])
+
+    assert np.median(z_error) < 0.015, float(np.median(z_error))
+    assert np.percentile(z_error, 95) < 0.05, float(np.percentile(z_error, 95))
+finally:
+    cam.shutdown()
+"""
+    env = os.environ.copy()
+    env.setdefault("MUJOCO_GL", "egl")
+    env["PYTHONPATH"] = os.pathsep.join(p for p in sys.path if p)
+    result = subprocess.run([sys.executable, "-c", code, cfg["model_path"]], env=env,
+                            text=True, capture_output=True, timeout=30, check=False)
+    if result.returncode in {-6, 134} and "GL" in result.stderr:
+        pytest.skip(f"off-screen rendering unavailable: {result.stderr[-400:]}")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+def test_sim_capture_stamp_is_the_latest_robot_state_stamp(sim_cam):
+    stamp = Time(sec=12, nanosec=34)
+    sim_cam.set_robot_state((0.0, 0.0, 0.30), (0.0, 0.0, 0.0, 1.0), [0.0] * 12, stamp=stamp)
+
+    assert sim_cam.capture().stamp is stamp
+
+
+def test_camera_node_waits_for_robot_state_before_sim_capture():
+    class Camera:
+        is_simulation = True
+
+        def capture(self):
+            raise AssertionError("sim camera published before a RobotState pose arrived")
+
+    node = _node_shell(Camera(), have_robot_state=False)
+
+    CameraNode._tick_cb(node)
+
+    assert node._tick == 0
+    assert node.pub_color.messages == []
+    assert node.pub_depth.messages == []
+
+
+def test_camera_node_publishes_frame_stamp_and_shared_sim_optical_frame():
+    stamp = Time(sec=7, nanosec=8)
+
+    class Camera:
+        is_simulation = True
+
+        def capture(self):
+            return Frame(color=np.zeros((1, 2, 3), dtype=np.uint8),
+                         depth=np.ones((1, 2), dtype=np.float32),
+                         stamp=stamp)
+
+    node = _node_shell(Camera(), have_robot_state=True)
+
+    CameraNode._tick_cb(node)
+
+    assert node.pub_color.messages[0].header.stamp is stamp
+    assert node.pub_color_info.messages[0].header.stamp is stamp
+    assert node.pub_depth.messages[0].header.stamp is stamp
+    assert node.pub_depth_info.messages[0].header.stamp is stamp
+    assert node.pub_color.messages[0].header.frame_id == "camera_color_optical_frame"
+    assert node.pub_depth.messages[0].header.frame_id == "camera_color_optical_frame"
+    assert node.pub_depth_info.messages[0].header.frame_id == "camera_color_optical_frame"
+
+
+
+def test_camera_node_uses_clock_for_non_ros_backend_stamp():
+    class Camera:
+        is_simulation = False
+
+        def capture(self):
+            return Frame(color=np.zeros((1, 2, 3), dtype=np.uint8), stamp=123.456)
+
+    node = _node_shell(Camera(), have_robot_state=True)
+    node.depth_frame = "camera_depth_optical_frame"
+
+    CameraNode._tick_cb(node)
+
+    assert node.pub_color.messages[0].header.stamp.sec == 99
+    assert node.pub_color_info.messages[0].header.stamp.sec == 99
+
+
+def test_camera_node_does_not_republish_a_stale_sim_robot_state():
+    stamp = Time(sec=7, nanosec=8)
+
+    class Camera:
+        is_simulation = True
+
+        def __init__(self):
+            self.captures = 0
+
+        def capture(self):
+            self.captures += 1
+            return Frame(color=np.zeros((1, 2, 3), dtype=np.uint8), stamp=stamp)
+
+    camera = Camera()
+    node = _node_shell(camera, have_robot_state=True)
+    node._latest_robot_state_stamp = stamp
+
+    CameraNode._tick_cb(node)
+    CameraNode._tick_cb(node)
+
+    assert camera.captures == 1
+    assert len(node.pub_color.messages) == 1
 
 
 def test_camera_does_not_look_at_the_robots_own_legs(sim_cam, cfg):

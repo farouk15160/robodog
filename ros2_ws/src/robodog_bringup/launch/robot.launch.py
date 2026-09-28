@@ -17,16 +17,18 @@ frame or controller changes between simulation and hardware.
 """
 import os
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, GroupAction, LogInfo,
+from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription, LogInfo,
                             OpaqueFunction)
 from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 from robodog_control.motion_policy import startup_actions
+from robodog_perception.mapping import mapping_plan
 
 ARGS = [
     ("backend", "kinematic", ["kinematic", "mujoco", "robstride06_can"],
@@ -42,6 +44,8 @@ ARGS = [
     ("control_rate_hz", "400.0", None, "control loop rate"),
     ("web_port", "8080", None, "web GUI port"),
     ("use_camera", "true", None, "include the camera in the robot model"),
+    ("mapping", "none", ["none", "rtabmap"], "optional RGB-D SLAM and OctoMap (simulation)"),
+    ("mapping_database", "", None, "map database path; default preserves a separate database per world"),
 ]
 
 
@@ -52,6 +56,15 @@ def _setup(context, *a, **kw):
     cam_backend = cfg("camera_backend")
     is_sim = backend != "robstride06_can"
     auto_enable, auto_stand = startup_actions(backend, cfg("auto_enable"), cfg("auto_stand"))
+    mapping = mapping_plan(mode=cfg("mapping"), backend=backend,
+                           camera_backend=cam_backend, use_camera=cfg("use_camera").lower() == "true",
+                           world=world, database=cfg("mapping_database"))
+    if mapping.enabled:
+        try:
+            get_package_share_directory("rtabmap_slam")
+        except PackageNotFoundError as exc:
+            raise RuntimeError("Mapping requires ros-humble-rtabmap-ros. Install it "
+                               "before launching with mapping:=rtabmap.") from exc
 
     model = os.path.join(get_package_share_directory("robodog_sim"), "models",
                          "robodog_house.xml" if world == "house" else "robodog_scene.xml")
@@ -105,7 +118,16 @@ def _setup(context, *a, **kw):
                           name="robodog_camera_node", output="screen",
                           parameters=[{"backend": cam_backend,
                                        "mujoco_model": model,
+                                       "mapping_mode": mapping.enabled,
                                        "rate_hz": 15.0}]))
+
+    if mapping.enabled:
+        nodes.append(IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(os.path.join(
+                get_package_share_directory("robodog_perception"), "launch", "mapping.launch.py")),
+            launch_arguments={"backend": backend, "camera_backend": cam_backend,
+                              "use_camera": cfg("use_camera"), "world": world,
+                              "mapping_database": str(mapping.database_path)}.items()))
 
     # web.yaml holds a list of panel definitions, which is structured data
     # rather than ROS parameters; the server loads it by path. Only the
@@ -115,11 +137,14 @@ def _setup(context, *a, **kw):
         output="screen", condition=IfCondition(LaunchConfiguration("web")),
         parameters=[{"port": LaunchConfiguration("web_port")}]))
 
+    rviz_config = (os.path.join(get_package_share_directory("robodog_perception"),
+                               "config", "mapping.rviz") if mapping.enabled else
+                   os.path.join(get_package_share_directory("robodog_description"),
+                                "rviz", "robodog.rviz"))
     nodes.append(Node(
         package="rviz2", executable="rviz2", name="rviz2", output="log",
         condition=IfCondition(LaunchConfiguration("rviz")),
-        arguments=["-d", PathJoinSubstitution([FindPackageShare("robodog_description"),
-                                               "rviz", "robodog.rviz"])]))
+        arguments=["-d", rviz_config]))
     return nodes
 
 

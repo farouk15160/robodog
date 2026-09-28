@@ -68,6 +68,16 @@ def image_msg(data: np.ndarray, encoding: str, frame_id: str, stamp) -> Image:
     return m
 
 
+def _stamp_key(stamp) -> tuple[int, int] | None:
+    if hasattr(stamp, "sec") and hasattr(stamp, "nanosec"):
+        return int(stamp.sec), int(stamp.nanosec)
+    return None
+
+
+def _ros_stamp_or(stamp, fallback):
+    return stamp if _stamp_key(stamp) is not None else fallback
+
+
 class CameraNode(Node):
     def __init__(self) -> None:
         super().__init__("robodog_camera_node")
@@ -77,14 +87,21 @@ class CameraNode(Node):
         self.declare_parameter("rate_hz", 15.0)
         self.declare_parameter("publish_pointcloud", True)
         self.declare_parameter("device", "/dev/video0")
+        self.declare_parameter("mapping_mode", False)
 
         cfg_path = self.get_parameter("config").value or os.path.join(
             get_package_share_directory("robodog_perception"), "config", "nuwa_hp60c.yaml")
         with open(cfg_path) as f:
             self.cfg = yaml.safe_load(f)
         self.cfg["device"] = self.get_parameter("device").value
+        mapping_mode = bool(self.get_parameter("mapping_mode").value)
+        self.cfg["mapping_mode"] = mapping_mode
 
         backend = str(self.get_parameter("backend").value)
+        if mapping_mode and backend != "sim":
+            raise CameraBackendError(
+                "mapping_mode requires a registered RGB-D backend; the real NUWA HP60C "
+                "adapter does not publish a verified depth stream yet")
         if backend == "sim":
             model = self.get_parameter("mujoco_model").value or os.path.join(
                 get_package_share_directory("robodog_sim"), "models", "robodog_scene.xml")
@@ -105,7 +122,15 @@ class CameraNode(Node):
         pc = self.cfg["pointcloud"]
         self.pc_enabled = bool(self.get_parameter("publish_pointcloud").value and pc["enabled"])
         self.pc_decimation = int(pc["decimation"])
+        self.color_frame = "camera_color_optical_frame"
+        self.depth_frame = "camera_depth_optical_frame"
         self.pc_frame = pc["frame_id"]
+        if self.camera.is_simulation:
+            # The MuJoCo scene has one pinhole camera at camera_link. Publish
+            # both streams in the colour optical frame so RTABMap sees a truly
+            # registered RGB-D pair instead of the real stereo baseline offset.
+            self.depth_frame = self.color_frame
+            self.pc_frame = self.color_frame
         self.depth_scale = float(self.cfg["depth"]["depth_scale_m"])
         self.max_usable = float(self.cfg["depth"].get("max_usable_range_m",
                                                       self.cfg["depth"]["max_range_m"]))
@@ -124,6 +149,9 @@ class CameraNode(Node):
                                     max(float(pc["rate_hz"]), 1e-6)))
         self._tick = 0
         self._errors = 0
+        self._have_robot_state = not self.camera.is_simulation
+        self._latest_robot_state_stamp = None
+        self._last_published_robot_state_stamp = None
 
         if self.camera.is_simulation:
             # The simulated camera needs the robot placed in its own copy of the
@@ -136,23 +164,32 @@ class CameraNode(Node):
         p = msg.base_pose.position
         o = msg.base_pose.orientation
         self.camera.set_robot_state((p.x, p.y, p.z), (o.x, o.y, o.z, o.w),
-                                    [j.position for j in msg.joints])
+                                    [j.position for j in msg.joints], stamp=msg.header.stamp)
+        self._latest_robot_state_stamp = msg.header.stamp
+        self._have_robot_state = True
 
     def _tick_cb(self) -> None:
-        stamp = self.get_clock().now().to_msg()
+        if self.camera.is_simulation:
+            if not self._have_robot_state:
+                return
+            latest_key = _stamp_key(self._latest_robot_state_stamp)
+            if latest_key is not None and latest_key == _stamp_key(self._last_published_robot_state_stamp):
+                return
+        fallback_stamp = self.get_clock().now().to_msg()
         try:
             frame = self.camera.capture()
         except CameraBackendError as e:
             self._errors += 1
             self.get_logger().warn(f"capture failed: {e}", throttle_duration_sec=5.0)
             return
+        stamp = _ros_stamp_or(frame.stamp, fallback_stamp)
 
         if frame.color is not None:
             self.pub_color.publish(
                 image_msg(np.ascontiguousarray(frame.color, dtype=np.uint8), "rgb8",
-                          "camera_color_optical_frame", stamp))
+                          self.color_frame, stamp))
             self.pub_color_info.publish(
-                camera_info(self.color_k, "camera_color_optical_frame", stamp))
+                camera_info(self.color_k, self.color_frame, stamp))
 
         if frame.depth is not None:
             # float32 metres (NaN = invalid) -> 16UC1 millimetres (0 = invalid)
@@ -161,9 +198,9 @@ class CameraNode(Node):
             mm = np.clip(mm, 0, 65535).astype(np.uint16)
             self.pub_depth.publish(
                 image_msg(np.ascontiguousarray(mm), "16UC1",
-                          "camera_depth_optical_frame", stamp))
+                          self.depth_frame, stamp))
             self.pub_depth_info.publish(
-                camera_info(self.depth_k, "camera_depth_optical_frame", stamp))
+                camera_info(self.depth_k, self.depth_frame, stamp))
 
             if self.pc_enabled and self._tick % self._pc_decim == 0:
                 pts, idx = deproject(frame.depth, self.depth_k,
@@ -177,6 +214,8 @@ class CameraNode(Node):
                     cx = np.clip((idx[:, 1] * sx).astype(int), 0, frame.color.shape[1] - 1)
                     colors = frame.color[cy, cx]
                 self.pub_points.publish(make_cloud(pts, colors, self.pc_frame, stamp))
+        if self.camera.is_simulation:
+            self._last_published_robot_state_stamp = self._latest_robot_state_stamp
         self._tick += 1
 
     def destroy_node(self) -> None:

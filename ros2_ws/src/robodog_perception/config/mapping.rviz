@@ -1,0 +1,446 @@
+# Robot/world view plus live SLAM and OctoMap products.
+Panels:
+- Class: rviz_common/Displays
+  Help Height: 70
+  Name: Displays
+  Property Tree Widget:
+    Expanded:
+    - /Global Options1
+    Splitter Ratio: 0.5
+  Tree Height: 300
+- Class: rviz_common/Views
+  Expanded:
+  - /Current View1
+  Name: Views
+  Splitter Ratio: 0.5
+- Class: rviz_common/Tool Properties
+  Expanded: null
+  Name: Tool Properties
+  Splitter Ratio: 0.5
+Visualization Manager:
+  Class: ''
+  Displays:
+  - Alpha: 0.5
+    Cell Size: 1
+    Class: rviz_default_plugins/Grid
+    Color: 70; 74; 82
+    Enabled: true
+    Line Style:
+      Line Width: 0.019999999552965164
+      Value: Lines
+    Name: Grid
+    Normal Cell Count: 0
+    Offset:
+      X: 0
+      Y: 0
+      Z: 0
+    Plane: XY
+    Plane Cell Count: 24
+    Reference Frame: <Fixed Frame>
+    Value: true
+  - Alpha: 1
+    Class: rviz_default_plugins/RobotModel
+    Collision Enabled: false
+    Description File: ''
+    Description Source: Topic
+    Description Topic:
+      Depth: 5
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /robot_description
+    Enabled: true
+    Links:
+      All Links Enabled: true
+      Expand Joint Details: false
+      Expand Link Details: false
+      Expand Tree: false
+      FL_calf:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      FL_foot:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+      FL_hip:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      FL_thigh:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      FR_calf:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      FR_foot:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+      FR_hip:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      FR_thigh:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      Link Tree Style: Links in Alphabetic Order
+      RL_calf:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      RL_foot:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+      RL_hip:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      RL_thigh:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      RR_calf:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      RR_foot:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+      RR_hip:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      RR_thigh:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      base_link:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      camera_color_frame:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+      camera_color_optical_frame:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+      camera_depth_frame:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+      camera_depth_optical_frame:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+      camera_link:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      camera_mast:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+        Value: true
+      imu_link:
+        Alpha: 1
+        Show Axes: false
+        Show Trail: false
+    Mass Properties:
+      Inertia: false
+      Mass: false
+    Name: Robot
+    TF Prefix: ''
+    Update Interval: 0
+    Value: true
+    Visual Enabled: true
+  - Class: rviz_default_plugins/TF
+    Enabled: false
+    Filter (blacklist): ''
+    Filter (whitelist): ''
+    Frame Timeout: 15
+    Frames:
+      All Enabled: true
+    Marker Scale: 0.15000000596046448
+    Name: TF
+    Show Arrows: false
+    Show Axes: true
+    Show Names: true
+    Tree: {}
+    Update Interval: 0
+    Value: false
+  - Class: rviz_default_plugins/MarkerArray
+    Enabled: true
+    Name: World
+    Namespaces:
+      door: true
+      furniture: true
+      obstacle: true
+      platform: true
+      ramp: true
+      soft: true
+      stair: true
+      wall: true
+      waypoint: true
+      waypoint_label: true
+    Topic:
+      Depth: 1
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /robodog/world_markers
+    Value: true
+  - Alpha: 1
+    Autocompute Intensity Bounds: true
+    Autocompute Value Bounds:
+      Max Value: 10
+      Min Value: -10
+      Value: true
+    Axis: Z
+    Channel Name: intensity
+    Class: rviz_default_plugins/PointCloud2
+    Color: 255; 255; 255
+    Color Transformer: RGB8
+    Decay Time: 0
+    Enabled: true
+    Invert Rainbow: false
+    Max Color: 255; 255; 255
+    Max Intensity: 4096
+    Min Color: 0; 0; 0
+    Min Intensity: 0
+    Name: DepthPoints
+    Position Transformer: XYZ
+    Selectable: true
+    Size (Pixels): 3
+    Size (m): 0.014999999664723873
+    Style: Flat Squares
+    Topic:
+      Depth: 2
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: /robodog/camera/depth/points
+    Use Fixed Frame: true
+    Use rainbow: true
+    Value: true
+  - Class: rviz_default_plugins/Image
+    Enabled: true
+    Max Value: 1
+    Median window: 5
+    Min Value: 0
+    Name: Camera
+    Normalize Range: true
+    Topic:
+      Depth: 2
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: /robodog/camera/color/image_raw
+    Value: true
+  - Class: rviz_default_plugins/Image
+    Enabled: false
+    Max Value: 1
+    Median window: 5
+    Min Value: 0
+    Name: Depth
+    Normalize Range: true
+    Topic:
+      Depth: 2
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: /robodog/camera/depth/image_rect_raw
+    Value: false
+  - Angle Tolerance: 0.10000000149011612
+    Class: rviz_default_plugins/Odometry
+    Covariance:
+      Orientation:
+        Alpha: 0.5
+        Color: 255; 255; 127
+        Color Style: Unique
+        Frame: Local
+        Offset: 1
+        Scale: 1
+        Value: true
+      Position:
+        Alpha: 0.30000001192092896
+        Color: 204; 51; 204
+        Scale: 1
+        Value: true
+      Value: true
+    Enabled: false
+    Keep: 100
+    Name: BasePose
+    Position Tolerance: 0.10000000149011612
+    Shape:
+      Alpha: 0.6000000238418579
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Color: 40; 200; 220
+      Head Length: 0.05000000074505806
+      Head Radius: 0.029999999329447746
+      Shaft Length: 0.15000000596046448
+      Shaft Radius: 0.012000000104308128
+      Value: Arrow
+    Topic:
+      Depth: 10
+      Durability Policy: Volatile
+      Filter size: 10
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /robodog/odom
+    Value: false
+  - Class: rviz_default_plugins/Map
+    Enabled: true
+    Name: SLAM occupancy grid
+    Alpha: 0.55
+    Draw Behind: true
+    Color Scheme: map
+    Topic:
+      Value: /robodog/mapping/map
+      Depth: 1
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+  - Class: rviz_default_plugins/PointCloud2
+    Enabled: true
+    Name: OctoMap occupied voxels
+    Alpha: 0.8
+    Color Transformer: AxisColor
+    Axis: Z
+    Position Transformer: XYZ
+    Style: Boxes
+    Size (m): 0.05
+    Decay Time: 0
+    Use Fixed Frame: true
+    Topic:
+      Value: /robodog/mapping/octomap_occupied_space
+      Depth: 1
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+  Enabled: true
+  Global Options:
+    Background Color: 33; 36; 41
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+  - Class: rviz_default_plugins/MoveCamera
+  - Class: rviz_default_plugins/Select
+  - Class: rviz_default_plugins/FocusCamera
+  - Class: rviz_default_plugins/Measure
+    Line color: 128; 128; 0
+  - Class: rviz_default_plugins/SetGoal
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /goal_pose
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 5.305018424987793
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 1.3625352382659912
+        Y: 2.7454562187194824
+        Z: 1.8871679306030273
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.5899986028671265
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 3.245009660720825
+    Saved:
+    - Class: rviz_default_plugins/Orbit
+      Distance: 2
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.20000000298023224
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: FollowRobot
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.3499999940395355
+      Target Frame: base_link
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 2.9000000953674316
+    - Class: rviz_default_plugins/Orbit
+      Distance: 12
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 6
+        Y: 4.5
+        Z: 0
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: TopDown
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 1.569700002670288
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 3.1415998935699463
+Window Geometry:
+  Camera:
+    collapsed: false
+  Depth:
+    collapsed: false
+  Displays:
+    collapsed: false
+  Height: 1011
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd00000001000000000000019600000395fc0200000005fb0000000a00440065007000740068000000003f000000c90000001700fffffffb0000000c00430061006d006500720061010000003f000001040000001700fffffffb000000100044006900730070006c0061007900730100000149000001b2000000cc00fffffffb0000000a005600690065007700730000000254000000dc000000a900fffffffb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000301000000d30000005d00ffffff000005e40000039500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 1920
+  X: 1920
+  Y: 872

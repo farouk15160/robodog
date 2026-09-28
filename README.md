@@ -118,6 +118,20 @@ much smaller surface from a web page that can move a 19.72 kg machine.
 
 ---
 
+## SLAM and 3D mapping
+
+Optional RTAB-Map SLAM provides a 2D occupancy map and a 3D OctoMap from the
+simulated depth camera. SLAM estimates the trajectory; OctoMap represents
+occupied and free space. They are used together.
+
+```bash
+ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house mapping:=rtabmap
+```
+
+Use `world:=flat` for the proving ground. Maps persist separately per world.
+See [mapping setup, outputs and export](docs/mapping.md). Simulation uses exact
+odometry; real-camera depth and real odometry remain prerequisites for hardware.
+
 ## Architecture
 
 <p align="center">

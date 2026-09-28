@@ -45,6 +45,22 @@ class Intrinsics:
         fy = height / (2.0 * math.tan(math.radians(vfov_deg) / 2.0))
         return cls(width, height, fx, fy, width / 2.0, height / 2.0, **kw)
 
+    @classmethod
+    def from_vfov(cls, width: int, height: int, vfov_deg: float, **kw) -> "Intrinsics":
+        focal = height / (2.0 * math.tan(math.radians(vfov_deg) / 2.0))
+        return cls(width, height, focal, focal, width / 2.0, height / 2.0, **kw)
+
+    def scaled(self, width: int, height: int, **kw) -> "Intrinsics":
+        sx = width / self.width
+        sy = height / self.height
+        return Intrinsics(
+            width=width, height=height,
+            fx=self.fx * sx, fy=self.fy * sy,
+            cx=self.cx * sx, cy=self.cy * sy,
+            distortion=tuple(kw.get("distortion", self.distortion)),
+            distortion_model=kw.get("distortion_model", self.distortion_model),
+        )
+
     @property
     def K(self) -> list[float]:
         return [self.fx, 0.0, self.cx, 0.0, self.fy, self.cy, 0.0, 0.0, 1.0]
@@ -59,7 +75,7 @@ class Frame:
     """One synchronised capture. Either field may be None if that stream is off."""
     color: np.ndarray | None = None      # (h, w, 3) uint8, RGB
     depth: np.ndarray | None = None      # (h, w) float32, METRES, NaN = invalid
-    stamp: float = 0.0
+    stamp: Any = None
 
 
 class CameraBackendError(RuntimeError):

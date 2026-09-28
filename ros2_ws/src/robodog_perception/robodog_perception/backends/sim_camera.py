@@ -21,6 +21,7 @@ control cycle behind. Both are the right trade for a 10-30 Hz sensor.
 from __future__ import annotations
 
 import math
+import copy
 import time
 from typing import Any
 
@@ -39,12 +40,24 @@ class SimCameraBackend(CameraBackend):
         if not self.model_path:
             raise CameraBackendError("SimCameraBackend requires config['model_path']")
         self.camera_name = config.get("camera_name", "depth_camera")
-        cc, dc = config["color"], config["depth"]
-        self.color_k = Intrinsics.from_fov(cc["width"], cc["height"],
-                                           cc["hfov_deg"], cc["vfov_deg"],
-                                           distortion=tuple(cc.get("distortion", [0.0] * 5)))
-        self.depth_k = Intrinsics.from_fov(dc["width"], dc["height"],
-                                           dc["hfov_deg"], dc["vfov_deg"])
+        self.mapping_mode = bool(config.get("mapping_mode", False))
+        cc, dc = self._stream_configs(config)
+        # These provisional intrinsics keep the backend usable before configure().
+        # configure() replaces them with values derived from the actual MuJoCo
+        # camera fovy and render resolution.
+        if self.mapping_mode:
+            # Mapping mode is a simulated registered RGB-D camera. Before the
+            # MuJoCo model is loaded, use one provisional pinhole model for
+            # both streams so CameraInfo remains self-consistent.
+            self.color_k = Intrinsics.from_fov(dc["width"], dc["height"],
+                                               dc["hfov_deg"], dc["vfov_deg"])
+            self.depth_k = Intrinsics.from_fov(dc["width"], dc["height"],
+                                               dc["hfov_deg"], dc["vfov_deg"])
+        else:
+            self.color_k = Intrinsics.from_fov(cc["width"], cc["height"],
+                                               cc["hfov_deg"], cc["vfov_deg"])
+            self.depth_k = Intrinsics.from_fov(dc["width"], dc["height"],
+                                               dc["hfov_deg"], dc["vfov_deg"])
         self.min_range = float(dc["min_range_m"])
         self.max_range = float(dc["max_range_m"])
         self.baseline = float(dc.get("baseline_m", 0.05))
@@ -53,6 +66,16 @@ class SimCameraBackend(CameraBackend):
         self._m = self._d = self._r = None
         self._rng = np.random.default_rng(0)
         self._frames = 0
+        self._pose_stamp = None
+
+    @staticmethod
+    def _stream_configs(config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        cc = copy.deepcopy(config["color"])
+        dc = copy.deepcopy(config["depth"])
+        if config.get("mapping_mode", False):
+            cc["width"], cc["height"] = 640, 480
+            dc["width"], dc["height"] = 640, 480
+        return cc, dc
 
     def configure(self) -> None:
         try:
@@ -74,6 +97,14 @@ class SimCameraBackend(CameraBackend):
         if cid < 0:
             raise CameraBackendError(f"camera '{self.camera_name}' not in {self.model_path}")
         self._cam_id = cid
+        fovy_deg = float(self._m.cam_fovy[cid])
+        render_w = max(self.color_k.width, self.depth_k.width)
+        render_h = max(self.color_k.height, self.depth_k.height)
+        render_k = Intrinsics.from_vfov(render_w, render_h, fovy_deg)
+        self.color_k = render_k.scaled(self.color_k.width, self.color_k.height,
+                                       distortion=(0.0, 0.0, 0.0, 0.0, 0.0))
+        self.depth_k = render_k.scaled(self.depth_k.width, self.depth_k.height,
+                                       distortion=(0.0, 0.0, 0.0, 0.0, 0.0))
         # Resolve qpos addresses by joint NAME. A world with movable props adds
         # free joints of its own, so the robot's state is not guaranteed to sit
         # at a fixed offset, and assuming one silently renders the wrong pose.
@@ -113,11 +144,12 @@ class SimCameraBackend(CameraBackend):
             self._r = None
 
     # ------------------------------------------------------------------ #
-    def set_robot_state(self, base_pos, base_quat_xyzw, joint_positions) -> None:
+    def set_robot_state(self, base_pos, base_quat_xyzw, joint_positions, stamp=None) -> None:
         """Place the robot in the render scene. Called by the node from the
         latest RobotState; the simulated camera is otherwise stateless."""
         if self._d is None:
             return
+        self._pose_stamp = stamp
         q = self._d.qpos
         a = self._base_adr
         q[a:a + 3] = base_pos
@@ -141,7 +173,7 @@ class SimCameraBackend(CameraBackend):
         self._frames += 1
         return Frame(color=self._resize(rgb, self.color_k),
                      depth=self._resize(depth, self.depth_k),
-                     stamp=time.time())
+                     stamp=self._pose_stamp if self._pose_stamp is not None else time.time())
 
     def _apply_sensor_model(self, depth: np.ndarray) -> np.ndarray:
         """Turn a perfect z-buffer into something the real device could return.

@@ -1,0 +1,395 @@
+{
+  "date": "2026-09-28",
+  "environment": {
+    "ros": "Humble",
+    "mujoco": "3.13.0",
+    "rtabmap_ros": "0.23.7",
+    "octomap_server": "2.3.1",
+    "headless": true,
+    "ros_domain_id": 89
+  },
+  "limitations": [
+    "Simulation ground-truth odometry; no hardware odometry validation.",
+    "Short straight walks do not establish loop-closure performance or complete world coverage.",
+    "TF edges and expected publisher graph checked; per-edge publisher GID unavailable in Humble rclpy."
+  ],
+  "house_database_observations": {
+    "before_reload": 18,
+    "after_reload": 24
+  },
+  "exports": {
+    "house": {
+      "bytes": 63850,
+      "sha256": "63fdbde24ca13ba7d397ed4f0fb2a39f351951264c358a1b5db49cb637dd0828",
+      "header": "# Octomap OcTree file\n# (feel free to add / change comments, but leave the first line as it is!)\n#\nid ColorOcTree\nsize 7964\nres 0.05\n"
+    },
+    "flat": {
+      "bytes": 220675,
+      "sha256": "a6dddf1c1aec6ab469d47de7d3383003e934ecda77dfeb8f5522a15aff23101d",
+      "header": "# Octomap OcTree file\n# (feel free to add / change comments, but leave the first line as it is!)\n#\nid ColorOcTree\nsize 27567\nres 0.05\n"
+    }
+  },
+  "runs": {
+    "house_walk": {
+      "passed": true,
+      "requested_distance_m": 0.5,
+      "errors": [],
+      "initial": {
+        "known_cells": 519,
+        "occupied_cells": 41,
+        "cloud_points": 687,
+        "octomap_bytes": 60672,
+        "resolution_m": 0.05000000074505806,
+        "graph_nodes": null,
+        "odom_position_m": [
+          2.978819331971174,
+          0.700075855389858,
+          0.3083869320786716
+        ],
+        "simulation_time_s": 0.5199999999999981,
+        "clamp_events": 0,
+        "realtime_factor": 0.7939808495227705,
+        "map_publications": {
+          "octomap_full": 1,
+          "octomap_occupied_space": 1,
+          "map": 1
+        },
+        "aligned_camera": {
+          "stamp_ns": 1790598755298620904,
+          "width": 640,
+          "height": 480,
+          "frame": "camera_color_optical_frame",
+          "k": [
+            526.6319354796092,
+            0.0,
+            320.0,
+            0.0,
+            526.6319354796092,
+            240.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "depth_encoding": "16UC1",
+          "depth_units": "millimetres"
+        },
+        "tf_verification": {
+          "publishers": [
+            "/robot_state_publisher",
+            "/robodog_control_node",
+            "/robodog/mapping/rtabmap"
+          ],
+          "edges_received": [
+            "map->odom",
+            "odom->base_link"
+          ],
+          "per_edge_publisher_gid_verified": false,
+          "authority_basis": "Humble rclpy lacks message publisher GID; expected node graph and received edges checked. Edge ownership requires launch/source review, not live GID attribution."
+        }
+      },
+      "final": {
+        "known_cells": 523,
+        "occupied_cells": 66,
+        "cloud_points": 1053,
+        "octomap_bytes": 63696,
+        "resolution_m": 0.05000000074505806,
+        "graph_nodes": 5,
+        "odom_position_m": [
+          3.4783458606573916,
+          0.725192914038563,
+          0.33158017872804946
+        ],
+        "simulation_time_s": 5.259999999999804,
+        "clamp_events": 0,
+        "realtime_factor": 0.6079870348721131,
+        "map_publications": {
+          "octomap_full": 5,
+          "octomap_occupied_space": 5,
+          "map": 5,
+          "mapData": 14
+        },
+        "aligned_camera": {
+          "stamp_ns": 1790598762980272125,
+          "width": 640,
+          "height": 480,
+          "frame": "camera_color_optical_frame",
+          "k": [
+            526.6319354796092,
+            0.0,
+            320.0,
+            0.0,
+            526.6319354796092,
+            240.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "depth_encoding": "16UC1",
+          "depth_units": "millimetres"
+        },
+        "tf_verification": {
+          "publishers": [
+            "/robot_state_publisher",
+            "/robodog_control_node",
+            "/robodog/mapping/rtabmap"
+          ],
+          "edges_received": [
+            "map->odom",
+            "odom->base_link"
+          ],
+          "per_edge_publisher_gid_verified": false,
+          "authority_basis": "Humble rclpy lacks message publisher GID; expected node graph and received edges checked. Edge ownership requires launch/source review, not live GID attribution."
+        }
+      },
+      "odom_delta_m": [
+        0.4995265286862174,
+        0.02511705864870506,
+        0.02319324664937783
+      ],
+      "travelled_m": 0.5001575946603879,
+      "backup_service_acknowledged": true,
+      "stop_and_stand_acknowledged": true
+    },
+    "house_reload": {
+      "passed": true,
+      "requested_distance_m": 0.0,
+      "errors": [],
+      "initial": {
+        "known_cells": 523,
+        "occupied_cells": 66,
+        "cloud_points": 1065,
+        "octomap_bytes": 63824,
+        "resolution_m": 0.05000000074505806,
+        "graph_nodes": 6,
+        "odom_position_m": [
+          2.9810504815132544,
+          0.7000650371196632,
+          0.3089682995758243
+        ],
+        "simulation_time_s": 2.4199999999999755,
+        "clamp_events": 0,
+        "realtime_factor": 0.9387852927166375,
+        "map_publications": {
+          "octomap_full": 1,
+          "octomap_occupied_space": 1,
+          "map": 1,
+          "mapData": 4
+        },
+        "aligned_camera": {
+          "stamp_ns": 1790598806387197314,
+          "width": 640,
+          "height": 480,
+          "frame": "camera_color_optical_frame",
+          "k": [
+            526.6319354796092,
+            0.0,
+            320.0,
+            0.0,
+            526.6319354796092,
+            240.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "depth_encoding": "16UC1",
+          "depth_units": "millimetres"
+        },
+        "tf_verification": {
+          "publishers": [
+            "/robot_state_publisher",
+            "/robodog_control_node",
+            "/robodog/mapping/rtabmap"
+          ],
+          "edges_received": [
+            "map->odom",
+            "odom->base_link"
+          ],
+          "per_edge_publisher_gid_verified": false,
+          "authority_basis": "Humble rclpy lacks message publisher GID; expected node graph and received edges checked. Edge ownership requires launch/source review, not live GID attribution."
+        }
+      },
+      "final": {
+        "known_cells": 523,
+        "occupied_cells": 66,
+        "cloud_points": 1065,
+        "octomap_bytes": 63824,
+        "resolution_m": 0.05000000074505806,
+        "graph_nodes": 6,
+        "odom_position_m": [
+          2.9810504815132544,
+          0.7000650371196632,
+          0.3089682995758243
+        ],
+        "simulation_time_s": 2.4199999999999755,
+        "clamp_events": 0,
+        "realtime_factor": 0.9387852927166375,
+        "map_publications": {
+          "octomap_full": 1,
+          "octomap_occupied_space": 1,
+          "map": 1,
+          "mapData": 4
+        },
+        "aligned_camera": {
+          "stamp_ns": 1790598806387197314,
+          "width": 640,
+          "height": 480,
+          "frame": "camera_color_optical_frame",
+          "k": [
+            526.6319354796092,
+            0.0,
+            320.0,
+            0.0,
+            526.6319354796092,
+            240.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "depth_encoding": "16UC1",
+          "depth_units": "millimetres"
+        },
+        "tf_verification": {
+          "publishers": [
+            "/robot_state_publisher",
+            "/robodog_control_node",
+            "/robodog/mapping/rtabmap"
+          ],
+          "edges_received": [
+            "map->odom",
+            "odom->base_link"
+          ],
+          "per_edge_publisher_gid_verified": false,
+          "authority_basis": "Humble rclpy lacks message publisher GID; expected node graph and received edges checked. Edge ownership requires launch/source review, not live GID attribution."
+        }
+      },
+      "odom_delta_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "travelled_m": 0.0,
+      "backup_service_acknowledged": true,
+      "stop_and_stand_acknowledged": true
+    },
+    "flat_walk": {
+      "passed": true,
+      "requested_distance_m": 0.5,
+      "errors": [],
+      "initial": {
+        "known_cells": 3607,
+        "occupied_cells": 0,
+        "cloud_points": 1837,
+        "octomap_bytes": 132080,
+        "resolution_m": 0.05000000074505806,
+        "graph_nodes": null,
+        "odom_position_m": [
+          -0.018094066117967583,
+          7.326415966686469e-05,
+          0.3090232913613752
+        ],
+        "simulation_time_s": 0.5799999999999915,
+        "clamp_events": 0,
+        "realtime_factor": 0.7871707625588623,
+        "map_publications": {
+          "octomap_full": 1,
+          "octomap_occupied_space": 1,
+          "map": 1
+        },
+        "aligned_camera": {
+          "stamp_ns": 1790598862262164727,
+          "width": 640,
+          "height": 480,
+          "frame": "camera_color_optical_frame",
+          "k": [
+            526.6319354796092,
+            0.0,
+            320.0,
+            0.0,
+            526.6319354796092,
+            240.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "depth_encoding": "16UC1",
+          "depth_units": "millimetres"
+        },
+        "tf_verification": {
+          "publishers": [
+            "/robot_state_publisher",
+            "/robodog_control_node",
+            "/robodog/mapping/rtabmap"
+          ],
+          "edges_received": [
+            "map->odom",
+            "odom->base_link"
+          ],
+          "per_edge_publisher_gid_verified": false,
+          "authority_basis": "Humble rclpy lacks message publisher GID; expected node graph and received edges checked. Edge ownership requires launch/source review, not live GID attribution."
+        }
+      },
+      "final": {
+        "known_cells": 4262,
+        "occupied_cells": 0,
+        "cloud_points": 4163,
+        "octomap_bytes": 210352,
+        "resolution_m": 0.05000000074505806,
+        "graph_nodes": 5,
+        "odom_position_m": [
+          0.48218020533309974,
+          0.0277932046820208,
+          0.33152888453428925
+        ],
+        "simulation_time_s": 5.359999999999749,
+        "clamp_events": 0,
+        "realtime_factor": 0.6165649122496158,
+        "map_publications": {
+          "octomap_full": 4,
+          "octomap_occupied_space": 4,
+          "map": 4,
+          "mapData": 13
+        },
+        "aligned_camera": {
+          "stamp_ns": 1790598869769899886,
+          "width": 640,
+          "height": 480,
+          "frame": "camera_color_optical_frame",
+          "k": [
+            526.6319354796092,
+            0.0,
+            320.0,
+            0.0,
+            526.6319354796092,
+            240.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "depth_encoding": "16UC1",
+          "depth_units": "millimetres"
+        },
+        "tf_verification": {
+          "publishers": [
+            "/robot_state_publisher",
+            "/robodog_control_node",
+            "/robodog/mapping/rtabmap"
+          ],
+          "edges_received": [
+            "map->odom",
+            "odom->base_link"
+          ],
+          "per_edge_publisher_gid_verified": false,
+          "authority_basis": "Humble rclpy lacks message publisher GID; expected node graph and received edges checked. Edge ownership requires launch/source review, not live GID attribution."
+        }
+      },
+      "odom_delta_m": [
+        0.5002742714510673,
+        0.027719940522353936,
+        0.022505593172914062
+      ],
+      "travelled_m": 0.5010416567297165,
+      "backup_service_acknowledged": true,
+      "stop_and_stand_acknowledged": true
+    }
+  }
+}

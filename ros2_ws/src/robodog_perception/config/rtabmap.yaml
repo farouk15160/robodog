@@ -1,0 +1,27 @@
+# Simulation mapping uses control's odom->base_link TF. RTAB-Map only publishes
+# map->odom. No simulated /clock is published by this stack: use wall time.
+/**:
+  ros__parameters:
+    frame_id: base_link
+    odom_frame_id: odom
+    map_frame_id: map
+    publish_tf: true
+    use_sim_time: false
+    subscribe_depth: true
+    subscribe_rgb: true
+    subscribe_rgbd: false
+    approx_sync: false
+    topic_queue_size: 5
+    sync_queue_size: 10
+    qos_image: 2
+    qos_camera_info: 2
+    wait_for_transform: 0.5
+    map_cleanup: false
+    # RTAB-Map core parameters are strings, unlike native ROS parameters above.
+    Rtabmap/DetectionRate: "2"
+    Grid/3D: "true"
+    Grid/Sensor: "1"
+    Grid/RayTracing: "true"
+    Grid/CellSize: "0.05"
+    Grid/RangeMin: "0.15"
+    Grid/RangeMax: "4.0"
