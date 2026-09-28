@@ -44,6 +44,10 @@ PALETTE = {
     "target":    (0.85, 0.25, 0.30, 1.0),
     "terrain":   (0.55, 0.50, 0.44, 1.0),
     "beam":      (0.72, 0.58, 0.35, 1.0),
+    "human_skin":  (0.68, 0.43, 0.29, 1.0),
+    "human_shirt": (0.12, 0.42, 0.65, 1.0),
+    "human_pants": (0.16, 0.20, 0.26, 1.0),
+    "human_shoes": (0.07, 0.08, 0.10, 1.0),
 }
 
 
@@ -103,6 +107,41 @@ class World:
 # --------------------------------------------------------------------------- #
 # constructors
 # --------------------------------------------------------------------------- #
+def human_reference(x: float, y: float) -> list[Prim]:
+    """Static standing mannequin, exactly 1.90 m from soles to crown.
+
+    Faces +x, with arms at its sides. Shared primitives keep its dimensions
+    identical in MuJoCo and RViz; this is a scale reference, not a human
+    dynamics model. Place beside the spawn, clear of the travel lane.
+    """
+    def part(name, shape, offset, size, tag):
+        return Prim(f"human190_{name}", shape,
+                    (x + offset[0], y + offset[1], offset[2]), size,
+                    tag=f"human_{tag}")
+
+    out = [
+        part("pelvis", "box", (0, 0, 1.01), (.21, .32, .18), "pants"),
+        part("torso", "box", (0, 0, 1.31), (.25, .39, .46), "shirt"),
+        part("neck", "cylinder", (0, 0, 1.585), (.055, .09), "skin"),
+        part("head", "sphere", (0, 0, 1.765), (.135,), "skin"),
+        part("nose", "sphere", (.133, 0, 1.755), (.024,), "skin"),
+    ]
+    for side, sign in (("left", 1), ("right", -1)):
+        out.extend([
+            part(f"{side}shoe", "box", (.055, sign * .11, .04), (.28, .115, .08), "shoes"),
+            part(f"{side}shin", "cylinder", (0, sign * .11, .30), (.055, .44), "pants"),
+            part(f"{side}knee", "sphere", (0, sign * .11, .55), (.06,), "pants"),
+            part(f"{side}thigh", "cylinder", (0, sign * .11, .77), (.075, .42), "pants"),
+            part(f"{side}shoulder", "sphere", (0, sign * .225, 1.485), (.08,), "shirt"),
+            part(f"{side}upperarm", "cylinder", (0, sign * .27, 1.32), (.052, .29), "shirt"),
+            part(f"{side}elbow", "sphere", (0, sign * .27, 1.16), (.052,), "skin"),
+            part(f"{side}forearm", "cylinder", (0, sign * .27, 1.005), (.044, .25), "skin"),
+            part(f"{side}hand", "sphere", (0, sign * .27, .835), (.05,), "skin"),
+            part(f"{side}eye", "sphere", (.122, sign * .045, 1.80), (.009,), "shoes"),
+        ])
+    return out
+
+
 def wall(name: str, x0: float, y0: float, x1: float, y1: float,
          *, height: float = WALL_H, thickness: float = WALL_T,
          doors: list[tuple[float, float]] | None = None) -> list[Prim]:

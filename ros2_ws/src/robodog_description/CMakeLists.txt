@@ -3,7 +3,7 @@ project(robodog_description)
 
 find_package(ament_cmake REQUIRED)
 
-install(DIRECTORY urdf meshes config rviz launch
+install(DIRECTORY urdf meshes config rviz
         DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)

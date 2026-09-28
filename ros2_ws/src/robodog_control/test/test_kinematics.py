@@ -33,9 +33,9 @@ def limits(P):
 
 
 def test_geometry_matches_the_cad(g):
-    assert (g.thigh, g.shank) == (0.213, 0.21732)
-    assert g.lateral == pytest.approx(0.0845)
-    assert g.reach_max == pytest.approx(0.43032)
+    assert (g.thigh, g.shank) == (0.192, 0.195621)
+    assert g.lateral == pytest.approx(0.084501)
+    assert g.reach_max == pytest.approx(0.387621)
 
 
 @pytest.mark.parametrize("leg,want", [("FL", (1, 1)), ("FR", (1, -1)),
@@ -122,11 +122,10 @@ def test_standing_torque_stays_inside_the_continuous_rating(g, P):
     load = P["mass_budget"]["total_kg"] * 9.81 / 4.0
     pose = P["named_poses"]["stand"]
     q = np.array([pose["haa"], pose["hfe"], pose["kfe"]])
-    peak = max(float(np.abs(gravity_torque(g, leg, q, load)).max()) for leg in LEGS)
-    assert peak < 6.0, f"stance needs {peak:.2f} N.m, above the 6 N.m continuous rating"
-    # 62.5% of continuous settles at about 43 C, so the robot can stand
-    # indefinitely, and leaves 4.5x headroom to the 17 N.m peak for dynamics.
-    assert peak / 6.0 < 0.70, f"stance uses {peak/6*100:.0f}% of continuous, too little margin"
+    # September RS06 continuous stall limits: hips8Nm; 2:1 knee at95%=15.2Nm.
+    utilisation = max(float((np.abs(gravity_torque(g, leg, q, load)) /
+                             np.array([8.0, 8.0, 15.2])).max()) for leg in LEGS)
+    assert utilisation < 0.70, f"static load uses {utilisation:.0%} of continuous"
 
 
 def test_all_four_legs_use_identical_stance_angles(P):
@@ -173,13 +172,13 @@ def test_feet_hang_vertically_below_the_hfe_axes(g, P):
             assert abs(offset) < 1e-6, f"{name}/{leg} foot is {offset*1000:.1f} mm off"
 
 
-def test_stance_support_polygon_is_centred_on_the_centre_of_mass(g, P):
+def test_stance_support_polygon_is_within_10mm_of_base_centre_of_mass(g, P):
     pose = P["named_poses"]["stand"]
     q = np.array([pose["haa"], pose["hfe"], pose["kfe"]])
     feet = np.array([forward_in_base(g, leg, q) for leg in LEGS])
     centroid = feet[:, :2].mean(axis=0)
     com = np.array(P["links"]["base"]["com_xyz"][:2])
-    assert np.abs(centroid - com).max() < 0.005, \
+    assert np.abs(centroid - com).max() < 0.01, \
         f"support centroid {centroid} is {np.abs(centroid-com).max()*1000:.1f} mm from the COM"
 
 

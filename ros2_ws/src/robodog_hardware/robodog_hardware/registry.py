@@ -6,7 +6,7 @@ The control node takes a name from a parameter, so switching from simulation to
 the real robot is a launch argument, not a code change:
 
     ros2 launch robodog_bringup robot.launch.py backend:=mujoco
-    ros2 launch robodog_bringup robot.launch.py backend:=robstride02_can
+    ros2 launch robodog_bringup robot.launch.py backend:=robstride06_can
 
 Imports are deferred so that a missing optional dependency (mujoco, python-can)
 only breaks the backend that needs it.
@@ -33,10 +33,16 @@ def _robstride(cfg):
     return RobStride02Backend(cfg)
 
 
+def _robstride06(cfg):
+    from .backends.robstride_can import RobStride06Backend
+    return RobStride06Backend(cfg)
+
+
 BACKENDS: dict[str, Callable[[dict], JointBackend]] = {
     "kinematic": _kinematic,
     "mujoco": _mujoco,
     "robstride02_can": _robstride,
+    "robstride06_can": _robstride06,
 }
 
 

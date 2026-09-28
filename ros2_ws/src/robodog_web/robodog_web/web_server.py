@@ -32,10 +32,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 import threading
 import time
 from typing import Any
+from urllib.parse import urlsplit
 
 import numpy as np
 import rclpy
@@ -52,6 +54,7 @@ from sensor_msgs.msg import Image
 from robodog_msgs.msg import GaitCommand, JointCommand, JointCommandArray, RobotState
 from robodog_msgs.srv import (EmergencyStop, EnableJoints, SetControlMode, SetGait,
                               SetNamedPose)
+from robodog_web.telemetry import joint_actuator_info
 
 PROTOCOL_VERSION = 1
 SENSOR_QOS = QoSProfile(reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -317,6 +320,18 @@ class WebApp:
 
     # ---------------- websocket ----------------
     async def websocket(self, request):
+        # Browsers supply Origin on WebSocket handshakes; require the GUI's own
+        # origin before accepting an endpoint capable of moving the robot.
+        origin = request.headers.get("Origin")
+        if origin != f"{request.scheme}://{request.host}":
+            raise web.HTTPForbidden(reason="command socket requires the GUI origin")
+        if self.cfg.get("host", "127.0.0.1") in {"127.0.0.1", "localhost", "::1"}:
+            try:
+                hostname = urlsplit(origin).hostname
+            except ValueError:
+                raise web.HTTPForbidden(reason="invalid command origin")
+            if hostname not in {"127.0.0.1", "localhost", "::1"}:
+                raise web.HTTPForbidden(reason="local GUI requires a loopback host")
         ws = web.WebSocketResponse(heartbeat=20.0)
         await ws.prepare(request)
         self.clients.add(ws)
@@ -399,12 +414,7 @@ class WebApp:
                 cmd.duty_factor = float(p.get("duty", 0.0))
                 return self.node.call("gait", SetGait.Request(command=cmd))
             if action == "cmd_vel":
-                t = Twist()
-                t.linear.x = _clamp(p.get("vx", 0.0), lim["max_linear_velocity"])
-                t.linear.y = _clamp(p.get("vy", 0.0), lim["max_linear_velocity"])
-                t.angular.z = _clamp(p.get("wz", 0.0), lim["max_angular_velocity"])
-                self.node.pub_vel.publish(t)
-                return True, f"vx={t.linear.x:.2f} vy={t.linear.y:.2f} wz={t.angular.z:.2f}"
+                return self._velocity(p, lim)
             if action == "jog":
                 if not lim.get("enable_joint_jog", False):
                     return False, ("joint jog is disabled in web.yaml; it bypasses the "
@@ -414,6 +424,24 @@ class WebApp:
             return False, f"unknown action '{action}'"
         except Exception as e:                                  # pragma: no cover
             return False, f"{type(e).__name__}: {e}"
+
+    def _velocity(self, p: dict, lim: dict) -> tuple[bool, str]:
+        state = self.node.state
+        if state is None:
+            return False, "no telemetry yet; velocity command not sent"
+        simulation = state.get("simulation", {}).get("active") is True
+        linear_limit = lim.get("simulation_max_linear_velocity", lim["max_linear_velocity"]) \
+            if simulation else lim["max_linear_velocity"]
+        requested = tuple(float(p.get(key, 0.0)) for key in ("vx", "vy", "wz"))
+        accepted = tuple(_clamp(value, limit) for value, limit in zip(
+            requested, (linear_limit, linear_limit, lim["max_angular_velocity"])))
+        command = Twist()
+        command.linear.x, command.linear.y, command.angular.z = accepted
+        self.node.pub_vel.publish(command)
+        context = "simulation" if simulation else "hardware"
+        status = f"clamped to {context} limits" if accepted != requested else context
+        return True, (f"{status}: vx={accepted[0]:.2f} vy={accepted[1]:.2f} "
+                      f"wz={accepted[2]:.2f}")
 
     def _jog(self, p: dict, lim: dict) -> tuple[bool, str]:
         name = str(p.get("joint", ""))
@@ -438,6 +466,8 @@ class WebApp:
 
 def _clamp(v, limit: float) -> float:
     v = float(v)
+    if not math.isfinite(v) or not math.isfinite(limit) or limit < 0:
+        raise ValueError("command and limit must be finite; limit must be nonnegative")
     return max(-abs(limit), min(abs(limit), v))
 
 
@@ -446,7 +476,7 @@ def _robot_info() -> dict:
     desc = get_package_share_directory("robodog_description")
     with open(os.path.join(desc, "config", "robot_parameters.yaml")) as f:
         P = yaml.safe_load(f)
-    with open(os.path.join(desc, "config", "robstride02.yaml")) as f:
+    with open(os.path.join(desc, "config", "robstride06.yaml")) as f:
         RS = yaml.safe_load(f)
     # control.yaml is a ROS parameter file, so the gains live under the node
     # wildcard. Read defensively: the GUI must still start if the control
@@ -465,6 +495,7 @@ def _robot_info() -> dict:
         "robot": "robodog",
         "actuator": RS["model"],
         "joints": names,
+        "joint_actuators": joint_actuator_info(RS, names),
         "legs": ["FL", "FR", "RL", "RR"],
         "limits": {n: P["joint_limits"][n.split("_")[1]] for n in names},
         "operational": RS["operational_limits"],
@@ -480,7 +511,8 @@ def main(argv=None) -> None:
     rclpy.init(args=argv)
     boot = Node("robodog_web_bootstrap")
     boot.declare_parameter("port", 8080)
-    boot.declare_parameter("host", "0.0.0.0")
+    # Empty ROS override lets web.yaml select the binding; default is local.
+    boot.declare_parameter("host", "")
     boot.declare_parameter("config", "")
     port = int(boot.get_parameter("port").value)
     host = str(boot.get_parameter("host").value)
@@ -490,6 +522,8 @@ def main(argv=None) -> None:
 
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)["robodog_web"]
+    host = host or str(cfg.get("host", "127.0.0.1"))
+    cfg = {**cfg, "host": host}
     www = os.path.join(get_package_share_directory("robodog_web"), "www")
 
     node = WebBridgeNode(cfg)

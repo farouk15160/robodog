@@ -32,6 +32,7 @@ import numpy as np
 
 from ..backend import BackendError, JointBackend
 from ..thermal import ThermalModel
+from ..transmission import validate_transmission
 from ..types import NJ, BaseState, ControlMode, JointCommand, JointState
 
 FOOT_ORDER = ("FL", "FR", "RL", "RR")
@@ -47,20 +48,27 @@ class MujocoBackend(JointBackend):
         self.model_path = c.get("model_path")
         if not self.model_path:
             raise BackendError("MujocoBackend requires config['model_path']")
-        self.tau_max = float(c.get("peak_torque_nm", 17.0))
-        self.vel_max = float(c.get("no_load_speed_rad_s", 42.935))
+        self.ratio, self.efficiency = validate_transmission(
+            c.get("transmission_ratio", 1.0), c.get("transmission_efficiency", 1.0), NJ)
+        self.torque_gain = self.ratio * self.efficiency
+        self.tau_max = float(c.get("peak_torque_nm", 17.0)) * self.torque_gain
+        self.vel_max = float(c.get("no_load_speed_rad_s", 42.935)) / self.ratio
         self.keyframe = c.get("keyframe", "stand")
         self.launch_viewer = bool(c.get("viewer", False))
         # CAN round trip + firmware latency, in physics steps. 2 steps at
         # 0.5 ms = 1 ms, which is the order of a 1 Mbit/s bus at 500 Hz.
         self.delay_steps = int(c.get("command_delay_steps", 2))
+        if self.delay_steps < 0:
+            raise BackendError("command_delay_steps must be nonnegative")
 
         self.m = self.d = self._viewer = None
         self.cmd = JointCommand()
+        self._requested = self.cmd.copy()
         self._queue: collections.deque[JointCommand] = collections.deque()
         self.on = np.zeros(NJ, bool)
         self.tau = np.zeros(NJ)
         self.steps = 0
+        self._physics_observer = None
         self._t0 = time.monotonic()
         self.thermal = ThermalModel(
             NJ, torque_constant=float(c.get("torque_constant_nm_per_arms", 1.22)),
@@ -120,7 +128,9 @@ class MujocoBackend(JointBackend):
         self._mj.mj_forward(self.m, self.d)
         self.cmd = JointCommand()
         self.cmd.position[:] = self.d.qpos[self.qadr]
+        self._requested = self.cmd.copy()
         self._queue.clear()
+        self.tau = np.zeros(NJ)
         self.thermal.reset()
         self.steps = 0
 
@@ -148,12 +158,28 @@ class MujocoBackend(JointBackend):
                           stamp=float(self.d.time))
 
     def write(self, cmd: JointCommand) -> None:
-        self._queue.append(cmd.copy())
-        while len(self._queue) > max(1, self.delay_steps):
-            self.cmd = self._queue.popleft()
+        self._requested = cmd.copy()
 
-    def _apply(self) -> None:
+    def set_physics_observer(self, callback=None) -> None:
+        """Optional bounded-memory collector called once per physics substep.
+
+        Signature: callback(applied_joint_torque, pre_step_joint_velocity, dt,
+        peak_clipped=mask, speed_clipped=mask, physics_clipped=mask).
+        Forces come from qfrc_actuator, never an unclamped command. The arrays
+        are snapshots and the backend itself retains no measurement history.
+        """
+        if callback is not None and not callable(callback):
+            raise ValueError("physics observer must be callable or None")
+        self._physics_observer = callback
+
+    def _apply(self):
         """Evaluate the actuator impedance law against the CURRENT state."""
+        # Delay is measured in physics ticks, independently of host write rate.
+        # With delay2, ticks1/2 retain the old command and tick3 applies the new
+        # one. Delay0 applies the most recent write on the first physics tick.
+        self._queue.append(self._requested.copy())
+        while len(self._queue) > self.delay_steps:
+            self.cmd = self._queue.popleft()
         c = self.cmd
         q = self.d.qpos[self.qadr]
         qd = self.d.qvel[self.vadr]
@@ -163,17 +189,31 @@ class MujocoBackend(JointBackend):
         # Torque falls off as the no-load speed is approached, as a real BLDC
         # running out of voltage headroom does.
         headroom = np.clip(1.0 - np.abs(qd) / self.vel_max, 0.0, 1.0)
-        tau = np.clip(tau, -self.tau_max, self.tau_max) * np.where(np.sign(tau) == np.sign(qd), headroom, 1.0)
-        self.tau = tau
-        self.d.ctrl[self.aid] = tau
+        peak_limited = np.clip(tau, -self.tau_max, self.tau_max)
+        applied_request = peak_limited * np.where(np.sign(tau) == np.sign(qd), headroom, 1.0)
+        # The shipped model has gear1; retain joint-side command semantics if
+        # a linear hinge transmission is changed for a model cross-check.
+        gear = self.m.actuator_gear[self.aid, 0]
+        if np.any(gear == 0):
+            raise BackendError("joint torque control requires nonzero hinge transmission gears")
+        self.d.ctrl[self.aid] = applied_request / gear
+        return (applied_request, np.abs(tau - peak_limited) > 1e-9,
+                np.abs(peak_limited - applied_request) > 1e-9)
 
     def step(self, dt: float) -> None:
         n = max(1, int(round(dt / self.m.opt.timestep)))
         for _ in range(n):
-            self._apply()
+            velocity = self.d.qvel[self.vadr].copy()
+            request, peak_clipped, speed_clipped = self._apply()
             self._mj.mj_step(self.m, self.d)
+            self.tau = self.d.qfrc_actuator[self.vadr].copy()
             self.steps += 1
-        self.thermal.update(self.tau, dt)
+            self.thermal.update(self.tau / self.torque_gain, self.m.opt.timestep)
+            if self._physics_observer is not None:
+                self._physics_observer(
+                    self.tau.copy(), velocity, float(self.m.opt.timestep),
+                    peak_clipped=peak_clipped, speed_clipped=speed_clipped,
+                    physics_clipped=np.abs(self.tau - request) > 1e-7)
         if self._viewer is not None and self._viewer.is_running():   # pragma: no cover
             self._viewer.sync()
 

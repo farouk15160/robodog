@@ -1,0 +1,1241 @@
+{
+  "official_revision": "1eb6642e3f3fdfb7fb13a9794fd6a2dd93ea0e7d",
+  "model_source": "/tmp/robodog-unitree-mujoco/unitree_robots/go2/go2.xml",
+  "original_model_sha256": "2014a3d76e30f17ab9447d8a67bd015291f74fa4d71ae30d005f1a32bd693d4b",
+  "mujoco_version": "3.13.0",
+  "controller": "robodog shared GaitGenerator, not factory policy",
+  "cases": [
+    {
+      "commanded_vx_m_s": 0.4,
+      "duration_s": 20.0,
+      "warmup_s": 1.0,
+      "actual_vx_m_s": 0.39289114317352786,
+      "travel_m": 7.857822863470557,
+      "lateral_drift_m": 0.09670652724799504,
+      "max_tilt_deg": 5.0069167503034215,
+      "min_height_m": 0.3219026464250786,
+      "stable": true,
+      "tracks_velocity": true,
+      "mass_kg": 15.206408000000003,
+      "physics_samples": 40000,
+      "initial_height_m": 0.322,
+      "command_delay_s": 0.001,
+      "physics_dt_s": 0.0005,
+      "control_dt_s": 0.0025,
+      "gait": {
+        "step_frequency_hz": 2.2,
+        "duty_factor": 0.5,
+        "step_height_m": 0.04,
+        "stance_height_m": 0.33
+      },
+      "gains": {
+        "position_kp": 80.0,
+        "position_kd": 2.0,
+        "stance_kp": 90.0,
+        "stance_kd": 2.0,
+        "swing_kp": 60.0,
+        "swing_kd": 1.5
+      },
+      "target_limit_cycles": 0,
+      "joints": [
+        {
+          "name": "FL_haa_joint",
+          "joint_peak_nm": 7.798422887803492,
+          "motor_peak_nm": 7.798422887803492,
+          "motor_peak_signed_nm": -7.798422887803492,
+          "motor_peak_time_s": 0.11050000000000008,
+          "motor_speed_at_peak_rad_s": 0.16754102256682146,
+          "motor_peak_speed_rad_s": 1.122755341715239,
+          "joint_rms_nm": 3.06433234816706,
+          "motor_rms_nm": 3.06433234816706,
+          "full_run_joint_rms_nm": 3.111233824305356,
+          "full_run_motor_rms_nm": 3.111233824305356,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FL_hfe_joint",
+          "joint_peak_nm": 8.059564099509544,
+          "motor_peak_nm": 8.059564099509544,
+          "motor_peak_signed_nm": 8.059564099509544,
+          "motor_peak_time_s": 0.45350000000000035,
+          "motor_speed_at_peak_rad_s": -1.133730495563613,
+          "motor_peak_speed_rad_s": 4.822954755095673,
+          "joint_rms_nm": 2.4858020105909286,
+          "motor_rms_nm": 2.4858020105909286,
+          "full_run_joint_rms_nm": 2.5482670677498835,
+          "full_run_motor_rms_nm": 2.5482670677498835,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0005,
+              "longest_time_s": 0.0005,
+              "peak_abs_motor_speed_rad_s": 1.133730495563613,
+              "rms_motor_speed_rad_s": 1.133730495563613
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FL_kfe_joint",
+          "joint_peak_nm": 20.20941410212832,
+          "motor_peak_nm": 20.20941410212832,
+          "motor_peak_signed_nm": 20.20941410212832,
+          "motor_peak_time_s": 0.001,
+          "motor_speed_at_peak_rad_s": 6.661338147750939e-17,
+          "motor_peak_speed_rad_s": 4.5044389171347285,
+          "joint_rms_nm": 7.830510725654334,
+          "motor_rms_nm": 7.830510725654334,
+          "full_run_joint_rms_nm": 7.852863797759218,
+          "full_run_motor_rms_nm": 7.852863797759218,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 9.452500000000061,
+              "longest_time_s": 0.22500000000000017,
+              "peak_abs_motor_speed_rad_s": 4.5044389171347285,
+              "rms_motor_speed_rad_s": 0.527834720456064
+            },
+            "11": {
+              "total_time_s": 8.007499999998295,
+              "longest_time_s": 0.17300000000000013,
+              "peak_abs_motor_speed_rad_s": 3.8976078492580486,
+              "rms_motor_speed_rad_s": 0.4614164914170991
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 3.8976078492580486,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FR_haa_joint",
+          "joint_peak_nm": 5.02198371244767,
+          "motor_peak_nm": 5.02198371244767,
+          "motor_peak_signed_nm": 5.02198371244767,
+          "motor_peak_time_s": 0.7579999999999719,
+          "motor_speed_at_peak_rad_s": -0.16011820656005388,
+          "motor_peak_speed_rad_s": 1.2859375566279232,
+          "joint_rms_nm": 3.076773527828259,
+          "motor_rms_nm": 3.076773527828259,
+          "full_run_joint_rms_nm": 3.0607093380401844,
+          "full_run_motor_rms_nm": 3.0607093380401844,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FR_hfe_joint",
+          "joint_peak_nm": 8.030281357514978,
+          "motor_peak_nm": 8.030281357514978,
+          "motor_peak_signed_nm": 8.030281357514978,
+          "motor_peak_time_s": 0.6809999999999804,
+          "motor_speed_at_peak_rad_s": -0.9496494412855426,
+          "motor_peak_speed_rad_s": 4.23488937419411,
+          "joint_rms_nm": 2.5056048988073663,
+          "motor_rms_nm": 2.5056048988073663,
+          "full_run_joint_rms_nm": 2.4933288996051,
+          "full_run_motor_rms_nm": 2.4933288996051,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0005,
+              "longest_time_s": 0.0005,
+              "peak_abs_motor_speed_rad_s": 0.9496494412855426,
+              "rms_motor_speed_rad_s": 0.9496494412855426
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FR_kfe_joint",
+          "joint_peak_nm": 13.272516315457532,
+          "motor_peak_nm": 13.272516315457532,
+          "motor_peak_signed_nm": 13.272516315457532,
+          "motor_peak_time_s": 0.3030000000000002,
+          "motor_speed_at_peak_rad_s": -0.6490573462891785,
+          "motor_peak_speed_rad_s": 4.335007490491481,
+          "joint_rms_nm": 7.862268384121845,
+          "motor_rms_nm": 7.862268384121845,
+          "full_run_joint_rms_nm": 7.8568691180061805,
+          "full_run_motor_rms_nm": 7.8568691180061805,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 9.430500000000034,
+              "longest_time_s": 0.21400000000000016,
+              "peak_abs_motor_speed_rad_s": 2.2754346003070904,
+              "rms_motor_speed_rad_s": 0.5263956902288679
+            },
+            "11": {
+              "total_time_s": 8.111499999998422,
+              "longest_time_s": 0.20100000000000015,
+              "peak_abs_motor_speed_rad_s": 2.2754346003070904,
+              "rms_motor_speed_rad_s": 0.4648146657279746
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 2.2754346003070904,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RL_haa_joint",
+          "joint_peak_nm": 8.769155729761358,
+          "motor_peak_nm": 8.769155729761358,
+          "motor_peak_signed_nm": -8.769155729761358,
+          "motor_peak_time_s": 0.22600000000000017,
+          "motor_speed_at_peak_rad_s": -0.8410499219487337,
+          "motor_peak_speed_rad_s": 1.5159324707208355,
+          "joint_rms_nm": 2.8128131001546857,
+          "motor_rms_nm": 2.8128131001546857,
+          "full_run_joint_rms_nm": 2.801825044496591,
+          "full_run_motor_rms_nm": 2.801825044496591,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.003,
+              "longest_time_s": 0.003,
+              "peak_abs_motor_speed_rad_s": 0.995773063297235,
+              "rms_motor_speed_rad_s": 0.9197191065770858
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RL_hfe_joint",
+          "joint_peak_nm": 6.111026946532001,
+          "motor_peak_nm": 6.111026946532001,
+          "motor_peak_signed_nm": -6.111026946532001,
+          "motor_peak_time_s": 0.22550000000000017,
+          "motor_speed_at_peak_rad_s": -0.12974718571618893,
+          "motor_peak_speed_rad_s": 4.1483724537304125,
+          "joint_rms_nm": 1.8734457968276939,
+          "motor_rms_nm": 1.8734457968276939,
+          "full_run_joint_rms_nm": 1.8778858456908403,
+          "full_run_motor_rms_nm": 1.8778858456908403,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RL_kfe_joint",
+          "joint_peak_nm": 16.639308203417084,
+          "motor_peak_nm": 16.639308203417084,
+          "motor_peak_signed_nm": 16.639308203417084,
+          "motor_peak_time_s": 0.22600000000000017,
+          "motor_speed_at_peak_rad_s": 1.1493407450245519,
+          "motor_peak_speed_rad_s": 4.3834153387345385,
+          "joint_rms_nm": 7.950497245215578,
+          "motor_rms_nm": 7.950497245215578,
+          "full_run_joint_rms_nm": 7.913486676263274,
+          "full_run_motor_rms_nm": 7.913486676263274,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 9.335499999999918,
+              "longest_time_s": 0.21600000000000016,
+              "peak_abs_motor_speed_rad_s": 1.5347668991531966,
+              "rms_motor_speed_rad_s": 0.24555831366950126
+            },
+            "11": {
+              "total_time_s": 5.33999999999976,
+              "longest_time_s": 0.12750000000000009,
+              "peak_abs_motor_speed_rad_s": 1.5347668991531966,
+              "rms_motor_speed_rad_s": 0.2818034281527083
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 1.5347668991531966,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RR_haa_joint",
+          "joint_peak_nm": 9.012537478787017,
+          "motor_peak_nm": 9.012537478787017,
+          "motor_peak_signed_nm": 9.012537478787017,
+          "motor_peak_time_s": 0.001,
+          "motor_speed_at_peak_rad_s": -6.394884621840902e-17,
+          "motor_peak_speed_rad_s": 0.948287410138991,
+          "joint_rms_nm": 2.798030090318049,
+          "motor_rms_nm": 2.798030090318049,
+          "full_run_joint_rms_nm": 2.832944509552667,
+          "full_run_motor_rms_nm": 2.832944509552667,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0025,
+              "longest_time_s": 0.0025,
+              "peak_abs_motor_speed_rad_s": 0.3472116635770134,
+              "rms_motor_speed_rad_s": 0.21223099160345574
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RR_hfe_joint",
+          "joint_peak_nm": 6.609729192935274,
+          "motor_peak_nm": 6.609729192935274,
+          "motor_peak_signed_nm": 6.609729192935274,
+          "motor_peak_time_s": 0.03350000000000002,
+          "motor_speed_at_peak_rad_s": 0.12674060275640825,
+          "motor_peak_speed_rad_s": 4.895783177559776,
+          "joint_rms_nm": 1.8602555096199938,
+          "motor_rms_nm": 1.8602555096199938,
+          "full_run_joint_rms_nm": 1.9076048841139548,
+          "full_run_motor_rms_nm": 1.9076048841139548,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RR_kfe_joint",
+          "joint_peak_nm": 25.586248041889554,
+          "motor_peak_nm": 25.586248041889554,
+          "motor_peak_signed_nm": 25.586248041889554,
+          "motor_peak_time_s": 0.001,
+          "motor_speed_at_peak_rad_s": -2.3092638912203255e-17,
+          "motor_peak_speed_rad_s": 4.924313989679765,
+          "joint_rms_nm": 7.908466114404592,
+          "motor_rms_nm": 7.908466114404592,
+          "full_run_joint_rms_nm": 7.9914379657551535,
+          "full_run_motor_rms_nm": 7.9914379657551535,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 9.318999999999898,
+              "longest_time_s": 0.21750000000000017,
+              "peak_abs_motor_speed_rad_s": 4.924313989679765,
+              "rms_motor_speed_rad_s": 0.2545637915809819
+            },
+            "11": {
+              "total_time_s": 5.526499999999657,
+              "longest_time_s": 0.17900000000000013,
+              "peak_abs_motor_speed_rad_s": 4.924313989679765,
+              "rms_motor_speed_rad_s": 0.29726520977170673
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 4.924313989679765,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        }
+      ],
+      "groups": {
+        "hip_roll": {
+          "peak_joint_nm": 9.012537478787017,
+          "worst_joint_rms_nm": 3.076773527828259,
+          "pooled_joint_rms_nm": 2.940984444208046
+        },
+        "hip_pitch": {
+          "peak_joint_nm": 8.059564099509544,
+          "worst_joint_rms_nm": 2.5056048988073663,
+          "pooled_joint_rms_nm": 2.2038385410181633
+        },
+        "knee": {
+          "peak_joint_nm": 25.586248041889554,
+          "worst_joint_rms_nm": 7.950497245215578,
+          "pooled_joint_rms_nm": 7.8880670176129914
+        }
+      }
+    },
+    {
+      "commanded_vx_m_s": 0.5,
+      "duration_s": 20.0,
+      "warmup_s": 1.0,
+      "actual_vx_m_s": 0.49227053598874193,
+      "travel_m": 9.845410719774838,
+      "lateral_drift_m": 0.1833973555418507,
+      "max_tilt_deg": 6.068121216876596,
+      "min_height_m": 0.3218985395561935,
+      "stable": true,
+      "tracks_velocity": true,
+      "mass_kg": 15.206408000000003,
+      "physics_samples": 40000,
+      "initial_height_m": 0.322,
+      "command_delay_s": 0.001,
+      "physics_dt_s": 0.0005,
+      "control_dt_s": 0.0025,
+      "gait": {
+        "step_frequency_hz": 2.2,
+        "duty_factor": 0.5,
+        "step_height_m": 0.04,
+        "stance_height_m": 0.33
+      },
+      "gains": {
+        "position_kp": 80.0,
+        "position_kd": 2.0,
+        "stance_kp": 90.0,
+        "stance_kd": 2.0,
+        "swing_kp": 60.0,
+        "swing_kd": 1.5
+      },
+      "target_limit_cycles": 0,
+      "joints": [
+        {
+          "name": "FL_haa_joint",
+          "joint_peak_nm": 8.038245898597264,
+          "motor_peak_nm": 8.038245898597264,
+          "motor_peak_signed_nm": -8.038245898597264,
+          "motor_peak_time_s": 0.10550000000000008,
+          "motor_speed_at_peak_rad_s": 0.23533623550532767,
+          "motor_peak_speed_rad_s": 1.2231777434837223,
+          "joint_rms_nm": 2.85462052564547,
+          "motor_rms_nm": 2.85462052564547,
+          "full_run_joint_rms_nm": 2.911537044034561,
+          "full_run_motor_rms_nm": 2.911537044034561,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.011000000000000006,
+              "longest_time_s": 0.011000000000000006,
+              "peak_abs_motor_speed_rad_s": 0.2626960031872414,
+              "rms_motor_speed_rad_s": 0.23617112787630545
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FL_hfe_joint",
+          "joint_peak_nm": 9.627845515366587,
+          "motor_peak_nm": 9.627845515366587,
+          "motor_peak_signed_nm": 9.627845515366587,
+          "motor_peak_time_s": 0.45350000000000035,
+          "motor_speed_at_peak_rad_s": -1.2346312786898894,
+          "motor_peak_speed_rad_s": 5.76661147995569,
+          "joint_rms_nm": 2.8533809255904186,
+          "motor_rms_nm": 2.8533809255904186,
+          "full_run_joint_rms_nm": 2.939612250536071,
+          "full_run_motor_rms_nm": 2.939612250536071,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.32500000000000023,
+              "longest_time_s": 0.048500000000000036,
+              "peak_abs_motor_speed_rad_s": 1.2346312786898894,
+              "rms_motor_speed_rad_s": 0.41895456563635974
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FL_kfe_joint",
+          "joint_peak_nm": 20.22732141970178,
+          "motor_peak_nm": 20.22732141970178,
+          "motor_peak_signed_nm": 20.22732141970178,
+          "motor_peak_time_s": 0.001,
+          "motor_speed_at_peak_rad_s": 6.661338147750939e-17,
+          "motor_peak_speed_rad_s": 4.86484544638909,
+          "joint_rms_nm": 7.891747396066658,
+          "motor_rms_nm": 7.891747396066658,
+          "full_run_joint_rms_nm": 7.915501193754795,
+          "full_run_motor_rms_nm": 7.915501193754795,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 9.314499999999892,
+              "longest_time_s": 0.22500000000000017,
+              "peak_abs_motor_speed_rad_s": 4.45396585105538,
+              "rms_motor_speed_rad_s": 0.6734908804378368
+            },
+            "11": {
+              "total_time_s": 8.214999999998549,
+              "longest_time_s": 0.17900000000000013,
+              "peak_abs_motor_speed_rad_s": 3.852024817394373,
+              "rms_motor_speed_rad_s": 0.6025284151645198
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 3.852024817394373,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FR_haa_joint",
+          "joint_peak_nm": 4.906528595032101,
+          "motor_peak_nm": 4.906528595032101,
+          "motor_peak_signed_nm": 4.906528595032101,
+          "motor_peak_time_s": 0.7554999999999722,
+          "motor_speed_at_peak_rad_s": -0.1977980600663665,
+          "motor_peak_speed_rad_s": 1.6139097378518312,
+          "joint_rms_nm": 2.865348396646378,
+          "motor_rms_nm": 2.865348396646378,
+          "full_run_joint_rms_nm": 2.84741239725949,
+          "full_run_motor_rms_nm": 2.84741239725949,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FR_hfe_joint",
+          "joint_peak_nm": 9.629394625776127,
+          "motor_peak_nm": 9.629394625776127,
+          "motor_peak_signed_nm": 9.629394625776127,
+          "motor_peak_time_s": 0.6809999999999804,
+          "motor_speed_at_peak_rad_s": -0.9931666784085165,
+          "motor_peak_speed_rad_s": 5.112790582360455,
+          "joint_rms_nm": 2.874016487105932,
+          "motor_rms_nm": 2.874016487105932,
+          "full_run_joint_rms_nm": 2.8548940559570752,
+          "full_run_motor_rms_nm": 2.8548940559570752,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.2760000000000002,
+              "longest_time_s": 0.007000000000000003,
+              "peak_abs_motor_speed_rad_s": 0.9931666784085165,
+              "rms_motor_speed_rad_s": 0.4139068213224262
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "FR_kfe_joint",
+          "joint_peak_nm": 14.23218021979405,
+          "motor_peak_nm": 14.23218021979405,
+          "motor_peak_signed_nm": 14.23218021979405,
+          "motor_peak_time_s": 0.3080000000000002,
+          "motor_speed_at_peak_rad_s": -0.8561097472370518,
+          "motor_peak_speed_rad_s": 4.142232868817455,
+          "joint_rms_nm": 7.922793122501737,
+          "motor_rms_nm": 7.922793122501737,
+          "full_run_joint_rms_nm": 7.921298764909351,
+          "full_run_motor_rms_nm": 7.921298764909351,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 9.285499999999857,
+              "longest_time_s": 0.21150000000000016,
+              "peak_abs_motor_speed_rad_s": 2.912051983126352,
+              "rms_motor_speed_rad_s": 0.6781754139364773
+            },
+            "11": {
+              "total_time_s": 8.307499999998662,
+              "longest_time_s": 0.19300000000000014,
+              "peak_abs_motor_speed_rad_s": 2.912051983126352,
+              "rms_motor_speed_rad_s": 0.6112906299912132
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 2.912051983126352,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RL_haa_joint",
+          "joint_peak_nm": 9.465139452079786,
+          "motor_peak_nm": 9.465139452079786,
+          "motor_peak_signed_nm": -9.465139452079786,
+          "motor_peak_time_s": 0.22600000000000017,
+          "motor_speed_at_peak_rad_s": -0.9119192017838331,
+          "motor_peak_speed_rad_s": 1.695879600237438,
+          "joint_rms_nm": 2.505650703808867,
+          "motor_rms_nm": 2.505650703808867,
+          "full_run_joint_rms_nm": 2.495991604818969,
+          "full_run_motor_rms_nm": 2.495991604818969,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.005000000000000001,
+              "longest_time_s": 0.005000000000000001,
+              "peak_abs_motor_speed_rad_s": 1.1861513066974487,
+              "rms_motor_speed_rad_s": 1.0591917020236616
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RL_hfe_joint",
+          "joint_peak_nm": 7.68177259738479,
+          "motor_peak_nm": 7.68177259738479,
+          "motor_peak_signed_nm": -7.68177259738479,
+          "motor_peak_time_s": 0.22250000000000017,
+          "motor_speed_at_peak_rad_s": -0.11001111772366967,
+          "motor_peak_speed_rad_s": 4.956360612859114,
+          "joint_rms_nm": 2.2560204344567003,
+          "motor_rms_nm": 2.2560204344567003,
+          "full_run_joint_rms_nm": 2.2647367719343268,
+          "full_run_motor_rms_nm": 2.2647367719343268,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RL_kfe_joint",
+          "joint_peak_nm": 16.370847906352683,
+          "motor_peak_nm": 16.370847906352683,
+          "motor_peak_signed_nm": 16.370847906352683,
+          "motor_peak_time_s": 5.225999999999823,
+          "motor_speed_at_peak_rad_s": 0.08733814872717238,
+          "motor_peak_speed_rad_s": 4.571006778856963,
+          "joint_rms_nm": 8.016382905323372,
+          "motor_rms_nm": 8.016382905323372,
+          "full_run_joint_rms_nm": 7.9714340511659065,
+          "full_run_motor_rms_nm": 7.9714340511659065,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 9.233499999999793,
+              "longest_time_s": 0.21200000000000016,
+              "peak_abs_motor_speed_rad_s": 1.683058073618785,
+              "rms_motor_speed_rad_s": 0.32072408562391397
+            },
+            "11": {
+              "total_time_s": 5.437499999999706,
+              "longest_time_s": 0.12750000000000009,
+              "peak_abs_motor_speed_rad_s": 1.6813209146201773,
+              "rms_motor_speed_rad_s": 0.35536332077350063
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 1.6813209146201773,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RR_haa_joint",
+          "joint_peak_nm": 9.399246879474733,
+          "motor_peak_nm": 9.399246879474733,
+          "motor_peak_signed_nm": 9.399246879474733,
+          "motor_peak_time_s": 0.001,
+          "motor_speed_at_peak_rad_s": -6.394884621840902e-17,
+          "motor_peak_speed_rad_s": 1.0980615893920507,
+          "joint_rms_nm": 2.492154995113865,
+          "motor_rms_nm": 2.492154995113865,
+          "full_run_joint_rms_nm": 2.5289260741360655,
+          "full_run_motor_rms_nm": 2.5289260741360655,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.0035,
+              "longest_time_s": 0.0035,
+              "peak_abs_motor_speed_rad_s": 0.5641434232700382,
+              "rms_motor_speed_rad_s": 0.3407616641168105
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RR_hfe_joint",
+          "joint_peak_nm": 8.120633356511151,
+          "motor_peak_nm": 8.120633356511151,
+          "motor_peak_signed_nm": 8.120633356511151,
+          "motor_peak_time_s": 0.031000000000000024,
+          "motor_speed_at_peak_rad_s": 0.2375409775160375,
+          "motor_peak_speed_rad_s": 5.765446418583894,
+          "joint_rms_nm": 2.240466955527736,
+          "motor_rms_nm": 2.240466955527736,
+          "full_run_joint_rms_nm": 2.3000761903237756,
+          "full_run_motor_rms_nm": 2.3000761903237756,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.004,
+              "longest_time_s": 0.002,
+              "peak_abs_motor_speed_rad_s": 0.32894578436470745,
+              "rms_motor_speed_rad_s": 0.27314222251616976
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        },
+        {
+          "name": "RR_kfe_joint",
+          "joint_peak_nm": 26.942677397073176,
+          "motor_peak_nm": 26.942677397073176,
+          "motor_peak_signed_nm": 26.942677397073176,
+          "motor_peak_time_s": 0.001,
+          "motor_speed_at_peak_rad_s": -2.3092638912203255e-17,
+          "motor_peak_speed_rad_s": 5.1342871904238185,
+          "joint_rms_nm": 7.974316361277047,
+          "motor_rms_nm": 7.974316361277047,
+          "full_run_joint_rms_nm": 8.07894733003064,
+          "full_run_motor_rms_nm": 8.07894733003064,
+          "duration_s": 19.99999999999874,
+          "rms_duration_s": 19.000000000001016,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 9.236499999999797,
+              "longest_time_s": 0.21750000000000017,
+              "peak_abs_motor_speed_rad_s": 5.1342871904238185,
+              "rms_motor_speed_rad_s": 0.3323077460660188
+            },
+            "11": {
+              "total_time_s": 5.632999999999598,
+              "longest_time_s": 0.17400000000000013,
+              "peak_abs_motor_speed_rad_s": 5.1342871904238185,
+              "rms_motor_speed_rad_s": 0.3683163563825192
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 5.1342871904238185,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          }
+        }
+      ],
+      "groups": {
+        "hip_roll": {
+          "peak_joint_nm": 9.465139452079786,
+          "worst_joint_rms_nm": 2.865348396646378,
+          "pooled_joint_rms_nm": 2.68552610063509
+        },
+        "hip_pitch": {
+          "peak_joint_nm": 9.629394625776127,
+          "worst_joint_rms_nm": 2.874016487105932,
+          "pooled_joint_rms_nm": 2.5744452729752227
+        },
+        "knee": {
+          "peak_joint_nm": 26.942677397073176,
+          "worst_joint_rms_nm": 8.016382905323372,
+          "pooled_joint_rms_nm": 7.951453391358358
+        }
+      }
+    }
+  ]
+}

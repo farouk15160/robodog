@@ -6,19 +6,17 @@ Mesh preparation for robodog_description.
    vertex clustering. These are VISUAL meshes only -- collision uses analytic
    primitives from robot_parameters.yaml -- so the watertightness lost by
    clustering does not matter.
-2. Generates `robstride02.stl` procedurally from the manufacturer envelope
-   (78.5 mm dia x 41.5 mm deep). It is a geometric drop-in for the CAD's
-   RMD-X8 placeholder: the output face sits at the same local z = +33 mm, so
-   every actuator visual transform recovered from the CAD stays valid.
+2. Generates an RS06 envelope (88mm max diameter x49mm depth), in the supplied
+   CAD motor interface frame. This is a clearance estimate, not a fit approval.
 
 Run:  python3 tools/prepare_meshes.py
 """
 from __future__ import annotations
-import math, os, struct, sys
+import math, os, struct
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "cad/robot/onshape_export/meshes")
+SRC = os.path.join(ROOT, "cad/urdf/meshes")
 DST = os.path.join(ROOT, "ros2_ws/src/robodog_description/meshes")
 
 # target cell size (m) for vertex clustering, per mesh
@@ -29,7 +27,7 @@ CLUSTER = {
     "lower_leg.stl": 0.0030, "foot_ball.stl": 0.0022,
     "_61804_2RS.stl": 0.0012, "motor_pulley.stl": 0.0015,
 }
-SKIP = {"RMDX8V3.stl", "XYZ_frame.stl"}          # replaced / dropped
+SKIP = {"Part_1.stl", "XYZ_frame.stl"}          # replaced / dropped
 
 
 def read_stl(path: str) -> np.ndarray:
@@ -76,7 +74,7 @@ def cluster_decimate(tris: np.ndarray, cell: float) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- #
-# procedural ROBSTRIDE02 visual
+# procedural ROBSTRIDE06 envelope visual
 # --------------------------------------------------------------------------- #
 def revolve(profile, seg=48):
     """Revolve a closed (r, z) polyline about +z into a triangle soup."""
@@ -99,22 +97,16 @@ def revolve(profile, seg=48):
     return np.asarray(tris, dtype=np.float64)
 
 
-def make_robstride02() -> np.ndarray:
-    """ROBSTRIDE02 envelope. Local frame matches the CAD actuator placeholder:
-    +z is the output shaft axis, the output face is at z = +0.033."""
-    R, D = 0.03925, 0.0415                    # 78.5 mm dia, 41.5 mm body depth
-    z_out = 0.033                             # output face (CAD interface plane)
-    z_back = z_out - D
-    p = [
-        (0.0, z_back), (0.0325, z_back),      # rear face
-        (R, z_back + 0.004),                  # rear chamfer
-        (R, z_out - 0.010),                   # can barrel
-        (0.0345, z_out - 0.004),              # front shoulder
-        (0.0345, z_out), (0.021, z_out),      # output flange face
-        (0.021, z_out + 0.004),               # output boss
-        (0.0, z_out + 0.004),
-    ]
-    return revolve(p, seg=48)
+def make_robstride06() -> np.ndarray:
+    """Conservative RS06 flange envelope, not manufacturing CAD.
+
+    Manufacturer outline: maximum diameter 88mm, axial length49mm.
+    Supplied CAD placeholder has shaft along local y, output plane y=-4mm.
+    """
+    radius, depth = 0.044, 0.049
+    triangles = revolve([(0, -0.004), (radius, -0.004),
+                         (radius, depth - 0.004), (0, depth - 0.004)])
+    return np.ascontiguousarray(triangles[:, :, [0, 2, 1]])
 
 
 def main():
@@ -135,10 +127,10 @@ def main():
         tot_out += len(out)
         print(f"{name:26s} {len(tris):9d} {len(out):9d} {len(out)/len(tris)*100:6.1f}% {kb:7.1f}")
 
-    rs = make_robstride02()
-    write_stl(os.path.join(DST, "robstride02.stl"), rs)
-    print(f"{'robstride02.stl':26s} {'-':>9s} {len(rs):9d} {'gen':>7s} "
-          f"{os.path.getsize(os.path.join(DST,'robstride02.stl'))/1024:7.1f}")
+    rs = make_robstride06()
+    write_stl(os.path.join(DST, "robstride06.stl"), rs)
+    print(f"{'robstride06.stl':26s} {'-':>9s} {len(rs):9d} {'gen':>7s} "
+          f"{os.path.getsize(os.path.join(DST,'robstride06.stl'))/1024:7.1f}")
 
     src_mb = sum(os.path.getsize(os.path.join(SRC, f)) for f in os.listdir(SRC)) / 1e6
     dst_mb = sum(os.path.getsize(os.path.join(DST, f)) for f in os.listdir(DST)) / 1e6

@@ -19,7 +19,7 @@ active, or branch on `is_simulation` to change control behaviour. If you find
 yourself wanting to, that usually means something belongs in the backend.
 
 **Say what is estimated.** Several constants are engineering estimates, marked
-`[ESTIMATE]` in `robstride02.yaml` and `[VERIFY]` / `HW-CHECK` in the camera
+`[ESTIMATE]` in the selected `robstride06.yaml` and `[VERIFY]` / `HW-CHECK` in the camera
 and CAN code. If you replace one with a measured value, remove the marker and
 say in the commit message how it was measured. If you add a new one, mark it.
 
@@ -31,15 +31,11 @@ colcon build --symlink-install && source install/setup.bash
 MUJOCO_GL=egl python3 -m pytest src/*/test -q
 ```
 
-All 217 must pass. `test_trot_is_thermally_sustainable` was an expected failure
-for most of this project, at 173 % of the continuous torque rating; it now
-reads 90 %, and it did not get there by being tuned — see the locomotion
-section of the README. New behaviour needs a test; the useful ones here are
-cross-checks rather than unit tests — the MuJoCo model is asserted against the
-URDF, the world geometry against the clearances the docstring claims, the CAN
-codec against the datasheet. Several tests exist because a bug got past a
-weaker one, and each of those says so in its docstring. Please keep that habit:
-a test that records *why* it exists is worth several that do not.
+Run the complete regression suite; do not reuse the old RS02 test count or
+thermal percentages as current evidence. New behavior needs tests that check
+physical invariants and observable behavior: URDF/MJCF consistency, transmission
+mapping, per-motor torque limits, actual travel and telemetry. Run gait checks
+with the same gains, actuator configuration and safety layer as the controller.
 
 ## Style
 
@@ -50,17 +46,14 @@ scattered inline notes.
 
 ## Where help is most wanted
 
-1. **Locomotion.** Standing is solid and the balance layer holds attitude well,
-   but the robot does not yet track commanded velocity (see §6.6 of the
-   documentation for the measured numbers). This needs contact detection rather
-   than a fixed gait schedule, slip handling, and co-tuning of stance
-   compliance against swing timing. The force-to-motion path is verified
-   correct in isolation, so this is tuning, not a sign error.
+1. **Locomotion.** Validate the new 19.72 kg RS06 model over terrain and turns,
+   including contact detection, slip handling and motor-side RMS loads. Historic
+   RS02 straight-line results do not establish current performance.
 2. **The `ros2_control` C++ `SystemInterface`.** The interface contract is
    already declared in `urdf/ros2_control.xacro`; the runtime is Python.
-3. **Hardware validation.** If you have ROBSTRIDE02 actuators, the single most
+3. **Hardware validation.** If you have RobStride RS06 actuators, the single most
    valuable contribution is confirming or correcting the CAN frame layout in
-   `robodog_hardware/protocol/robstride02.py` against your firmware revision.
+   `robodog_hardware/protocol/robstride06.py` against your firmware revision.
 4. **A NUWA HP60C datasheet.** The camera parameters are plausible placeholders
    and every one of them is marked.
 5. **State estimation.** The current estimator is a complementary filter plus
@@ -75,7 +68,18 @@ regenerate the docs in the same commit so the two never disagree.
 
 ## Safety
 
-This repository can drive real actuators capable of 17 N·m. Anything touching
+This repository can drive real actuators capable of 36 N·m at the motor output, with an
+additional 2:1 knee reduction. Anything touching
 `robodog_control/safety.py`, `robodog_hardware/protocol/`, or the joint limits
 gets extra scrutiny and needs a test demonstrating the envelope still holds.
 Please do not weaken a limit to make a gait work.
+
+The September RS06 specification distinguishes 8 N·m continuous stall from
+11 N·m rotating rated torque at 100 rpm with a 200 × 200 mm heat sink. The
+controller uses the 8 N·m holding reference. Published output inertia and line
+resistance replace the former estimates; thermal impedance remains uncalibrated.
+See [the versioned audit](docs/rs06_datasheet_audit.md) before changing ratings.
+Simulation temperatures are estimates. Real IMU/base feedback is unavailable,
+and travel commands are blocked until that integration supplies live feedback.
+Hardware startup defaults to disabled; RS06 enable and motion require physically
+commissioned joints marked `calibrated: true`.

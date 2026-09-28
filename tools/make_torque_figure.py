@@ -31,13 +31,16 @@ OUT = os.path.join(ROOT, "docs/images/why_torque.png")
 
 def main() -> int:
     P = yaml.safe_load(open(os.path.join(CFG, "robot_parameters.yaml")))
-    RS = yaml.safe_load(open(os.path.join(CFG, "robstride02.yaml")))
+    RS = yaml.safe_load(open(os.path.join(CFG, P["actuator_config"])))
     g = P["geometry"]
     L1, L2, R = g["thigh_length_m"], g["shank_length_m"], g["foot_radius_m"]
     load = P["mass_budget"]["total_kg"] * 9.81 / 4.0
     cont = RS["operational_limits"]["continuous_torque_nm"]
+    knee_drive = RS["transmissions"]["kfe"]
+    knee_gain = knee_drive["ratio"] * knee_drive["efficiency"]
 
-    heights = [0.24, 0.32, 0.40]
+    heights = [0.24, P["named_poses"]["stand"]["base_height_m"],
+               R + 0.95 * (L1 + L2)]
     titles = ["crouched", "nominal stance", "nearly straight"]
     fig, axes = plt.subplots(1, 3, figsize=(11.4, 5.0))
 
@@ -49,7 +52,7 @@ def main() -> int:
 
         # Draw with the GROUND as the shared reference, not the hip: the point
         # is that the body rises, so the ground must stay put across panels.
-        hip = np.array([0.0, h - R])
+        hip = np.array([0.0, h])
         knee = hip + np.array([-L1 * math.sin(q1), -L1 * math.cos(q1)])
         foot = knee + np.array([-L2 * math.sin(q1 + q2), -L2 * math.cos(q1 + q2)])
         lever = abs(foot[0] - knee[0])
@@ -88,23 +91,24 @@ def main() -> int:
         ax.text(foot[0] + 0.016, foot[1] + 0.03, f"{load:.1f} N",
                 fontsize=9, color="#1f6feb", ha="left")
 
-        frac = tau / cont
+        motor_tau = tau / knee_gain
+        frac = motor_tau / cont
         col = "#2a8a55" if frac < 0.7 else ("#b8860b" if frac < 1.0 else "#b0281a")
         ax.set_title(f"{title}\n"
                      f"bend {math.degrees(abs(q2)):.0f}\u00b0    "
-                     f"{tau:.2f} N\u00b7m    {frac:.0%}",
+                     f"joint {tau:.2f} / motor {motor_tau:.2f} N\u00b7m\n{frac:.0%} motor rating",
                      fontsize=10.5, color=col, pad=8)
         ax.set_xlim(-0.30, 0.235)
         ax.set_ylim(-0.085, 0.455)
         ax.set_aspect("equal")
         ax.axis("off")
 
-    fig.suptitle("Joint torque is set by how BENT the leg is, not by how long it is",
+    fig.suptitle("Static knee torque = load × horizontal lever arm",
                  fontsize=13, fontweight="bold", y=0.99)
     fig.text(0.5, 0.025,
              "torque = load × lever arm.  The load is fixed by the robot's weight; "
              "the lever arm is the horizontal knee→foot distance,\nwhich shrinks as the "
-             "leg straightens. Straighter legs also leave less travel to lift a foot with.",
+             "leg straightens. Motor torque includes the knee belt; equal-load static estimate only.",
              ha="center", fontsize=9, color="#4a5568")
     fig.tight_layout(rect=(0, 0.075, 1, 0.94))
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

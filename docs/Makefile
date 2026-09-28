@@ -14,7 +14,7 @@ TOOLS  := ../tools
 TEX    := robodog_architecture.tex
 PDF    := $(TEX:.tex=.pdf)
 MODEL  := ../ros2_ws/src/robodog_description/config/robot_parameters.yaml
-ACT    := ../ros2_ws/src/robodog_description/config/robstride02.yaml
+ACT    := $(wildcard ../ros2_ws/src/robodog_description/config/robstride*.yaml)
 FIGS   := $(patsubst %,figures/%.pdf,system_architecture software_architecture \
             node_topic_graph control_architecture data_flow hardware_boundary \
             state_machine domain_model simulation_architecture perception_pipeline)
@@ -22,7 +22,7 @@ FIGS   := $(patsubst %,figures/%.pdf,system_architecture software_architecture \
 .PHONY: all facts diagrams clean distclean
 all: $(PDF)
 
-$(PDF): $(TEX) preamble.tex generated_facts.tex $(FIGS)
+$(PDF): $(TEX) preamble.tex generated_facts.tex $(FIGS) $(wildcard images/*.png)
 	latexmk -pdf -interaction=nonstopmode -halt-on-error $(TEX)
 
 generated_facts.tex: $(TOOLS)/make_doc_facts.py $(MODEL) $(ACT)

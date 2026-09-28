@@ -1,6 +1,7 @@
 """Backend-boundary tests: the contract every backend must satisfy, the
 thermal model, and the parts of the CAN backend that work without hardware."""
 import os
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -18,7 +19,7 @@ CFG = os.path.join(os.path.dirname(__file__), "..", "config", "robstride_bus.yam
 # the boundary contract
 # --------------------------------------------------------------------------- #
 def test_registry_lists_all_three_backends():
-    assert set(available()) == {"kinematic", "mujoco", "robstride02_can"}
+    assert set(available()) == {"kinematic", "mujoco", "robstride02_can", "robstride06_can"}
 
 
 def test_unknown_backend_fails_loudly():
@@ -160,8 +161,13 @@ def test_copper_loss_matches_the_datasheet_at_rated_current():
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 def bus_cfg():
+    from robodog_hardware.transmission import backend_config
+    from robodog_hardware.types import JOINT_NAMES
     with open(CFG) as f:
-        return yaml.safe_load(f)
+        bus = yaml.safe_load(f)
+    spec = yaml.safe_load((Path(__file__).parents[2] /
+                           "robodog_description/config/robstride06.yaml").read_text())
+    return {**bus, **backend_config(spec, JOINT_NAMES)}
 
 
 def test_bus_config_maps_every_joint(bus_cfg):
@@ -180,12 +186,12 @@ def test_motor_ids_are_unique_per_bus(bus_cfg):
 def test_can_backend_rejects_a_missing_joint_mapping(bus_cfg):
     bus_cfg["joints"].pop("RR_kfe_joint")
     with pytest.raises(BackendError, match="no CAN mapping"):
-        create_backend("robstride02_can", bus_cfg)
+        create_backend("robstride06_can", bus_cfg)
 
 
 def test_shipped_bus_configuration_fits_within_budget(bus_cfg):
     """The configuration we actually ship must pass its own budget check."""
-    assert create_backend("robstride02_can", bus_cfg).check_bus_budget() == []
+    assert create_backend("robstride06_can", bus_cfg).check_bus_budget() == []
 
 
 def test_single_bus_is_rejected(bus_cfg):
@@ -194,22 +200,22 @@ def test_single_bus_is_rejected(bus_cfg):
     for j in bus_cfg["joints"].values():
         j["bus"] = 0
     bus_cfg["buses"] = [bus_cfg["buses"][0]]
-    assert create_backend("robstride02_can", bus_cfg).check_bus_budget()
+    assert create_backend("robstride06_can", bus_cfg).check_bus_budget()
 
 
 def test_two_buses_at_500hz_is_rejected_for_lack_of_margin(bus_cfg):
     """90% load leaves nothing for error frames or retransmission."""
     bus_cfg["control_rate_hz"] = 500
-    assert create_backend("robstride02_can", bus_cfg).check_bus_budget()
+    assert create_backend("robstride06_can", bus_cfg).check_bus_budget()
 
 
 def test_real_backend_declares_itself_not_a_simulation(bus_cfg):
-    assert create_backend("robstride02_can", bus_cfg).is_simulation is False
+    assert create_backend("robstride06_can", bus_cfg).is_simulation is False
 
 
 def test_real_backend_has_no_ground_truth_base_state(bus_cfg):
     """Contract: consumers must handle None and use the state estimator."""
-    assert create_backend("robstride02_can", bus_cfg).base_state() is None
+    assert create_backend("robstride06_can", bus_cfg).base_state() is None
 
 
 def test_fault_bits_map_onto_ros_flags():

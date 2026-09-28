@@ -2,14 +2,14 @@
 
 <p align="center">
   <b>Software architecture for a 12-DOF quadruped robot</b><br>
-  12 × ROBSTRIDE02 QDD actuators · 10 kg · ROS 2 Jazzy · MuJoCo
+  12 × RobStride RS06 · ≈19.72 kg · ROS 2 · MuJoCo
 </p>
 
 <p align="center">
-  <img alt="ROS 2 Jazzy" src="https://img.shields.io/badge/ROS_2-Jazzy-22314E?logo=ros&logoColor=white">
+  <img alt="ROS 2 Humble" src="https://img.shields.io/badge/ROS_2-Humble-22314E?logo=ros&logoColor=white">
   <img alt="MuJoCo" src="https://img.shields.io/badge/MuJoCo-3.x-ef6c00">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
-  <img alt="tests" src="https://img.shields.io/badge/tests-217_passing-3ecf8e">
+  <img alt="tests" src="https://img.shields.io/badge/tests-regression_suite-3ecf8e">
   <img alt="licence" src="https://img.shields.io/badge/licence-Apache--2.0-blue">
 </p>
 
@@ -22,14 +22,14 @@
 ## What this is
 
 A complete, working **first software architecture** for a quadruped robot built
-around twelve [ROBSTRIDE02](https://robstride.com) quasi-direct-drive actuators.
+around twelve [RobStride RS06](https://robstride.com) quasi-direct-drive actuators.
 It takes a raw Onshape CAD export and turns it into a running robot stack: a
 kinematic and inertial model, a 400 Hz control loop with a real safety layer,
 gait generation, physics simulation with a five-room test house, an RGB-D
 perception pipeline, and a web GUI you can drive it from.
 
 Everything runs today, in simulation. **No hardware has been driven** — the
-ROBSTRIDE02 CAN driver and the camera driver are written but unvalidated, and
+RobStride CAN driver and the camera driver are written but unvalidated, and
 the project is explicit about which numbers are measured and which are
 estimates waiting for a real robot.
 
@@ -43,13 +43,13 @@ class JointBackend(ABC):
     def base_state(self) -> BaseState | None   # None on the real robot — it has no such sensor
 ```
 
-Three implementations exist — ideal-kinematic, MuJoCo, and ROBSTRIDE02-over-CAN
+Three implementations exist — ideal-kinematic, MuJoCo, and RobStride-over-CAN
 — and the camera has the same arrangement. Switching from simulation to the
 real robot is a launch argument. Not a topic, service, frame, message,
 controller or gain changes.
 
 `JointCommand` is deliberately the actuator's **native impedance frame**, which
-is exactly one CAN message, because the RS02 closes
+is exactly one CAN message, because the RS06 closes
 `τ = kp(q*−q) + kd(q̇*−q̇) + τ_ff` in firmware at tens of kHz. The host sets
 setpoints; it is not the servo. That is also why 400 Hz is enough — and 400 Hz
 is precisely what the two-bus CAN budget allows.
@@ -59,26 +59,35 @@ is precisely what the two-bus CAN budget allows.
 ## Quick start
 
 ```bash
-# dependencies beyond a standard ROS 2 Jazzy install
-pip install mujoco          # physics and the simulated camera
-pip install python-can      # only needed for real hardware
+# dependencies beyond a standard ROS 2 install (locally validated on Humble)
+python3 -m pip install --user mujoco  # physics and the simulated camera
+python3 -m pip install --user aiohttp # web GUI HTTP and WebSocket server
+python3 -m pip install --user python-can # only needed for real hardware
 
 git clone https://github.com/farouk15160/robodog.git
 cd robodog/ros2_ws
+rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install && source install/setup.bash
 
 ros2 run robodog_sim generate_models        # build the MuJoCo models
 ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house
 ```
 
-Open **http://localhost:8080** for the GUI. RViz starts alongside.
+Open **http://localhost:8080** for the GUI. RViz starts alongside. The GUI binds
+localhost and checks WebSocket origins by default. Simulation automatically
+enables and stands; real CAN hardware stays disabled unless explicitly enabled,
+and its joints must be physically calibrated first.
+
+`colcon build` does not install missing Python runtime dependencies. Install them
+for the same `python3` used by ROS; `python3 -c 'import aiohttp, mujoco'` must pass
+in the sourced terminal before launch. No temporary `PYTHONPATH` is needed.
 
 | Command | What it does |
 |---|---|
 | `ros2 launch robodog_bringup robot.launch.py` | ideal joints, no physics — fastest way to exercise the stack |
 | `… backend:=mujoco world:=flat` | full physics on the calibration course |
 | `… backend:=mujoco world:=house` | full physics in the five-room house |
-| `… backend:=robstride02_can camera_backend:=nuwa_hp60c` | the real robot |
+| `… backend:=robstride06_can camera_backend:=nuwa_hp60c` | the real robot |
 | `ros2 launch robodog_bringup display.launch.py` | inspect the URDF with joint sliders |
 | `ros2 run robodog_sim viewer --world house` | MuJoCo viewer, no control stack |
 | `ros2 run robodog_control pose stand` | move to a named pose |
@@ -105,7 +114,7 @@ maximum commanded velocity, gait confirmation, whether joint jogging is allowed
 at all — are configuration too, not constants buried in JavaScript.
 
 It speaks a purpose-built protocol rather than rosbridge: less bandwidth, and a
-much smaller surface from a web page that can move a 10 kg machine.
+much smaller surface from a web page that can move a 19.72 kg machine.
 
 ---
 
@@ -139,6 +148,12 @@ rendered to PDF and PNG from a single source by `tools/make_diagrams.py`.
 
 Two worlds ship. Gait work should not be debugged against furniture at the same
 time, so terrain and navigation are separate.
+
+Both include a **1.90 m standing human mannequin** beside the robot's starting
+position for size comparison. Its feet rest on the floor, and the same static
+geometry appears in MuJoCo and RViz. It stands clear of the forward travel lane.
+See the [flat-world comparison](docs/images/human_reference_flat.png) and
+[house comparison](docs/images/human_reference_house.png).
 
 ### `flat` — open-air proving ground, 24 × 24 m
 
@@ -197,162 +212,133 @@ a designed challenge into a wall or an open field.
 
 ---
 
-## What works, and what doesn't
+## Current configuration and validation
 
-| | Status |
-|---|---|
-| Model, URDF, MuJoCo, TF, RViz | complete, and cross-checked against each other |
-| Hardware and camera abstraction | complete — three joint backends, two camera backends |
-| Safety layer | complete; runs in simulation and on hardware alike |
-| Web GUI | complete — live telemetry, commands, camera |
-| **Standing** | **solid** — 0.1° tilt, holds 320 mm, 5.5 N·m peak, no clamping |
-| **Walking and trotting** | **works** — tracks commanded velocity to within 7 mm/s |
-| **Course holding** | **works** — 54 mm lateral drift over 6 s at 0.5 m/s |
-| Pace and bound | **partial** — neither tracks velocity; neither is a travel gait |
-| Real actuators and camera | written, **unvalidated** — no hardware has been driven |
+The active model uses the new export in `cad/urdf/`, twelve **RobStride RS06**
+actuators and a **19.72 kg working mass**. The twelve 621 g actuators contribute
+7.452 kg. The CAD export contributes approximately 7.549 kg before its tiny
+placeholder motor and equipment masses are removed and real inertias are added. Battery,
+electronics, wiring and mounting masses remain planning estimates.
 
-Measured over 6 s from the standing keyframe, balance active:
+| Mass component | Modeled mass |
+|---|---:|
+| New CAD export | 7.549431 kg |
+| Replaced CAD motor/equipment placeholders | −0.004160 kg |
+| Twelve RS06 actuators | 7.452 kg |
+| Belt/pulley upgrade allowance | 0.120 kg |
+| Installed electronics, batteries and remaining payload | 4.452 kg |
+| Camera | 0.150 kg |
+| **Total** | **19.719271 kg** |
 
-| Gait | commanded | actual | error | peak tilt | drift |
-|---|---:|---:|---:|---:|---:|
-| stand | 0.00 m/s | −0.001 | −0.001 | 0.1° | 0.000 m |
-| walk | 0.15 | +0.155 | +0.005 | 7.4° | 0.024 m |
-| walk | 0.30 | +0.300 | +0.000 | 10.9° | 0.040 m |
-| trot | 0.30 | +0.297 | −0.003 | 5.1° | 0.040 m |
-| trot | 0.50 | +0.493 | −0.007 | 7.2° | 0.054 m |
-| pace | 0.30 | +0.146 | −0.154 | 16.6° | 0.066 m |
-| bound | 0.30 | +0.193 | −0.107 | 18.4° | 0.001 m |
+The current geometry has 192.0 mm thighs and 195.621 mm shanks. The full-chain
+reach is approximately 387.6 mm; reach reserve is a geometric quantity, not a
+verified obstacle or step height.
 
-### Thermal load
+The knee belt is a **2:1 reduction**: the RS06 output turns twice per knee turn.
+At the model's assumed 95% belt efficiency, the manufacturer's 8 N·m continuous
+stall value corresponds to **15.2 N·m at the knee**. Its 11 N·m rotating rating
+corresponds to 20.9 N·m, and 36 N·m peak corresponds to 68.4 N·m. HAA and HFE
+are direct. Knee speed halves and equivalent actuator-output inertia increases
+fourfold: **0.012 kg·m² at the motor output becomes 0.048 kg·m² at the knee**.
+These are transmission calculations, not verified belt or shaft strength ratings.
 
-Peak torque is the wrong question to ask of a motor — RMS is what decides
-whether a winding survives, because copper loss goes as current squared.
-Measured with `tools/torque_report.py`, worst joint:
+The [manufacturer datasheet audit](docs/rs06_datasheet_audit.md) distinguishes
+the latest September 17 specification from the older July manual. The **11 N·m
+rotating rating at 100 rpm requires a 200 × 200 mm aluminum heat sink**. The
+separate stall table specifies **8 N·m continuous**; the controller uses that
+holding value as its conservative continuous budget. At 36 N·m, the published
+maximum is **1 second stalled or 4 seconds rotating**, not an indefinitely
+repeatable pulse allowance. Installed cooling and overload recovery remain
+unverified. The single central electronics plate does not demonstrate equivalent
+cooling for twelve motors.
 
-| Gait | peak | RMS | RMS / continuous | steady-state winding |
-|---|---:|---:|---:|---:|
-| stand | 3.9 N·m | 3.9 N·m | 65 % | 45 °C |
-| walk 0.15 | 17.0 | 5.5 | 91 % | 70 °C |
-| trot 0.30 | 14.3 | 5.4 | 90 % | 69 °C |
-| trot 0.50 | 14.5 | 5.5 | 92 % | 71 °C |
-| bound 0.30 | 17.0 | 7.9 | 131 % | 123 °C |
+The latest specification publishes **Kt = 1.1 N·m/Arms**, **0.23 Ω line
+resistance**, and **0.012 kg·m² equivalent output inertia**. The 0.115 Ω phase
+value is derived using an equivalent-wye model, not an independently published
+winding measurement. Thermal resistance and heat capacity still need
+identification. Simulation temperatures remain estimates; CAN telemetry uses
+the maximum of reported motor feedback and the estimated thermal observer.
+A constant Kt does not capture the published peak-current discrepancy, and the
+lumped copper model does not reproduce the manufacturer's per-phase stall
+heating model. Phase-current estimates are neither measured DC-bus current nor
+a verified conversion of the motor's Iq channel. See the audit for source pages
+and caveats.
 
-Walk and trot are inside the 6 N·m continuous rating. Bound is not, and is not
-meant to be: it is the gait used to probe the peak-torque and I²t path in
-simulation and should not be commanded on hardware.
+The battery model assumes the two 6S packs are **in series: 12S, 44.4 V nominal,
+50.4 V fully charged**. Parallel packs provide 22.2 V nominal: within the latest manual's 15–60 V
+input range, but a different speed and power envelope from this simulation.
+Confirm the delivered revision and power wiring before hardware use.
 
-These numbers replace an earlier table in which every travelling gait sat
-between 141 % and 201 % of continuous. That table was accurate — about a robot
-with two of its twelve joints welded shut. See below.
+See the [current speed sweep and Go2 comparison](docs/locomotion_validation.md)
+for the measured operating limits and calculation method. The
+[per-joint report](docs/rs06_speed_study.md), [JSON](docs/rs06_speed_study.json)
+and [CSV](docs/rs06_speed_study.csv) include all twelve joints, peaks, RMS,
+time above 8/11 N·m, speed during overload, and clipping. These results supersede
+the earlier `rs06_feasibility` measurements: applied torque is now sampled at
+every 0.5 ms physics step, and the command delay is correctly 1 ms.
 
-> **Still not validated against hardware.** The thermal model is first-order,
-> from datasheet resistance and an *assumed* thermal resistance. Read 90 % as
-> "plausibly inside the rating", not as a measurement of a real motor.
+Each run lasts 20 simulated seconds on an obstacle-free plane; RMS excludes
+the first second while peaks include startup. The tuned walk uses 1.5 Hz,
+0.78 duty factor and 30 mm lift at 320 mm stance; trot uses 2.2 Hz and
+40 mm lift at 330 mm stance.
 
-### How locomotion was broken for most of this project
+| Gait | Command / actual speed | Worst motor RMS / peak | Safety-clamped cycles | Result |
+|---|---:|---:|---:|---|
+| Stand | 0 / ≈0 m/s | 3.28 / 4.05 N·m | 0% | Stable |
+| Walk | 0.15 / 0.171 m/s | 4.94 / 10.77 N·m | 0% | Tracks |
+| Trot | 0.50 / 0.515 m/s | 4.79 / 13.34 N·m | 0% | Tracks |
+| Trot | 0.75 / 0.756 m/s | 4.99 / 21.19 N·m | 0% | Tracks; inspect peaks |
+| Trot | 1.00 / 0.979 m/s | 5.38 / 28.15 N·m | 26.8% | Tracks with limiting |
+| Trot | 1.50 / 1.477 m/s | 6.49 / 30.37 N·m | 99.4% | Tracks with near-continuous limiting |
+| Trot | 2.00 / 0.052 m/s | 7.21 / 35.12 N·m | 99.9% | Unstable; invalid operating point |
 
-The robot used to step in place and drift backwards at ≈ 0.04 m/s while drawing
-173 % of continuous torque. Both symptoms had the same two causes, and neither
-was in the balance layer or the gains — which is where the effort went first.
+Low-speed straight-line simulation is promising. Higher speeds do not have
+comfortable demonstrated margins, and the requested 0.3 rad/s turns only
+achieved 0.127–0.144 rad/s. Short simulations and estimated temperatures do not
+verify cooling, belt strength or hardware walking. Compare motor-output torque
+with the RS06 rating: the knee's joint torque is 1.9 times motor-output torque
+under the assumed 2:1 ratio and 95% efficiency.
 
-**A 41 mm step at every lift-off.** Stance retracts the foot at the measured
-body velocity, but the swing arc was rebuilt each cycle assuming stance had
-swept back the full *commanded* stride. Whenever the robot was not already at
-the commanded speed the two disagreed, and the difference was commanded in a
-single 2.5 ms tick: 41 mm from a standstill at 0.3 m/s. That drove 0.33 rad of
-tracking error, saturating the hips at 17 N·m and destroying the force
-distribution the balance layer had just computed — so the robot could not
-accelerate, so the measured velocity stayed at zero, so the step never shrank.
+The official Go2 model also completed matched 0.4 and 0.5 m/s tests using our
+shared gait controller. Its peak joint caps are 23.7 N·m at the hips and
+45.43 N·m at the knees; continuous ratings are not inferred. The
+[comparison](docs/locomotion_validation.md) separates joint and motor torque,
+model differences, and the [official SDK/viewer shutdown failure](docs/go2_runner_smoke.md).
 
-**Two hips welded shut.** The thigh capsule and the HAA actuator cylinder are
-both conservative bounding volumes around parts that clear each other in the
-CAD, and MuJoCo does not auto-filter the pair because the thigh is the base's
-*grandchild*, not its child. The front hips jammed 13 mrad above the standing
-pose and would not move under 16.6 N·m, while the rear hips swung 1.59 rad on
-3 N·m. The front legs could only lift with the knee.
+After sourcing ROS and the built workspace, reproduce with:
 
-The lesson worth keeping: **a careful measurement of a broken system is still a
-measurement of a broken system.** The stance-height study was repeated at four
-heights, was internally consistent, and was wrong. So was the conclusion that
-lower stance impedance helped — with the hips free, the original `stance_kp` of
-90 turned out to be the best value tested. What found both bugs was per-joint
-instrumentation, not more tuning: printing commanded against measured position
-for one leg through one gait cycle showed a 40 mm jump in the target at
-lift-off, and a hip angle that did not change by 0.001 rad in four seconds
-under peak torque. A joint that will not move under 16 N·m is not a control
-problem.
+```bash
+MUJOCO_GL=egl python3 tools/torque_report.py --study --seconds 20 --output docs/rs06_speed_study.json
+```
 
-Both are now regression-tested: `test_the_foot_command_never_jumps` and
-`test_every_hip_can_swing_through_its_commanded_range`.
+No hardware has been driven. Real IMU/base-state feedback is not integrated;
+its absence remains explicit, and the controller rejects hardware travel
+commands until live base feedback is available. The RS06 backend also requires
+calibrated joints for normal enable/motion. Motor calibration, firmware checks
+and identified cooling remain prerequisites for physical trials. MuJoCo provides exact base feedback, so that path has different
+uncertainty from the physical robot. Pace, bound, stairs and jumps remain
+experimental until individually measured.
 
-<details>
-<summary><b>Design study: would shorter legs help?</b> (measured — click to expand)</summary>
+### Historical results
 
-Short answer: barely, and not for the reason it seems. Run
-`python3 tools/design_study.py` to reproduce.
-
-<p align="center">
-  <img src="docs/images/why_torque.png" width="94%" alt="Joint torque is set by how bent the leg is">
-</p>
-
-**Torque is set by how bent the leg is, not by how long it is.** A joint torque
-is a force times a lever arm; the force is the robot's weight on that foot, and
-the lever arm is the horizontal distance from the joint axis to the foot. Bend
-the leg and that distance grows. So at a fixed ride height, *longer* legs must
-fold further to reach the ground and cost **more** torque, not less:
-
-| legs | total | knee bend | lever arm | torque | of continuous |
-|---|---|---:|---:|---:|---:|
-| 80 % | 344 mm | 59° | 84 mm | 2.02 N·m | 34 % |
-| **100 %** | **430 mm** | **92°** | **154 mm** | **3.78 N·m** | **63 %** |
-| 120 % | 516 mm | 109° | 210 mm | 5.29 N·m | 88 % |
-| 130 % | 559 mm | 115° | 236 mm | 6.01 N·m | 100 % |
-
-**Mass is not where the weight is.** Only the long parts of the thigh and shank
-scale with leg length — 320 g per leg out of 10 kg. Shortening the legs 20 %
-saves **256 g, or 2.6 %**. The actuators (4.56 kg) and the electronics
-(1.11 kg) do not shrink.
-
-**Torque does fall, but stance height is the same lever and it is free.**
-Holding a load costs torque proportional to the horizontal distance from knee
-to foot. Shorter links shrink it; so does standing taller, because both
-straighten the leg. At a fixed 320 mm ride height:
-
-| leg scale | links | mass | stance torque | leg travel left |
-|---|---|---:|---:|---:|
-| 1.00 | 213 / 217 mm | 10.00 kg | 63 % of continuous | 130 mm |
-| 0.90 | 192 / 196 mm | 9.87 kg | 49 % | 87 mm |
-| 0.80 | 170 / 174 mm | 9.74 kg | 34 % | 44 mm |
-
-**The cost is terrain capability.** At 0.80 scale the robot has 44 mm of leg
-travel left to lift a foot with — it could no longer climb its own 80 mm
-stairs. That is disqualifying for an indoor robot, and it is why quadrupeds
-stand at 60–75 % of leg extension rather than 85 %+.
-
-**And it would not have fixed the real problem.** This study was written while
-the gait was drawing 173 % of continuous, and the conclusion was that a 20 %
-leg reduction — worth roughly 45 % less torque — would land near 95 %, still
-without margin, having permanently given up the stairs. That reasoning held up:
-the excess was the controller, not the geometry. Two bugs later the same trot
-draws 90 % at full leg length, with all 130 mm of travel intact. Shortening the
-legs would have cost the stairs and fixed nothing.
-
-</details>
-
-See §6.6 of [the documentation](docs/robodog_architecture.pdf) for the measured
-numbers, and [CONTRIBUTING.md](CONTRIBUTING.md) if you would like to help.
+The previous 10 kg RS02 model walked and trotted in simulation after fixing a
+foot-target discontinuity and false hip self-collisions. Its torque percentages,
+temperatures, speed tables, screenshots and architecture performance figures
+are **superseded** and must not be used to size the RS06 configuration. The
+regression tests retain the useful checks: continuous foot commands, free hip
+motion, actual displacement, tracking, and consistency between URDF and MJCF.
 
 ---
 
 ## Repository layout
 
 ```
-cad/                        Onshape export (input) and the RS02 vendor STEP
+cad/                        Onshape export (input) and archived RS02 vendor STEP
 tools/                      CAD → model pipeline, meshes, diagrams, doc facts
 ros2_ws/src/
   robodog_msgs/             message and service contract
   robodog_description/      URDF/Xacro, meshes, RViz, actuator datasheet
-  robodog_hardware/         JointBackend + the ROBSTRIDE02 CAN codec
+  robodog_hardware/         JointBackend + parameterized RobStride CAN codec
   robodog_control/          400 Hz loop, safety, gait, balance, IK, estimator
   robodog_sim/              MJCF generator, test worlds, RViz markers
   robodog_perception/       CameraBackend, depth, PointCloud2
@@ -368,7 +354,7 @@ docs/                       LaTeX documentation, Draw.io diagrams, figures
 | Artefact | Produced by | From |
 |---|---|---|
 | `robot_parameters.yaml` | `tools/cad_to_model.py` | the Onshape export |
-| `meshes/*.stl` | `tools/prepare_meshes.py` | CAD meshes, 41 MB → 2.3 MB |
+| `meshes/*.stl` | `tools/prepare_meshes.py` | active CAD export meshes |
 | `models/*.xml` (MJCF) | `robodog_sim/mjcf.py` | `robot_parameters.yaml` |
 | diagrams (`.drawio`, `.pdf`, `.png`) | `tools/make_diagrams.py` | one Python description |
 | `docs/generated_facts.tex` | `tools/make_doc_facts.py` | the model and the datasheet |
@@ -388,31 +374,17 @@ cd docs && make                      # facts, diagrams, and the PDF
 
 ## Key figures
 
-Derived from the CAD, not assumed:
-
-| | |
+| Quantity | Active configuration |
 |---|---|
-| Mass | **10.000 kg** — 4.33 structure + 4.56 actuators + 1.11 electronics |
-| Links | thigh 213.00 mm, shank 217.32 mm, reach 430.32 mm |
-| Stance | 320 mm, 69.7 % leg extension, 62.5 % of continuous torque |
-| Support polygon | 442 × 289 mm, centred within 3.5 mm of the centre of mass |
-| Actuator | 6 N·m continuous, 17 N·m peak, 7.75:1, 2 × 14-bit encoders |
-| CAN | 2 buses at 1 Mbit/s, 6 motors each, 400 Hz, 72 % load |
-| Control loop | 400 Hz — measured period 2.49 ms against a nominal 2.50 |
-| Balance | 6-DOF wrench → per-foot ground reaction, friction-cone projected |
+| Working mass | Approximately 19.72 kg; payload placement and several masses estimated |
+| Motors | 12 × RS06, 621 g each; 8 N·m continuous stall, 11 N·m rotating rated, 36 N·m peak |
+| External transmission | HAA/HFE 1:1; knees 2:1, 95% efficiency assumed |
+| Battery assumption | Two 6S packs in series; 44.4 V nominal, 50.4 V full |
+| CAN | Two buses, six motors each; 400 Hz target, bus budget checked |
+| Thermal telemetry | Estimated in simulation; feedback/observer maximum on CAN |
 
-A few results worth calling out, because they came out of the CAD rather than
-going into it:
-
-- The assembly was drawn around **RMD-X8 actuators at 760.8 g**. Substituting
-  the ROBSTRIDE02 at 380 g removes 4.57 kg and lands the structure at 8.89 kg,
-  leaving 1.11 kg for electronics — which is how the 10 kg target is met.
-- The knee is **belt-driven from a proximally mounted actuator** (48 mm from
-  the hip axis, 179 mm from the knee). That is why the calf weighs only 172 g
-  and the thigh's centre of mass sits 27 mm below the hip.
-- **Reflected rotor inertia is 4.8 × 10⁻³ kg·m²** — larger than the calf's own
-  inertia about the knee. Leaving it out of the simulation would make the legs
-  roughly four times too easy to accelerate.
+Geometry, named poses and inertias are generated in
+`ros2_ws/src/robodog_description/config/robot_parameters.yaml`.
 
 ---
 
@@ -422,12 +394,18 @@ going into it:
 cd ros2_ws && MUJOCO_GL=egl python3 -m pytest src/*/test -q
 ```
 
-**217 tests**, all passing. The
+With the MuJoCo GUI running, `python3 tools/gui_smoke.py` from the repository
+root exercises actual browser commands and all twelve telemetry rows. It needs
+Python Playwright and Google Chrome and refuses a hardware backend. On Humble,
+use `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` if an unrelated ROS pytest plugin fails
+to load; GUI access tests also require permission to open local sockets.
+
+Run the regression suite for the current checkout. The
 valuable ones are cross-checks rather than unit tests: the
 MuJoCo model's masses, joint origins, axes, ranges and visual-mesh orientations
 are asserted against the URDF, so the two descriptions cannot drift apart; the
 world geometry is measured against the clearances its own docstring claims; and
-the RS02 CAN codec has 29 tests that run with no hardware, because that is the
+the RobStride CAN codec has tests that run with no hardware, because that is the
 part most likely to need changing for a different firmware revision.
 
 Several tests exist because a bug got past a weaker one — a gravity-torque sign
@@ -441,12 +419,13 @@ body while every physics test passed. Each of those says so in its docstring.
 
 1. **Verify the CAN frame layout** against the delivered firmware — the
    identifier layout has varied across RobStride revisions. It is isolated in
-   `robodog_hardware/protocol/robstride02.py`, so a revision touches one file.
+   `robodog_hardware/protocol/robstride06.py`, so a revision touches one file.
 2. **Calibrate every joint.** `ros2 run robodog_hardware calibrate_joint
    --joint FL_haa_joint --lower-limit -0.80`. Direction and offset are unknown
-   until the robot is assembled; leave `enable_on_start: false` until signed off.
-3. **Identify the estimates** — rotor inertia, joint friction, thermal
-   constants. They are marked `[ESTIMATE]` in `robstride02.yaml`, and the
+   until the robot is assembled. Leave startup disabled and mark each joint
+   `calibrated: true` only after its physical commissioning is complete.
+3. **Identify the remaining estimates** — joint friction, belt losses and thermal
+   constants; validate the published equivalent output inertia in the assembly. They are marked `[ESTIMATE]` in the selected `robstride06.yaml`, and the
    safety margins currently carry that uncertainty.
 
 §11 of the documentation has the full bring-up sequence and the list of open
@@ -456,7 +435,7 @@ items.
 
 ## Documentation
 
-[**`docs/robodog_architecture.pdf`**](docs/robodog_architecture.pdf) — 21 pages
+[**`docs/robodog_architecture.pdf`**](docs/robodog_architecture.pdf) — architecture and historical measurements
 covering the system and software architecture, ROS node and topic structure,
 control and simulation architecture, the hardware/software boundary, coordinate
 and joint conventions, safety limits, and the migration path to hardware. Every

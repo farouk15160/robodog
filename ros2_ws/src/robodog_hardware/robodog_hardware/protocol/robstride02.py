@@ -119,15 +119,18 @@ def split_id(can_id: int) -> tuple[int, int, int]:
 # encoders
 # --------------------------------------------------------------------------- #
 def encode_motion_control(motor_id: int, position: float, velocity: float,
-                          torque: float, kp: float, kd: float) -> tuple[int, bytes]:
+                          torque: float, kp: float, kd: float, *,
+                          ranges=None) -> tuple[int, bytes]:
     """The impedance command. The feed-forward torque rides in the IDENTIFIER,
     not the payload -- the 8 data bytes are already full."""
-    can_id = make_id(CommType.MOTION_CONTROL, to_uint16(torque, T_MIN, T_MAX), motor_id)
+    p0, p1, v0, v1, t0, t1, kp0, kp1, kd0, kd1 = ranges or (
+        P_MIN, P_MAX, V_MIN, V_MAX, T_MIN, T_MAX, KP_MIN, KP_MAX, KD_MIN, KD_MAX)
+    can_id = make_id(CommType.MOTION_CONTROL, to_uint16(torque, t0, t1), motor_id)
     data = struct.pack(">HHHH",
-                       to_uint16(position, P_MIN, P_MAX),
-                       to_uint16(velocity, V_MIN, V_MAX),
-                       to_uint16(kp, KP_MIN, KP_MAX),
-                       to_uint16(kd, KD_MIN, KD_MAX))
+                       to_uint16(position, p0, p1),
+                       to_uint16(velocity, v0, v1),
+                       to_uint16(kp, kp0, kp1),
+                       to_uint16(kd, kd0, kd1))
     return can_id, data
 
 
@@ -186,7 +189,7 @@ class Feedback:
         return self.faults == 0 and self.mode == MotorMode.RUNNING
 
 
-def decode_feedback(can_id: int, data: bytes) -> Feedback:
+def decode_feedback(can_id: int, data: bytes, *, ranges=None) -> Feedback:
     """Decode a type-2 frame. Raises ValueError on anything else, so a caller
     cannot silently mistake a fault frame for a measurement."""
     comm, field, _target = split_id(can_id)
@@ -194,13 +197,14 @@ def decode_feedback(can_id: int, data: bytes) -> Feedback:
         raise ValueError(f"expected FEEDBACK (2), got comm type {comm}")
     if len(data) != 8:
         raise ValueError(f"expected 8 data bytes, got {len(data)}")
+    p0, p1, v0, v1, t0, t1 = ranges or (P_MIN, P_MAX, V_MIN, V_MAX, T_MIN, T_MAX)
     pos, vel, tor, temp = struct.unpack(">HHHH", data)
     # data field: bits 0..7 motor id, bits 8..13 faults, bits 14..15 mode
     return Feedback(
         motor_id=field & 0xFF,
-        position=from_uint16(pos, P_MIN, P_MAX),
-        velocity=from_uint16(vel, V_MIN, V_MAX),
-        torque=from_uint16(tor, T_MIN, T_MAX),
+        position=from_uint16(pos, p0, p1),
+        velocity=from_uint16(vel, v0, v1),
+        torque=from_uint16(tor, t0, t1),
         temperature=temp * TEMP_SCALE_C,
         faults=(field >> 8) & 0x3F,
         mode=(field >> 14) & 0x03,

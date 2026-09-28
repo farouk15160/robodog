@@ -18,6 +18,24 @@ NAMES = [f"{l}_{k}_joint" for l in ("FL", "FR", "RL", "RR") for k in ("haa", "hf
 RATE = 400.0
 
 
+def test_rs06_knee_torque_budget_and_speed_are_joint_side():
+    from pathlib import Path
+    description = Path(__file__).parents[2] / "robodog_description/config"
+    params = yaml.safe_load((description / "robot_parameters.yaml").read_text())
+    rs = yaml.safe_load((description / "robstride06.yaml").read_text())
+    limits = SafetyLimits.from_config(params, rs, NAMES)
+    monitor = SafetyMonitor(limits, NAMES, RATE)
+    assert limits.peak_torque[:3] == pytest.approx([36, 36, 68.4])
+    assert limits.continuous_torque[:3] == pytest.approx([8, 8, 15.2])
+    measured = state(position=(limits.position_lower + limits.position_upper) / 2)
+    request = impedance(pos=measured.position, kp=0, kd=0, eff=100)
+    request.velocity[:] = 100
+    allowed, report = monitor.apply(measured, request)
+    assert allowed.effort[:3] == pytest.approx([36, 36, 68.4])
+    assert allowed.velocity[:3] == pytest.approx([20, 20, 10])
+    assert report.torque_utilisation[:3] == pytest.approx([36 / 8] * 3)
+
+
 @pytest.fixture(scope="module")
 def cfg():
     share = get_package_share_directory("robodog_description")
@@ -196,6 +214,17 @@ def test_fault_temperature_latches_an_estop(mon):
     assert rep.estop and rep.latched
     assert np.all(out.mode == int(ControlMode.IDLE))
     assert np.all(out.kp == 0.0) and np.all(out.effort == 0.0)
+
+
+def test_motor_overtemperature_fault_latches_even_with_low_numeric_temperature(mon):
+    m = state(temperature=25.0)
+    m.faults[0] = int(Fault.OVERTEMPERATURE)
+    out, rep = mon.apply(m, impedance(pos=0.0, kp=100.0))
+    assert rep.estop and rep.latched
+    assert np.all(out.mode == int(ControlMode.IDLE))
+    assert np.all(out.kp == 0.0) and np.all(out.effort == 0.0)
+    ok, msg = mon.clear_estop(m)
+    assert not ok and "cannot clear" in msg
 
 
 # --------------------------------------------------------------------------- #

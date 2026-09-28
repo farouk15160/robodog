@@ -26,8 +26,8 @@ def params():
 
 
 @pytest.fixture(scope="module")
-def rs02():
-    with open(os.path.join(PKG, "config", "robstride02.yaml")) as f:
+def actuator(params):
+    with open(os.path.join(PKG, "config", params["actuator_config"])) as f:
         return yaml.safe_load(f)
 
 
@@ -81,6 +81,18 @@ def test_total_mass_matches_design_target(urdf, params):
     assert total == pytest.approx(params["meta"]["target_mass_kg"], abs=0.01), total
 
 
+def test_new_cad_and_rs06_payload_are_present(urdf, params):
+    """The supplied 7.549 kg structure plus the user's complete load list."""
+    total = sum(float(link.find("inertial/mass").get("value"))
+                for link in urdf.findall("link") if link.find("inertial") is not None)
+    assert total == pytest.approx(19.72, abs=0.01)
+    assert params["meta"]["cad_source"] == "cad/urdf/urdf/urdf.urdf"
+    assert "ROBSTRIDE06" in params["meta"]["actuator"]
+    motors = [mesh for mesh in urdf.iter("mesh")
+              if mesh.get("filename").endswith("/robstride06.stl")]
+    assert len(motors) == 12
+
+
 def test_inertia_tensors_are_physically_valid(urdf):
     """Triangle inequality on the principal moments; a violation means the
     aggregation or a hand edit produced a tensor no rigid body can have."""
@@ -128,26 +140,37 @@ def test_zero_pose_puts_feet_where_the_model_says(params):
     z = -(g["thigh_length_m"] + g["shank_length_m"])
     y = g["haa_y_m"] + g["hfe_dr_m"] + g["thigh_lateral_m"]
     x = g["haa_x_m"] + g["hfe_dx_m"]
-    assert (x, y, -z) == pytest.approx((0.221, 0.1445, 0.43032), abs=1e-6)
+    assert (x, y, -z) == pytest.approx((0.291, 0.144501, 0.387621), abs=2e-6)
     assert params["named_poses"]["zero"]["base_height_m"] == pytest.approx(
         -z + g["foot_radius_m"], abs=1e-6)
+
+
+def test_knee_motor_collision_follows_new_proximal_cad_mount(params):
+    """The new knee motor sits at hip height, not the old 45mm-down mount."""
+    for leg in LEGS:
+        cylinders = [c for c in params["links"][f"{leg}_thigh"]["collisions"]
+                     if c["type"] == "cylinder"]
+        assert len(cylinders) == 1
+        assert abs(cylinders[0]["xyz"][2]) < 0.002
 
 
 # --------------------------------------------------------------------------- #
 # limits
 # --------------------------------------------------------------------------- #
-def test_urdf_limits_are_the_hardware_maxima(urdf, rs02):
-    tau = rs02["performance"]["peak_torque_nm"]
-    vel = rs02["performance"]["no_load_speed_rad_s"]
+def test_urdf_limits_are_the_hardware_maxima(urdf, actuator):
+    tau = actuator["performance"]["peak_torque_nm"]
+    vel = actuator["performance"]["no_load_speed_rad_s"]
     for leg in LEGS:
         for kind in KINDS:
             lim = urdf.find(f".//joint[@name='{leg}_{kind}_joint']").find("limit")
-            assert float(lim.get("effort")) == pytest.approx(tau)
-            assert float(lim.get("velocity")) == pytest.approx(vel)
+            ratio = 2.0 if kind == "kfe" else 1.0
+            efficiency = 0.95 if kind == "kfe" else 1.0
+            assert float(lim.get("effort")) == pytest.approx(tau * ratio * efficiency)
+            assert float(lim.get("velocity")) == pytest.approx(vel / ratio)
 
 
-def test_operational_limits_are_strictly_inside_hardware_limits(rs02):
-    o, p = rs02["operational_limits"], rs02["performance"]
+def test_operational_limits_are_strictly_inside_hardware_limits(actuator):
+    o, p = actuator["operational_limits"], actuator["performance"]
     assert o["continuous_torque_nm"] < o["peak_torque_nm"] <= p["peak_torque_nm"]
     assert o["velocity_rad_s"] < p["no_load_speed_rad_s"]
     assert o["temperature_warn_c"] < o["temperature_derate_c"] < o["temperature_fault_c"]

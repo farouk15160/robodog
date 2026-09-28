@@ -9,8 +9,8 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     args = [
         DeclareLaunchArgument("backend", default_value="kinematic",
-                              choices=["kinematic", "mujoco", "robstride02_can"],
-                              description="hardware backend; robstride02_can drives REAL motors"),
+                              choices=["kinematic", "mujoco", "robstride06_can"],
+                              description="hardware backend; robstride06_can drives REAL motors"),
         DeclareLaunchArgument("mujoco_model", default_value=""),
         DeclareLaunchArgument("mujoco_viewer", default_value="false"),
         DeclareLaunchArgument("auto_enable", default_value="false"),

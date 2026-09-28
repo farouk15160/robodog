@@ -7,17 +7,18 @@ Used in two places:
     safety architecture must be exercised in simulation and MuJoCo has no
     concept of copper loss;
   * on the real robot the same model runs as an OBSERVER alongside the
-    temperature the RS02 reports. The motor's own sensor sits on the driver
-    board and lags the winding by tens of seconds, so the observer is what
-    catches a fast thermal excursion (a stalled leg pushing against an
+    temperature the actuator reports. Sensor location and firmware thermal
+    estimation vary between models; this uncalibrated observer may indicate
+    a fast thermal excursion (a stalled leg pushing against an
     obstacle) before the reported temperature has moved.
 
     P_cu  = 3 * I_rms^2 * R_phase,   I_rms = tau / kt
     dT/dt = (P_cu - (T - T_ambient) / R_th) / C_th
 
-Parameters are estimates from robstride02.yaml -> thermal and MUST be
-calibrated: run a joint at rated torque against a stop and fit the step
-response. Until then the limits in safety.yaml carry the margin.
+Thermal impedance parameters are estimates from the active actuator YAML and
+require instrumented identification within the manufacturer's stall/rotating
+limits. This model omits per-phase stall hotspots, temperature-dependent
+resistance and high-current torque nonlinearity; it cannot qualify cooling.
 """
 from __future__ import annotations
 
@@ -40,11 +41,11 @@ class ThermalModel:
         self.temperature[:] = self.ambient
 
     def copper_loss(self, torque: np.ndarray) -> np.ndarray:
-        """Copper loss per joint [W]. Iron loss is ignored: below the rated
-        speed of 10.5 rad/s it is a few percent of copper loss, and ignoring it
-        is conservative in the direction that matters (it under-predicts
-        heating at high speed, which is why the observer is a supplement to the
-        reported temperature and not a replacement for it)."""
+        """Estimated copper loss per motor [W]. Iron and switching losses are
+        omitted; no measured loss map establishes their relative size. This is
+        NOT conservative and
+        the observer is an uncalibrated supplement to reported temperature,
+        never evidence of safe winding temperature."""
         i_rms = np.abs(torque) / self.kt
         return 3.0 * i_rms ** 2 * self.r_phase
 

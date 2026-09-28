@@ -22,6 +22,8 @@ OUT = os.path.join(ROOT, "docs/images")
 
 # name, model, keyframe, (lookat xyz), distance, azimuth, elevation, size
 SHOTS = [
+    ("human_reference_flat", "robodog_scene.xml", "stand", (0.05, 0.55, 0.90), 4.2, 140, -10, (1500, 1000)),
+    ("human_reference_house", "robodog_house.xml", "stand", (2.45, 0.7, 0.90), 3.5, 270, -22, (1500, 1000)),
     ("robot_stand", "robodog_scene.xml", "stand", (0.0, 0.0, 0.17), 1.05, 138, -16, (1500, 950)),
     ("robot_side", "robodog_scene.xml", "stand", (0.0, 0.0, 0.17), 0.95, 90, -6, (1400, 800)),
     ("robot_crouch", "robodog_scene.xml", "crouch", (0.0, 0.0, 0.13), 0.95, 138, -16, (1300, 800)),

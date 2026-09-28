@@ -6,7 +6,10 @@
 # Adding, removing or reordering a panel is a change here, not in JavaScript.
 robodog_web:
   port: 8080
-  host: "0.0.0.0"
+  # Local control by default. Remote binding is an explicit trusted-network
+  # choice: there are no user accounts or TLS here. Prefer an SSH tunnel.
+  # ROS parameter `host` overrides this setting when explicitly provided.
+  host: "127.0.0.1"
   stream_rate_hz: 20.0      # telemetry push rate; the UI redraws at this rate
   video_rate_hz: 10.0       # MJPEG frame rate, independent of telemetry
   video_quality: 70         # JPEG quality
@@ -16,7 +19,8 @@ robodog_web:
   # Operator safety. The GUI can command the robot, so what it is allowed to
   # command is configuration, not a hard-coded constant in the browser.
   limits:
-    max_linear_velocity: 0.6     # m/s, applied to the velocity sliders
+    max_linear_velocity: 0.5     # m/s hardware cap; server enforces by backend
+    simulation_max_linear_velocity: 2.0  # experimental command range, not proven speed
     max_angular_velocity: 1.2    # rad/s
     manual_joint_step_rad: 0.05  # per click in the joint jog panel
     require_confirm_for_gait: true
@@ -31,7 +35,7 @@ robodog_web:
     - {id: safety,      title: "Safety",           enabled: true,  order: 40, width: 1}
     - {id: pose,        title: "Poses",            enabled: true,  order: 50, width: 1}
     - {id: gait,        title: "Gait & Velocity",  enabled: true,  order: 60, width: 2}
-    - {id: joints,      title: "Joints",           enabled: true,  order: 70, width: 4}
+    - {id: joints,      title: "Joint Torque & Temperature", enabled: true, order: 70, width: 4}
     - {id: feet,        title: "Feet & Contact",   enabled: true,  order: 80, width: 2}
     - {id: camera,      title: "Camera",           enabled: true,  order: 90, width: 2}
     - {id: simulation,  title: "Simulation",       enabled: true,  order: 100, width: 1}

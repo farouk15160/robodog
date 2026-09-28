@@ -24,6 +24,8 @@
          robodog_control/config/safety.yaml and are enforced at runtime. -->
     <xacro:property name="tau_max" value="${RS['performance']['peak_torque_nm']}"/>
     <xacro:property name="vel_max" value="${RS['performance']['no_load_speed_rad_s']}"/>
+    <xacro:property name="knee_ratio" value="${RS['transmissions']['kfe']['ratio']}"/>
+    <xacro:property name="knee_efficiency" value="${RS['transmissions']['kfe']['efficiency']}"/>
     <xacro:property name="soft"    value="${OL['position_margin_rad']}"/>
 
     <xacro:rd_link name="${leg}_hip"   L="${P['links'][leg + '_hip']}"/>
@@ -59,20 +61,20 @@
     </joint>
 
     <!-- ========== KFE : knee ==========
-         Driven by an actuator mounted proximally on the thigh through a 1:1
+         Driven by an actuator mounted proximally on the thigh through a 2:1
          belt, so the joint stays kinematically simple but the thigh carries the
-         motor mass (COM only 27 mm below the hip) and the calf is just 172 g. -->
+         motor mass; the calf carries the distal structure and foot. -->
     <joint name="${leg}_kfe_joint" type="revolute">
       <parent link="${leg}_thigh"/>
       <child  link="${leg}_calf"/>
       <origin xyz="0 ${sy * G['thigh_lateral_m']} ${-G['thigh_length_m']}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit lower="${JL['kfe']['lower']}" upper="${JL['kfe']['upper']}"
-             effort="${tau_max}" velocity="${vel_max}"/>
+             effort="${tau_max * knee_ratio * knee_efficiency}" velocity="${vel_max / knee_ratio}"/>
       <safety_controller soft_lower_limit="${JL['kfe']['lower'] + soft}"
                          soft_upper_limit="${JL['kfe']['upper'] - soft}"
                          k_position="100.0" k_velocity="10.0"/>
-      <dynamics damping="${JD['damping_nms_per_rad']}" friction="${JD['coulomb_friction_nm']}"/>
+      <dynamics damping="${JD['damping_nms_per_rad'] * knee_ratio * knee_ratio}" friction="${JD['coulomb_friction_nm'] * knee_ratio}"/>
     </joint>
 
     <!-- ========== foot frame ==========

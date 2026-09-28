@@ -32,7 +32,7 @@ def _params() -> tuple[dict, dict, str]:
     share = get_package_share_directory("robodog_description")
     with open(os.path.join(share, "config", "robot_parameters.yaml")) as f:
         P = yaml.safe_load(f)
-    with open(os.path.join(share, "config", "robstride02.yaml")) as f:
+    with open(os.path.join(share, "config", P.get("actuator_config", "robstride06.yaml"))) as f:
         RS = yaml.safe_load(f)
     return P, RS, os.path.join(share, "meshes")
 
@@ -48,7 +48,7 @@ def make_model(params: dict, rs: dict, world: World | None, *, timestep: float,
     ET.SubElement(root, "worldbody")
     # Order matters: the robot's free joint must be the first in qpos so the
     # keyframes line up. See add_keyframes().
-    build_robot(root, params, spawn=spawn, yaw=yaw)
+    build_robot(root, params, spawn=spawn, yaw=yaw, rs=rs)
     if world is not None:
         add_world(root, world)
     add_keyframes(root, params, world, spawn=spawn, yaw=yaw)
@@ -71,8 +71,8 @@ def main(argv=None) -> int:
         meshdir = a.meshdir
     out = a.out
     if out is None:
-        here = os.path.dirname(os.path.abspath(__file__))
-        out = os.path.abspath(os.path.join(here, "..", "models"))
+        from ament_index_python.packages import get_package_share_directory
+        out = os.path.join(get_package_share_directory("robodog_sim"), "models")
     os.makedirs(out, exist_ok=True)
 
     jobs = [("robodog.xml", None, (0.0, 0.0), 0.0)]

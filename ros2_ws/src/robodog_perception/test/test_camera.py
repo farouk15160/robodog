@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 import yaml
 from ament_index_python.packages import get_package_share_directory
+from builtin_interfaces.msg import Time
 
 from robodog_perception.backend import Intrinsics
 from robodog_perception.pointcloud import deproject, make_cloud
@@ -103,7 +104,7 @@ def test_decimation_reduces_the_point_count_quadratically():
 
 def test_pointcloud2_layout_is_xyzrgb_float32():
     pts = np.zeros((10, 3), dtype=np.float32)
-    msg = make_cloud(pts, None, "camera_depth_optical_frame", None)
+    msg = make_cloud(pts, None, "camera_depth_optical_frame", Time())
     assert msg.point_step == 16 and msg.width == 10 and msg.height == 1
     assert [f.name for f in msg.fields] == ["x", "y", "z", "rgb"]
     assert len(msg.data) == 160

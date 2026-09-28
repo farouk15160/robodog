@@ -8,7 +8,7 @@ Top-level launch for the robodog quadruped.
     ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house
 
     # the real robot (requires calibration to have been signed off)
-    ros2 launch robodog_bringup robot.launch.py backend:=robstride02_can \
+    ros2 launch robodog_bringup robot.launch.py backend:=robstride06_can \
         camera_backend:=nuwa_hp60c
 
 The SAME node graph runs in every case. `backend` and `camera_backend` choose
@@ -26,18 +26,19 @@ from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitut
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+from robodog_control.motion_policy import startup_actions
 
 ARGS = [
-    ("backend", "kinematic", ["kinematic", "mujoco", "robstride02_can"],
-     "joint backend; robstride02_can drives REAL motors"),
+    ("backend", "kinematic", ["kinematic", "mujoco", "robstride06_can"],
+     "joint backend; robstride06_can drives REAL motors"),
     ("camera_backend", "sim", ["sim", "nuwa_hp60c", "none"],
      "camera backend; nuwa_hp60c drives the REAL camera"),
     ("world", "flat", ["flat", "house"], "simulation world"),
     ("rviz", "true", None, "start RViz"),
     ("web", "true", None, "start the web GUI server"),
     ("mujoco_viewer", "false", None, "open the MuJoCo viewer window"),
-    ("auto_enable", "true", None, "energise the joints at start-up"),
-    ("auto_stand", "true", None, "move to the stand pose at start-up"),
+    ("auto_enable", "auto", ["auto", "true", "false"], "auto enables simulation only"),
+    ("auto_stand", "auto", ["auto", "true", "false"], "auto stands simulation only"),
     ("control_rate_hz", "400.0", None, "control loop rate"),
     ("web_port", "8080", None, "web GUI port"),
     ("use_camera", "true", None, "include the camera in the robot model"),
@@ -49,7 +50,8 @@ def _setup(context, *a, **kw):
     backend = cfg("backend")
     world = cfg("world")
     cam_backend = cfg("camera_backend")
-    is_sim = backend != "robstride02_can"
+    is_sim = backend != "robstride06_can"
+    auto_enable, auto_stand = startup_actions(backend, cfg("auto_enable"), cfg("auto_stand"))
 
     model = os.path.join(get_package_share_directory("robodog_sim"), "models",
                          "robodog_house.xml" if world == "house" else "robodog_scene.xml")
@@ -84,8 +86,8 @@ def _setup(context, *a, **kw):
                  {"backend": backend,
                   "mujoco_model": model,
                   "mujoco_viewer": LaunchConfiguration("mujoco_viewer"),
-                  "auto_enable": LaunchConfiguration("auto_enable"),
-                  "auto_stand": LaunchConfiguration("auto_stand"),
+                  "auto_enable": auto_enable,
+                  "auto_stand": auto_stand,
                   "control_rate_hz": LaunchConfiguration("control_rate_hz")},
              ]),
     ]

@@ -15,7 +15,7 @@ setup(
         ("share/" + package_name + "/www/css", glob("www/css/*.css")),
         ("share/" + package_name + "/www/js", glob("www/js/*.js")),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "aiohttp", "numpy", "PyYAML"],
     zip_safe=True,
     maintainer="farouk",
     maintainer_email="farouk15160@gmail.com",

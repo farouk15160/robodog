@@ -25,6 +25,7 @@ import numpy as np
 
 from ..backend import JointBackend
 from ..thermal import ThermalModel
+from ..transmission import validate_transmission
 from ..types import NJ, BaseState, ControlMode, JointCommand, JointState
 
 
@@ -35,12 +36,15 @@ class KinematicBackend(JointBackend):
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         super().__init__(config)
         c = self.config
-        self.tau_max = float(c.get("peak_torque_nm", 17.0))
-        self.damping = float(c.get("damping_nms_per_rad", 0.05))
-        self.friction = float(c.get("coulomb_friction_nm", 0.12))
+        self.ratio, self.efficiency = validate_transmission(
+            c.get("transmission_ratio", 1.0), c.get("transmission_efficiency", 1.0), NJ)
+        self.torque_gain = self.ratio * self.efficiency
+        self.tau_max = float(c.get("peak_torque_nm", 17.0)) * self.torque_gain
+        self.damping = float(c.get("damping_nms_per_rad", 0.05)) * self.ratio ** 2
+        self.friction = float(c.get("coulomb_friction_nm", 0.12)) * self.ratio
         # reflected rotor inertia dominates; add a nominal link contribution
-        self.inertia = float(c.get("armature_kgm2", 4.805e-3)) + float(c.get("link_inertia_kgm2", 2.0e-3))
-        self.vel_max = float(c.get("no_load_speed_rad_s", 42.935))
+        self.inertia = float(c.get("armature_kgm2", 4.805e-3)) * self.ratio ** 2 + float(c.get("link_inertia_kgm2", 2.0e-3))
+        self.vel_max = float(c.get("no_load_speed_rad_s", 42.935)) / self.ratio
         self.base_height = float(c.get("base_height_m", 0.3198))
         self._q0 = np.asarray(c.get("initial_position", np.zeros(NJ)), dtype=float).copy()
 
@@ -96,7 +100,7 @@ class KinematicBackend(JointBackend):
         self.qd = np.clip(self.qd + net / self.inertia * dt, -self.vel_max, self.vel_max)
         self.q += self.qd * dt
 
-        self.thermal.update(self.tau, dt)
+        self.thermal.update(self.tau / self.torque_gain, dt)
         self.sim_time += dt
         self.steps += 1
 

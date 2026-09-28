@@ -43,8 +43,10 @@
         render(msg.data, msg.events || []);
       } else if (msg.type === "info") {
         state.info = msg.data;
-      } else if (msg.type === "ack" && !msg.ok) {
-        toast(`${msg.action}: ${msg.message}`);
+      } else if (msg.type === "ack") {
+        $("command-status").textContent = `${msg.action}: ${msg.message}`;
+        $("command-status").style.color = msg.ok ? "var(--accent)" : "var(--alarm)";
+        if (!msg.ok) toast(`${msg.action}: ${msg.message}`);
       }
     };
   }

@@ -22,22 +22,22 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def system_architecture() -> Diagram:
     d = Diagram("system_architecture", "System architecture", w=1180, h=760,
                 caption="Physical and computational stack. Everything above the red "
-                        "boundary is identical in simulation and on hardware.")
+                        "boundary shares commands and telemetry; hardware travel is gated.")
     d.box("L1", 20, 20, 1140, 150, "OPERATOR", "off-board", kind="layer", z=0)
-    d.box("gui", 60, 60, 240, 80, "Web GUI", "browser, any device", kind="external")
+    d.box("gui", 60, 60, 240, 80, "Web GUI", "localhost browser", kind="external")
     d.box("rviz", 330, 60, 200, 80, "RViz2", "3D state + sensors", kind="external")
     d.box("cli", 560, 60, 200, 80, "ros2 CLI / tools", "pose, joint_test, param", kind="external")
     d.box("rec", 790, 60, 330, 80, "rosbag2 / diagnostics", "recording and replay",
           kind="external", dashed=True)
 
-    d.box("L2", 20, 200, 1140, 300, "ONBOARD COMPUTER", "ROS 2 Jazzy, Ubuntu 24.04",
+    d.box("L2", 20, 200, 1140, 300, "ONBOARD COMPUTER", "ROS 2; Humble local validation",
           kind="layer", z=0)
     d.box("web", 60, 245, 230, 70, "robodog_web", "aiohttp + WebSocket", kind="package")
     d.box("ctrl", 320, 245, 300, 110, "robodog_control",
           "400 Hz loop, safety,\ngait, balance, estimator", kind="package")
     d.box("perc", 650, 245, 230, 70, "robodog_perception", "RGB-D, PointCloud2", kind="package")
     d.box("desc", 910, 245, 210, 70, "robodog_description", "URDF/Xacro, TF", kind="package")
-    d.box("hw", 320, 390, 300, 75, "robodog_hardware", "JointBackend + RS02 CAN codec",
+    d.box("hw", 320, 390, 300, 75, "robodog_hardware", "JointBackend + RS06 CAN codec",
           kind="package")
     d.box("sim", 650, 390, 230, 75, "robodog_sim", "MuJoCo model + worlds",
           kind="package", dashed=True)
@@ -46,14 +46,14 @@ def system_architecture() -> Diagram:
     d.box("BND", 20, 520, 1140, 40, "HARDWARE / SOFTWARE BOUNDARY",
           "JointBackend  +  CameraBackend", kind="boundary", z=0, rounded=False)
 
-    d.box("L3", 20, 590, 1140, 150, "PHYSICAL ROBOT", "10.0 kg, 12 DOF", kind="layer", z=0)
-    d.box("can0", 60, 630, 200, 85, "CAN bus 0", "1 Mbit/s, front legs\n6 x RS02, 72% load",
+    d.box("L3", 20, 590, 1140, 150, "PHYSICAL ROBOT", "19.72 kg, 12 DOF", kind="layer", z=0)
+    d.box("can0", 60, 630, 200, 85, "CAN bus 0", "1 Mbit/s, front legs\n6 x RS06, 72% load",
           kind="hardware")
-    d.box("can1", 285, 630, 200, 85, "CAN bus 1", "1 Mbit/s, rear legs\n6 x RS02, 72% load",
+    d.box("can1", 285, 630, 200, 85, "CAN bus 1", "1 Mbit/s, rear legs\n6 x RS06, 72% load",
           kind="hardware")
     d.box("cam", 510, 630, 200, 85, "NUWA HP60C", "USB3, RGB + depth", kind="hardware")
-    d.box("imu", 735, 630, 180, 85, "IMU", "accel + gyro", kind="hardware")
-    d.box("pwr", 940, 630, 180, 85, "48 V battery", "12S, 700 g", kind="hardware")
+    d.box("imu", 735, 630, 180, 85, "IMU", "integration unavailable", kind="hardware")
+    d.box("pwr", 940, 630, 180, 85, "44.4 V battery", "2 x 6S series, 2.50 kg", kind="hardware")
 
     d.edge("gui", "web", "WebSocket JSON", style="thick")
     d.edge("rviz", "ctrl", "topics + TF")
@@ -65,7 +65,7 @@ def system_architecture() -> Diagram:
     d.edge("hw", "can0", "motion frames", style="thick")
     d.edge("hw", "can1", "motion frames", style="thick")
     d.edge("perc", "cam", "UVC", style="dashed")
-    d.edge("ctrl", "imu", "fused by estimator", style="dashed")
+    d.edge("ctrl", "imu", "not connected", style="dashed")
     return d
 
 
@@ -79,16 +79,16 @@ def software_architecture() -> Diagram:
           "loop, safety, gait,\nbalance, IK, estimator", kind="package")
     d.box("perc", 620, 150, 230, 70, "robodog_perception", "camera + point cloud", kind="package")
     d.box("sim", 890, 150, 210, 70, "robodog_sim", "MJCF + worlds", kind="package")
-    d.box("hw", 330, 300, 250, 70, "robodog_hardware", "backends + RS02 codec", kind="package")
+    d.box("hw", 330, 300, 250, 70, "robodog_hardware", "backends + RS06 codec", kind="package")
     d.box("desc", 620, 300, 230, 70, "robodog_description", "URDF, meshes, RViz", kind="package")
     d.box("msgs", 380, 440, 210, 65, "robodog_msgs", "msg / srv definitions", kind="package")
 
     d.box("gen", 60, 440, 300, 65, "tools/cad_to_model.py", "CAD -> robot_parameters.yaml",
           kind="store", dashed=True)
-    d.box("cad", 60, 560, 300, 65, "cad/robot/onshape_export", "12 DOF, 85 parts", kind="store")
+    d.box("cad", 60, 560, 300, 65, "cad/urdf", "12 DOF, 264 links", kind="store")
     d.box("params", 620, 440, 230, 65, "robot_parameters.yaml", "single source of truth",
           kind="store")
-    d.box("rs02", 890, 440, 210, 65, "robstride02.yaml", "actuator datasheet", kind="store")
+    d.box("rs06", 890, 440, 210, 65, "robstride02.yaml", "actuator datasheet", kind="store")
 
     for a in ("web", "ctrl", "perc", "sim"):
         d.edge("bring", a)
@@ -101,9 +101,9 @@ def software_architecture() -> Diagram:
     d.edge("sim", "desc")
     d.edge("perc", "desc")
     d.edge("desc", "params", style="dashed")
-    d.edge("desc", "rs02", style="dashed")
+    d.edge("desc", "rs06", style="dashed")
     d.edge("sim", "params", style="dashed")
-    d.edge("hw", "rs02", style="dashed")
+    d.edge("hw", "rs06", style="dashed")
     d.edge("cad", "gen", "parsed by")
     d.edge("gen", "params", "generates")
     return d
@@ -112,7 +112,7 @@ def software_architecture() -> Diagram:
 def node_topic_graph() -> Diagram:
     d = Diagram("node_topic_graph", "ROS node and topic graph", w=1260, h=820,
                 caption="Nodes (green), topics (amber), services (red). "
-                        "The graph is identical in simulation and on hardware.")
+                        "Travel requires valid base feedback; hardware IMU integration is pending.")
     d.box("ctrl", 480, 330, 290, 90, "robodog_control_node", "400 Hz loop", kind="node")
     d.box("rsp", 480, 60, 290, 60, "robot_state_publisher", kind="node")
     d.box("camn", 60, 330, 250, 70, "robodog_camera_node", "15 Hz", kind="node")
@@ -188,15 +188,15 @@ def control_architecture() -> Diagram:
 
     d.box("l1", 40, 450, 1060, 110, "LAYER 1  JOINT INTERFACE", "400 Hz", kind="layer", z=0)
     d.box("be", 80, 490, 450, 55, "JointBackend.write(JointCommand)",
-          "position, velocity, effort, kp, kd")
+          "joint coordinates; knee motor ratio 2:1")
     d.box("st", 560, 490, 500, 55, "JointBackend.read() -> JointState",
           "position, velocity, effort, temperature, faults")
 
-    d.box("l0", 40, 590, 1060, 170, "LAYER 0  ACTUATOR", "firmware, tens of kHz",
+    d.box("l0", 40, 590, 1060, 170, "LAYER 0  ACTUATOR", "firmware servo loop",
           kind="layer", z=0)
     d.box("can", 80, 630, 300, 55, "CAN motion-control frame", "1 command per joint per cycle",
           kind="hardware")
-    d.box("foc", 410, 630, 340, 55, "RS02 impedance law + FOC",
+    d.box("foc", 410, 630, 340, 55, "RS06 impedance law + FOC",
           "tau = kp(q*-q) + kd(qd*-qd) + tau_ff", kind="hardware")
     d.box("enc", 780, 630, 280, 55, "2 x 14-bit encoders", "3.8e-4 rad output", kind="hardware")
     d.box("note", 80, 700, 980, 42,
@@ -226,7 +226,7 @@ def data_flow() -> Diagram:
                         "nothing reaches the actuators without passing it.")
     y = 120
     d.box("read", 30, y, 180, 80, "read()", "JointState\n12 x pos/vel/tau/T")
-    d.box("est", 235, y, 180, 80, "State estimator", "attitude + leg odometry")
+    d.box("est", 235, y, 180, 80, "Base feedback", "sim truth; hardware absent")
     d.box("ctl", 440, y, 190, 80, "Active controller", "idle | joint | pose |\ngait | joint_test")
     d.box("saf", 655, y, 190, 80, "Safety monitor", "clamp, I2t, thermal,\nwatchdog, e-stop")
     d.box("wr", 870, y, 170, 80, "write()", "JointCommand")
@@ -253,7 +253,7 @@ def data_flow() -> Diagram:
 def hardware_boundary() -> Diagram:
     d = Diagram("hardware_boundary", "Hardware / software boundary", w=1180, h=700,
                 caption="Replacing simulation with hardware is a launch argument. "
-                        "Nothing above the boundary changes.")
+                        "Hardware startup stays disabled; travel requires live base feedback.")
     d.box("above", 30, 30, 1120, 160, "UNCHANGED BY THE SWAP", "", kind="layer", z=0)
     d.box("cn", 70, 75, 280, 85, "robodog_control_node",
           "loop, safety, gait,\nbalance, estimator")
@@ -272,15 +272,15 @@ def hardware_boundary() -> Diagram:
           kind="package", dashed=True)
     d.box("cam1", 640, 310, 230, 100, "SimCameraBackend", "MuJoCo render + z^2\nrange noise",
           kind="package", dashed=True)
-    d.box("real1", 60, 450, 490, 110, "RobStride02Backend", kind="hardware")
+    d.box("real1", 60, 450, 490, 110, "RobStride06Backend", kind="hardware")
     d.box("real2", 640, 450, 230, 110, "NuwaHP60CBackend", kind="hardware")
     d.box("d1", 80, 490, 210, 55, "2 x CAN @ 1 Mbit/s", "python-can, 400 Hz", kind="hardware")
-    d.box("d2", 315, 490, 215, 55, "RS02 frame codec", "pure, 29 unit tests", kind="hardware")
+    d.box("d2", 315, 490, 215, 55, "RS06 frame codec", "model-specific scaling", kind="hardware")
     d.box("d3", 660, 490, 190, 55, "UVC / vendor SDK", "USB 3.0", kind="hardware")
 
     d.box("map", 900, 310, 250, 250, "Per-joint mapping",
-          "direction  +1 / -1\noffset_rad\nbus, motor_id\n\nThe ONLY place motor\n"
-          "coordinates differ from\ncanonical joint coordinates.\n\nSet by\n"
+          "direction, offset_rad\nratio, efficiency\nbus, motor_id, calibrated\n\nMaps motor output\n"
+          "to canonical joints.\nKnee reduction 2:1.\n\nVerify with\n"
           "calibrate_joint", kind="store")
 
     d.edge("cn", "B1", route="v", style="thick")
@@ -302,7 +302,7 @@ def state_machine() -> Diagram:
     d.box("idle", 300, 60, 180, 70, "IDLE", "powered, joints off", kind="state")
     d.box("ready", 540, 60, 180, 70, "READY", "enabled, holding", kind="state")
     d.box("stand", 540, 200, 180, 70, "STANDING", "pose reached", kind="state")
-    d.box("move", 540, 340, 180, 70, "MOVING", "gait active", kind="state")
+    d.box("move", 540, 340, 180, 70, "MOVING", "requires live base feedback", kind="state")
     d.box("fault", 830, 200, 190, 70, "FAULT", "limit exceeded", kind="state_bad")
     d.box("estop", 830, 340, 190, 70, "E-STOP", "output inhibited, latched", kind="state_bad")
     d.box("n1", 60, 200, 400, 120, "Transitions out of E-STOP",
@@ -316,9 +316,9 @@ def state_machine() -> Diagram:
           "than degrading quietly.", kind="note", dashed=True)
 
     d.edge("init", "idle", "backend ready")
-    d.edge("idle", "ready", "enable_joints")
+    d.edge("idle", "ready", "enable (calibrated)")
     d.edge("ready", "stand", "set_named_pose", route="v")
-    d.edge("stand", "move", "set_gait", route="v")
+    d.edge("stand", "move", "set_gait + feedback", route="v")
     d.edge("move", "stand", "gait: stand", route="h")
     d.edge("ready", "idle", "disable", route="h")
     d.edge("stand", "fault", "limit exceeded")
@@ -332,13 +332,13 @@ def domain_model() -> Diagram:
     d = Diagram("domain_model", "Domain model", w=1160, h=770,
                 caption="Value types crossing the hardware boundary and the entities "
                         "that own them.")
-    d.box("robot", 440, 30, 280, 80, "Robot", "12 joints, 4 legs\n10.0 kg, base_link")
+    d.box("robot", 440, 30, 280, 80, "Robot", "12 joints, 4 legs\n19.72 kg, base_link")
     d.box("leg", 440, 170, 280, 100, "Leg  (FL FR RL RR)",
           "sx: front/rear   sy: left/right\nLegGeometry: L1 L2 offsets")
     d.box("joint", 100, 170, 260, 100, "Joint",
           "kind: haa | hfe | kfe\nlimits, axis, dynamics")
-    d.box("act", 100, 330, 260, 110, "Actuator  RS02",
-          "6 N.m cont / 17 N.m peak\n7.75:1, 2 x 14-bit\nKt = 1.22 N.m/Arms")
+    d.box("act", 100, 330, 260, 110, "Actuator  RS06",
+          "8 N.m stall / 11 N.m rotating\n36 N.m peak; knee belt 2:1\n9:1 internal; Kt = 1.1 N.m/Arms")
     d.box("foot", 800, 170, 260, 100, "Foot",
           "20 mm contact sphere\ncontact, normal force")
     d.box("jc", 100, 500, 260, 90, "JointCommand", "mode, position, velocity,\neffort, kp, kd",
@@ -371,7 +371,7 @@ def simulation_architecture() -> Diagram:
     d = Diagram("simulation_architecture", "Simulation architecture", w=1180, h=680,
                 caption="The MJCF and the URDF are generated from the same parameters, "
                         "so the physics and the kinematics cannot drift apart.")
-    d.box("cad", 40, 40, 250, 70, "Onshape CAD export", "85 parts, 12 revolute", kind="store")
+    d.box("cad", 40, 40, 250, 70, "Onshape CAD export", "264 links, 12 revolute", kind="store")
     d.box("gen", 340, 40, 270, 70, "tools/cad_to_model.py", "FK, body aggregation, mass swap")
     d.box("par", 670, 40, 250, 70, "robot_parameters.yaml", "kinematics, inertia, visuals",
           kind="store")
@@ -379,7 +379,7 @@ def simulation_architecture() -> Diagram:
 
     d.box("xac", 500, 170, 250, 70, "robodog.urdf.xacro", "RViz, TF, IK")
     d.box("mj", 800, 170, 250, 70, "robodog_sim/mjcf.py", "MJCF generator")
-    d.box("mesh", 180, 170, 250, 70, "tools/prepare_meshes.py", "41 MB -> 2.3 MB", kind="store")
+    d.box("mesh", 180, 170, 250, 70, "tools/prepare_meshes.py", "active CAD visual meshes", kind="store")
 
     d.box("world", 40, 300, 280, 100, "world_spec + worlds/house.py",
           "5 rooms, doors, stairs,\nnarrow gaps, movable props", kind="store")
@@ -388,12 +388,12 @@ def simulation_architecture() -> Diagram:
     d.box("mark", 40, 560, 280, 70, "world_markers node", "same spec -> RViz MarkerArray")
 
     d.box("bk", 500, 300, 250, 100, "MujocoBackend",
-          "impedance law at 2 kHz\narmature 4.8e-3\n1 ms command delay", kind="package")
+          "impedance law at 2 kHz\narmature 0.012, knee x4\n1 ms command delay", kind="package")
     d.box("cam", 500, 440, 250, 90, "SimCameraBackend",
           "own model instance,\nrenders at 15 Hz", kind="package")
     d.box("note", 800, 420, 340, 190, "Fidelity choices that matter",
           "impedance evaluated at the PHYSICS\nrate, not the control rate\n\n"
-          "armature = reflected rotor inertia,\nlarger than the calf's own\n\n"
+          "published output equivalent inertia,\nknee reflects by ratio squared\n\n"
           "znear/zfar pinned in metres via\nstatistic/extent\n\n"
           "depth noise grows as z^2", kind="note", dashed=True)
 

@@ -14,7 +14,7 @@ Differences from the URDF, all deliberate:
     (4.805e-3 kg.m2 = J_rotor * 7.75^2). Without it the legs accelerate about
     four times too easily, because that figure is larger than the calf's own
     inertia about the knee.
-  * `frictionloss` and `damping` from robstride02.yaml -> joint_dynamics.
+  * `frictionloss` and `damping` from the active actuator configuration -> joint_dynamics.
   * contact sites at the feet for touch sensors, and an IMU site at base_link.
 """
 from __future__ import annotations
@@ -189,7 +189,7 @@ def _inertial(body: ET.Element, link: dict) -> None:
          fullinertia=_f(I["ixx"], I["iyy"], I["izz"], I["ixy"], I["ixz"], I["iyz"]))
 
 
-def build_robot(root: ET.Element, params: dict, *, spawn=(0.0, 0.0), yaw=0.0) -> ET.Element:
+def build_robot(root: ET.Element, params: dict, *, spawn=(0.0, 0.0), yaw=0.0, rs: dict | None = None) -> ET.Element:
     g = params["geometry"]
     jl = params["joint_limits"]
     stand = params["named_poses"]["stand"]
@@ -209,21 +209,23 @@ def build_robot(root: ET.Element, params: dict, *, spawn=(0.0, 0.0), yaw=0.0) ->
     # Camera bracket, drawn on base_link so it is rigid with the shell. Mirrors
     # the `camera_mast` link in the URDF.
     mast_h = cm["xyz"][2] - cm["mast_base_z_m"]
-    _sub(base, "geom", type="box", class_="visual", material="shell",
-         size=_f(cm["mast_section_m"] / 2, cm["mast_section_m"] / 2, mast_h / 2),
-         pos=_f(cm["xyz"][0], 0.0, cm["mast_base_z_m"] + mast_h / 2))
+    if cm["mast_section_m"] > 0:
+        _sub(base, "geom", type="box", class_="visual", material="shell",
+             size=_f(cm["mast_section_m"] / 2, cm["mast_section_m"] / 2, mast_h / 2),
+             pos=_f(cm["xyz"][0], 0.0, cm["mast_base_z_m"] + mast_h / 2))
     cam = _sub(base, "body", name="camera_link", pos=_f(cm["xyz"]),
                quat=_quat((0.0, cm["pitch_rad"], 0.0)))
-    # Must carry the same 68 g as the URDF: every visual geom in this model has
+    # Must carry the same configured camera mass as the URDF: every visual geom in this model has
     # density=0, so without an explicit inertial the camera would be massless
     # here and present in the URDF, and the two models would disagree on the
     # total mass and the centre of mass.
     # The body origin is the OPTICAL CENTRE; the housing sits behind it, so the
     # sensor is not rendering the inside of its own case. Mirrors the URDF.
-    _sub(cam, "inertial", pos="-0.045 0 0", mass=cm["mass_kg"],
-         diaginertia="1.0e-5 5.0e-5 5.0e-5")
-    _sub(cam, "geom", type="box", size="0.045 0.0125 0.0125", pos="-0.045 0 0",
-         class_="visual", material="sensor")
+    _sub(cam, "inertial", pos=_f(cm.get("com_xyz", [-.045, 0, 0])), mass=cm["mass_kg"],
+         diaginertia=_f(cm.get("inertia", [1.e-5, 5.e-5, 5.e-5])))
+    if not cm.get("visual_in_base", False):
+        _sub(cam, "geom", type="box", size="0.045 0.0125 0.0125", pos="-0.045 0 0",
+             class_="visual", material="sensor")
     _sub(cam, "site", name="camera_site", pos="0 0 0", size="0.008", rgba="0.1 0.6 0.8 0.8")
     # MuJoCo camera looks down its own -z with +y up; the ROS optical frame is
     # +z forward, +y down. euler="1.5708 -1.5708 0" maps one onto the other.
@@ -295,9 +297,21 @@ def build_robot(root: ET.Element, params: dict, *, spawn=(0.0, 0.0), yaw=0.0) ->
         for k in KINDS:
             j = f"{leg}_{k}_joint"
             # Plain torque sources. The impedance law is evaluated in the
-            # backend at every physics step, mirroring the RS02 firmware,
+            # backend at every physics step, mirroring the actuator firmware,
             # rather than being delegated to a MuJoCo position actuator.
-            _sub(act, "motor", name=j, joint=j, gear="1", class_="robot")
+            transmission = (rs or {}).get("transmissions", {}).get(k, {})
+            ratio = transmission.get("ratio", 1.0)
+            efficiency = transmission.get("efficiency", 1.0)
+            extra = {}
+            if rs is not None:
+                jd = rs["joint_dynamics"]
+                joint = root.find(f".//joint[@name='{j}']")
+                joint.set("armature", _f(jd["armature_kgm2"] * ratio ** 2))
+                joint.set("damping", _f(jd["damping_nms_per_rad"] * ratio ** 2))
+                joint.set("frictionloss", _f(jd["coulomb_friction_nm"] * ratio))
+                torque = rs["performance"]["peak_torque_nm"] * ratio * efficiency
+                extra = {"ctrlrange": _f(-torque, torque)}
+            _sub(act, "motor", name=j, joint=j, gear="1", class_="robot", **extra)
 
     # ---------------- sensors ----------------
     sen = _sub(root, "sensor")

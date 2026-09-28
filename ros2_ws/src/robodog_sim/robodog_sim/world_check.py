@@ -38,6 +38,8 @@ def z_range(p: Prim) -> tuple[float, float]:
     if p.type == "box":
         # a pitched box (a ramp) spans more in z than its thickness
         h = abs(p.size[2] * math.cos(p.rpy[1])) + abs(p.size[0] * math.sin(p.rpy[1]))
+    elif p.type == "sphere":
+        h = 2.0 * p.size[0]
     else:
         h = p.size[1]
     return p.pos[2] - h / 2.0, p.pos[2] + h / 2.0

@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <mujoco model="robodog">
-  <compiler angle="radian" meshdir="/home/farouk/Desktop/code/robotics_and_ros/robo_dog/ros2_ws/install/robodog_description/share/robodog_description/meshes" autolimits="true" balanceinertia="true" discardvisual="false"/>
+  <compiler angle="radian" meshdir="/home/farouk/code/robodog/ros2_ws/install/robodog_description/share/robodog_description/meshes" autolimits="true" balanceinertia="true" discardvisual="false"/>
   <option timestep="0.0005" integrator="implicitfast" cone="elliptic" impratio="10" gravity="0 0 -9.81"/>
   <size njmax="2000" nconmax="500"/>
   <statistic extent="1.0"/>
@@ -11,8 +11,8 @@
   </visual>
   <default>
     <default class="robot">
-      <joint damping="0.05" frictionloss="0.12" armature="0.004805"/>
-      <motor ctrllimited="true" ctrlrange="-17 17"/>
+      <joint damping="0.05" frictionloss="0.12" armature="0.012"/>
+      <motor ctrllimited="true" ctrlrange="-36 36"/>
       <default class="visual">
         <geom contype="0" conaffinity="0" group="2" density="0"/>
       </default>
@@ -25,16 +25,41 @@
     </default>
   </default>
   <asset>
+    <mesh name="4x9x4_bearing" file="4x9x4_bearing.stl"/>
     <mesh name="61804_2rs" file="61804_2rs.stl"/>
+    <mesh name="acs758_200a_sensor" file="acs758_200a_sensor.stl"/>
+    <mesh name="albright_sw80_48v" file="albright_sw80_48v.stl"/>
     <mesh name="angle_motor_connect" file="angle_motor_connect.stl"/>
+    <mesh name="as150u_socket" file="as150u_socket.stl"/>
+    <mesh name="battery_6s_10000mah_1" file="battery_6s_10000mah_1.stl"/>
+    <mesh name="battery_6s_10000mah_2" file="battery_6s_10000mah_2.stl"/>
+    <mesh name="belt" file="belt.stl"/>
+    <mesh name="bmi088_imu" file="bmi088_imu.stl"/>
     <mesh name="body" file="body.stl"/>
+    <mesh name="body_front" file="body_front.stl"/>
     <mesh name="body_panel" file="body_panel.stl"/>
+    <mesh name="body_rear" file="body_rear.stl"/>
+    <mesh name="e_stop_mushroom_nc" file="e_stop_mushroom_nc.stl"/>
+    <mesh name="electronics_deck_front" file="electronics_deck_front.stl"/>
+    <mesh name="electronics_deck_rear" file="electronics_deck_rear.stl"/>
     <mesh name="foot_ball" file="foot_ball.stl"/>
     <mesh name="handle" file="handle.stl"/>
+    <mesh name="head" file="head.stl"/>
+    <mesh name="head_cover" file="head_cover.stl"/>
+    <mesh name="idler_bolt_m4x30" file="idler_bolt_m4x30.stl"/>
+    <mesh name="idler_roller" file="idler_roller.stl"/>
+    <mesh name="imu_sassa_support" file="imu_sassa_support.stl"/>
     <mesh name="inline_connect" file="inline_connect.stl"/>
+    <mesh name="jetson_orin_nano_super_8gb" file="jetson_orin_nano_super_8gb.stl"/>
+    <mesh name="knee_output_hub" file="knee_output_hub.stl"/>
+    <mesh name="knee_rear_plate" file="knee_rear_plate.stl"/>
+    <mesh name="littelfuse_mega_100a_holder" file="littelfuse_mega_100a_holder.stl"/>
     <mesh name="lower_leg" file="lower_leg.stl"/>
+    <mesh name="lower_leg_cover" file="lower_leg_cover.stl"/>
+    <mesh name="meanwell_rsd_60l_12" file="meanwell_rsd_60l_12.stl"/>
     <mesh name="motor_pulley" file="motor_pulley.stl"/>
-    <mesh name="robstride02" file="robstride02.stl"/>
+    <mesh name="nuwa_hp60c" file="nuwa_hp60c.stl"/>
+    <mesh name="robstride06" file="robstride06.stl"/>
     <mesh name="upperleg_cover" file="upperleg_cover.stl"/>
     <mesh name="upperleg_main" file="upperleg_main.stl"/>
     <texture name="sky" type="skybox" builtin="gradient" rgb1="0.35 0.45 0.60" rgb2="0.08 0.10 0.14" width="256" height="256"/>
@@ -50,149 +75,193 @@
   <worldbody>
     <body name="base_link" childclass="robot" pos="0 0 0.34" quat="1 0 0 0">
       <freejoint name="base_free"/>
-      <inertial pos="-0.003508 2e-06 8.2e-05" mass="3.933644" fullinertia="0.015797 0.045708 0.05465 0 7.2e-05 -1e-06"/>
+      <inertial pos="-0.00558 0.001349 -0.004841" mass="9.955898" fullinertia="0.043451 0.178524 0.201573 0.000934 -0.000384 -0.000473"/>
+      <geom type="mesh" mesh="acs758_200a_sensor" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="albright_sw80_48v" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="as150u_socket" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="battery_6s_10000mah_1" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="battery_6s_10000mah_2" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="bmi088_imu" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
       <geom type="mesh" mesh="body" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="shell"/>
-      <geom type="mesh" mesh="body_panel" class="visual" pos="0.128 -0 0" quat="0.499998 0.5 -0.500002 -0.5" material="shell"/>
-      <geom type="mesh" mesh="body_panel" class="visual" pos="-0.128 0 0" quat="0.499998 -0.5 0.500002 -0.5" material="shell"/>
-      <geom type="mesh" mesh="handle" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="shell"/>
-      <geom type="mesh" mesh="robstride02" class="visual" pos="-0.128 -0.06 0" quat="0.500001 0.499997 -0.499999 -0.500002" material="actuator"/>
-      <geom type="mesh" mesh="robstride02" class="visual" pos="0.128 -0.060001 0" quat="0.500001 -0.499997 0.499999 -0.500002" material="actuator"/>
-      <geom type="mesh" mesh="robstride02" class="visual" pos="-0.128 0.06 0" quat="0.500001 0.499997 -0.499999 -0.500002" material="actuator"/>
-      <geom type="mesh" mesh="robstride02" class="visual" pos="0.128 0.06 0" quat="0.499999 -0.499999 0.500001 -0.500001" material="actuator"/>
-      <geom name="base_col0" type="box" class="collision" size="0.1175 0.06 0.0575" pos="0 0 0" quat="1 0 0 0"/>
-      <geom name="base_col1" type="cylinder" class="collision" size="0.03925 0.02075" pos="0.14025 0.06 0" quat="0.707107 0 0.707107 0"/>
-      <geom name="base_col2" type="cylinder" class="collision" size="0.03925 0.02075" pos="0.14025 -0.06 0" quat="0.707107 0 0.707107 0"/>
-      <geom name="base_col3" type="cylinder" class="collision" size="0.03925 0.02075" pos="-0.14025 0.06 0" quat="0.707107 0 0.707107 0"/>
-      <geom name="base_col4" type="cylinder" class="collision" size="0.03925 0.02075" pos="-0.14025 -0.06 0" quat="0.707107 0 0.707107 0"/>
+      <geom type="mesh" mesh="body_front" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="body_panel" class="visual" pos="0.198 -1e-06 0" quat="0.499998 0.5 -0.500002 -0.5" material="shell"/>
+      <geom type="mesh" mesh="body_panel" class="visual" pos="-0.198 1e-06 0" quat="0.499998 -0.5 0.500002 -0.5" material="shell"/>
+      <geom type="mesh" mesh="body_rear" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="e_stop_mushroom_nc" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="electronics_deck_front" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="electronics_deck_rear" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="handle" class="visual" pos="-0 0 0" quat="0.707105 0 0 -0.707108" material="shell"/>
+      <geom type="mesh" mesh="head" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="head_cover" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="imu_sassa_support" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="jetson_orin_nano_super_8gb" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="littelfuse_mega_100a_holder" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="meanwell_rsd_60l_12" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="nuwa_hp60c" class="visual" pos="0 0 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="robstride06" class="visual" pos="0.227 -0.060001 0" quat="2.70595e-06 -0.707105 0.707108 -2.70596e-06" material="structure"/>
+      <geom type="mesh" mesh="robstride06" class="visual" pos="-0.227 -0.06 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="robstride06" class="visual" pos="-0.227 0.060001 0" quat="0.707105 0 0 -0.707108" material="structure"/>
+      <geom type="mesh" mesh="robstride06" class="visual" pos="0.227 0.059999 0" quat="2.70595e-06 -0.707105 0.707108 -2.70596e-06" material="structure"/>
+      <geom name="base_col0" type="box" class="collision" size="0.192 0.11 0.06" pos="0 0 0" quat="1 0 0 0"/>
+      <geom name="base_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="-0.2065 -0.06 0" quat="0.499999 0.499999 -0.500001 -0.500001"/>
+      <geom name="base_col2" type="cylinder" class="collision" size="0.044 0.0245" pos="-0.2065 0.060001 0" quat="0.499999 0.499999 -0.500001 -0.500001"/>
+      <geom name="base_col3" type="cylinder" class="collision" size="0.044 0.0245" pos="0.2065 0.059999 0" quat="0.500001 -0.499997 0.499999 -0.500003"/>
+      <geom name="base_col4" type="cylinder" class="collision" size="0.044 0.0245" pos="0.2065 -0.060001 0" quat="0.500001 -0.499997 0.499999 -0.500003"/>
       <site name="imu_site" pos="0 0 0" size="0.01" rgba="0.1 0.6 0.8 0.6"/>
-      <geom type="box" class="visual" material="shell" size="0.014 0.014 0.06375" pos="0.1315 0 0.11125"/>
-      <body name="camera_link" pos="0.1315 0 0.175" quat="0.991562 0 0.129634 0">
-        <inertial pos="-0.045 0 0" mass="0.068" diaginertia="1.0e-5 5.0e-5 5.0e-5"/>
-        <geom type="box" size="0.045 0.0125 0.0125" pos="-0.045 0 0" class="visual" material="sensor"/>
+      <body name="camera_link" pos="0.297 0.002036 0.108013" quat="1 0 0 0">
+        <inertial pos="-0.01528 0 0" mass="0.15" diaginertia="0.0001 2e-05 0.00011"/>
         <site name="camera_site" pos="0 0 0" size="0.008" rgba="0.1 0.6 0.8 0.8"/>
         <camera name="depth_camera" mode="fixed" pos="0 0 0" quat="0.5 0.5 -0.5 -0.5" fovy="49"/>
       </body>
-      <body name="FL_hip" pos="0.161 0.06 0">
-        <joint name="FL_haa_joint" type="hinge" axis="1 0 0" range="-0.8 0.8"/>
-        <inertial pos="0.044247 -0.007504 7.7e-05" mass="0.6245" fullinertia="0.000641 0.001013 0.000773 -1.1e-05 1e-06 1e-06"/>
-        <geom type="mesh" mesh="angle_motor_connect" class="visual" pos="0.06 -0.017001 0" quat="0.500003 0.499996 -0.500001 0.5" material="structure"/>
-        <geom type="mesh" mesh="robstride02" class="visual" pos="0.06 -0.017001 0" quat="0.572061 -0.572062 0.41563 0.415624" material="actuator"/>
+      <body name="FL_hip" pos="0.231 0.06 0">
+        <joint name="FL_haa_joint" type="hinge" axis="1 0 0" range="-0.8 0.8" armature="0.012" damping="0.05" frictionloss="0.12"/>
+        <inertial pos="0.049351 -0.010325 2.7e-05" mass="0.908648" fullinertia="0.000844 0.00132 0.001049 2.1e-05 2e-06 0"/>
+        <geom type="mesh" mesh="angle_motor_connect" class="visual" pos="0.06 -0.017001 1e-06" quat="0.500004 0.499992 -0.499998 0.500006" material="structure"/>
+        <geom type="mesh" mesh="robstride06" class="visual" pos="0.06 0.011999 0" quat="2.55155e-06 0.104523 1.15343e-05 0.994522" material="structure"/>
         <geom name="FL_hip_col0" type="box" class="collision" size="0.055 0.0275 0.0375" pos="0.03 0.008 0" quat="1 0 0 0"/>
-        <geom name="FL_hip_col1" type="cylinder" class="collision" size="0.03925 0.02075" pos="0.06 0.03675 0" quat="0.707107 0.707107 0 0"/>
+        <geom name="FL_hip_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="0.06 -0.008501 1e-06" quat="-0.0739073 0.0739109 0.703242 0.703225"/>
         <body name="FL_thigh" pos="0.06 0.016 0">
-          <joint name="FL_hfe_joint" type="hinge" axis="0 1 0" range="-1.4 2.4"/>
-          <inertial pos="-0 0.045179 -0.027375" mass="0.703408" fullinertia="0.003135 0.003137 0.000699 0 -0 0.000467"/>
-          <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 0.079249 -1e-06" quat="8.32679e-06 1 4.99979e-07 2.5e-06" material="bearing"/>
-          <geom type="mesh" mesh="inline_connect" class="visual" pos="0 0.022999 -0" quat="2.37495e-06 0.707107 -2.6199e-06 -0.707106" material="structure"/>
-          <geom type="mesh" mesh="motor_pulley" class="visual" pos="0 0.055999 -1e-06" quat="0.707102 -0.707111 -2.12131e-06 -1.41423e-06" material="structure"/>
-          <geom type="mesh" mesh="robstride02" class="visual" pos="0 0.022999 -0" quat="0.707102 -0.707111 -2.12131e-06 -1.41423e-06" material="actuator"/>
-          <geom type="mesh" mesh="upperleg_cover" class="visual" pos="0 0.053499 -0" quat="0.499997 -0.500004 0.500003 0.499996" material="structure"/>
-          <geom type="mesh" mesh="upperleg_main" class="visual" pos="0 0.053499 -1e-06" quat="0.499997 -0.500004 0.500003 0.499996" material="structure"/>
-          <geom name="FL_thigh_col0" type="cylinder" class="collision" size="0.03925 0.02075" pos="0 0.04775 -0.045" quat="0.707107 0.707107 0 0"/>
-          <geom name="FL_thigh_col1" type="capsule" class="collision" size="0.03" fromto="0 0.034 -0.02 0 0.034 -0.198"/>
-          <body name="FL_calf" pos="0 0.0685 -0.213">
-            <joint name="FL_kfe_joint" type="hinge" axis="0 1 0" range="-2.6 0"/>
-            <inertial pos="1e-06 -4e-06 -0.088428" mass="0.171662" fullinertia="0.001271 0.001278 2.2e-05 0 0 -0"/>
-            <geom type="mesh" mesh="61804_2rs" class="visual" pos="1e-06 -0.006004 0" quat="-1.55964e-06 0.707106 -7.87769e-06 -0.707108" material="bearing"/>
-            <geom type="mesh" mesh="61804_2rs" class="visual" pos="1e-06 0.005996 -0" quat="0.707106 -1.0377e-06 0.707108 -5.28034e-06" material="bearing"/>
-            <geom type="mesh" mesh="foot_ball" class="visual" pos="1e-06 -4e-06 1e-06" quat="0.499999 0.5 0.499996 -0.500005" material="foot"/>
-            <geom type="mesh" mesh="lower_leg" class="visual" pos="1e-06 -4e-06 0" quat="0.499999 0.5 0.499996 -0.500005" material="structure"/>
-            <geom name="FL_calf_col0" type="capsule" class="collision" size="0.017" fromto="0 0 -0.015 0 0 -0.18732"/>
-            <geom name="FL_calf_col1" type="sphere" class="foot" size="0.02" pos="0 0 -0.21732"/>
-            <site name="FL_foot_site" pos="0 0 -0.21732" size="0.0204" type="sphere" rgba="0 0 0 0"/>
+          <joint name="FL_hfe_joint" type="hinge" axis="0 1 0" range="-1.4 2.4" armature="0.012" damping="0.05" frictionloss="0.12"/>
+          <inertial pos="2.7e-05 0.048393 -0.0284" mass="1.29223" fullinertia="0.004974 0.004899 0.0015 -1e-06 2e-06 0.000736"/>
+          <geom type="mesh" mesh="4x9x4_bearing" class="visual" pos="0 0.053499 -1e-06" quat="-0.499997 0.500003 -0.500007 -0.499994" material="structure"/>
+          <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 0.079249 -1e-06" quat="1.18268e-05 1 -1.49999e-06 -5.00018e-07" material="bearing"/>
+          <geom type="mesh" mesh="belt" class="visual" pos="0 0.053499 -1e-06" quat="-0.499997 0.500003 -0.500007 -0.499994" material="structure"/>
+          <geom type="mesh" mesh="idler_bolt_m4x30" class="visual" pos="0 0.053499 -1e-06" quat="-0.499997 0.500003 -0.500007 -0.499994" material="structure"/>
+          <geom type="mesh" mesh="idler_roller" class="visual" pos="0 0.053499 -1e-06" quat="-0.499997 0.500003 -0.500007 -0.499994" material="structure"/>
+          <geom type="mesh" mesh="inline_connect" class="visual" pos="0 0.022999 -0" quat="6.92862e-06 0.707105 -9.29489e-06 -0.707108" material="structure"/>
+          <geom type="mesh" mesh="knee_output_hub" class="visual" pos="0 0.055999 -1e-06" quat="0.7071 -0.707114 1.41422e-06 -7.07093e-07" material="structure"/>
+          <geom type="mesh" mesh="knee_rear_plate" class="visual" pos="0 0.022999 -0" quat="6.92862e-06 0.707105 -9.29489e-06 -0.707108" material="structure"/>
+          <geom type="mesh" mesh="motor_pulley" class="visual" pos="0 0.055999 -1e-06" quat="0.7071 -0.707114 1.41422e-06 -7.07093e-07" material="structure"/>
+          <geom type="mesh" mesh="robstride06" class="visual" pos="0 0.051999 -1e-06" quat="1.18268e-05 1 -1.49999e-06 -5.00018e-07" material="structure"/>
+          <geom type="mesh" mesh="upperleg_cover" class="visual" pos="0 0.053499 -1e-06" quat="-0.499997 0.500003 -0.500007 -0.499994" material="structure"/>
+          <geom type="mesh" mesh="upperleg_main" class="visual" pos="0 0.053499 -1e-06" quat="-0.499997 0.500003 -0.500007 -0.499994" material="structure"/>
+          <geom name="FL_thigh_col0" type="capsule" class="collision" size="0.03" fromto="0 0.034 -0.02 0 0.034 -0.177"/>
+          <geom name="FL_thigh_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="0 0.031499 -0" quat="0.707098 -0.707115 1.41422e-06 -7.0709e-07"/>
+          <body name="FL_calf" pos="0 0.068501 -0.192">
+            <joint name="FL_kfe_joint" type="hinge" axis="0 1 0" range="-2.6 0" armature="0.048" damping="0.2" frictionloss="0.24"/>
+            <inertial pos="0 3.3e-05 -0.08012" mass="0.202465" fullinertia="0.00114 0.001145 3.2e-05 -0 -8e-06 0"/>
+            <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 -0.009006 -1e-06" quat="3.88215e-06 0.707107 -9.78396e-06 -0.707107" material="bearing"/>
+            <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 0.008994 -1e-06" quat="0.707107 -6.4795e-06 0.707107 -7.18661e-06" material="bearing"/>
+            <geom type="mesh" mesh="foot_ball" class="visual" pos="0 -6e-06 -1e-06" quat="0.500004 0.499996 0.499994 -0.500006" material="foot"/>
+            <geom type="mesh" mesh="lower_leg" class="visual" pos="0 -6e-06 -1e-06" quat="0.500004 0.499996 0.499994 -0.500006" material="structure"/>
+            <geom type="mesh" mesh="lower_leg_cover" class="visual" pos="0 -6e-06 -1e-06" quat="0.500004 0.499996 0.499994 -0.500006" material="structure"/>
+            <geom name="FL_calf_col0" type="capsule" class="collision" size="0.017" fromto="0 0 -0.015 0 0 -0.165621"/>
+            <geom name="FL_calf_col1" type="sphere" class="foot" size="0.02" pos="0 0 -0.195621"/>
+            <site name="FL_foot_site" pos="0 0 -0.195621" size="0.0204" type="sphere" rgba="0 0 0 0"/>
           </body>
         </body>
       </body>
-      <body name="FR_hip" pos="0.161 -0.06 0">
-        <joint name="FR_haa_joint" type="hinge" axis="1 0 0" range="-0.8 0.8"/>
-        <inertial pos="0.044247 0.007502 -7.6e-05" mass="0.6245" fullinertia="0.000641 0.001013 0.000773 1.1e-05 -1e-06 1e-06"/>
-        <geom type="mesh" mesh="angle_motor_connect" class="visual" pos="0.06 0.016999 1e-06" quat="0.500007 -0.499995 0.499994 0.500003" material="structure"/>
-        <geom type="mesh" mesh="robstride02" class="visual" pos="0.06 0.016999 1e-06" quat="0.572054 0.572065 -0.415635 0.415624" material="actuator"/>
+      <body name="FR_hip" pos="0.231 -0.06 0">
+        <joint name="FR_haa_joint" type="hinge" axis="1 0 0" range="-0.8 0.8" armature="0.012" damping="0.05" frictionloss="0.12"/>
+        <inertial pos="0.049351 0.010323 -2.5e-05" mass="0.908648" fullinertia="0.000844 0.00132 0.001049 -2.1e-05 -2e-06 0"/>
+        <geom type="mesh" mesh="angle_motor_connect" class="visual" pos="0.06 0.016999 1e-06" quat="0.500012 -0.499992 0.499991 0.500006" material="structure"/>
+        <geom type="mesh" mesh="robstride06" class="visual" pos="0.06 -0.012001 0" quat="0.104531 3.64323e-06 0.994522 1.51833e-05" material="structure"/>
         <geom name="FR_hip_col0" type="box" class="collision" size="0.055 0.0275 0.0375" pos="0.03 -0.008 0" quat="1 0 0 0"/>
-        <geom name="FR_hip_col1" type="cylinder" class="collision" size="0.03925 0.02075" pos="0.06 -0.03675 0" quat="0.707107 0.707107 0 0"/>
+        <geom name="FR_hip_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="0.06 0.008499 1e-06" quat="-0.0739118 -0.0739169 -0.703244 0.703222"/>
         <body name="FR_thigh" pos="0.06 -0.016 0">
-          <joint name="FR_hfe_joint" type="hinge" axis="0 1 0" range="-1.4 2.4"/>
-          <inertial pos="0 -0.045181 -0.027376" mass="0.703408" fullinertia="0.003135 0.003137 0.000699 0 0 -0.000467"/>
-          <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 -0.079251 -2e-06" quat="2.5e-06 -1.73232e-07 -1 -1.08268e-05" material="bearing"/>
-          <geom type="mesh" mesh="inline_connect" class="visual" pos="-0 -0.023001 -1e-06" quat="0.707106 7.88112e-06 0.707107 7.88112e-06" material="structure"/>
-          <geom type="mesh" mesh="motor_pulley" class="visual" pos="-0 -0.056001 -1e-06" quat="-1.89026e-06 -1.64527e-06 0.707113 -0.7071" material="structure"/>
-          <geom type="mesh" mesh="robstride02" class="visual" pos="-0 -0.023001 -0" quat="-1.89026e-06 -1.64527e-06 0.707113 -0.7071" material="actuator"/>
-          <geom type="mesh" mesh="upperleg_cover" class="visual" pos="0 -0.053501 -1e-06" quat="-0.499995 -0.500004 -0.500005 0.499996" material="structure"/>
-          <geom type="mesh" mesh="upperleg_main" class="visual" pos="0 -0.053501 -1e-06" quat="-0.499995 -0.500004 -0.500005 0.499996" material="structure"/>
-          <geom name="FR_thigh_col0" type="cylinder" class="collision" size="0.03925 0.02075" pos="0 -0.04775 -0.045" quat="0.707107 0.707107 0 0"/>
-          <geom name="FR_thigh_col1" type="capsule" class="collision" size="0.03" fromto="0 -0.034 -0.02 0 -0.034 -0.198"/>
-          <body name="FR_calf" pos="0 -0.0685 -0.213">
-            <joint name="FR_kfe_joint" type="hinge" axis="0 1 0" range="-2.6 0"/>
-            <inertial pos="0 5e-06 -0.088429" mass="0.171662" fullinertia="0.001271 0.001278 2.2e-05 -0 0 0"/>
-            <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 -0.005997 -2e-06" quat="6.35679e-06 -0.707107 -6.60174e-06 0.707107" material="bearing"/>
-            <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 0.006003 -1e-06" quat="0.707107 3.65084e-06 0.707107 9.30769e-06" material="bearing"/>
-            <geom type="mesh" mesh="foot_ball" class="visual" pos="0 3e-06 -1e-06" quat="0.499997 0.500004 0.500006 -0.499994" material="foot"/>
-            <geom type="mesh" mesh="lower_leg" class="visual" pos="0 3e-06 -1e-06" quat="0.499997 0.500004 0.500006 -0.499994" material="structure"/>
-            <geom name="FR_calf_col0" type="capsule" class="collision" size="0.017" fromto="0 0 -0.015 0 0 -0.18732"/>
-            <geom name="FR_calf_col1" type="sphere" class="foot" size="0.02" pos="0 0 -0.21732"/>
-            <site name="FR_foot_site" pos="0 0 -0.21732" size="0.0204" type="sphere" rgba="0 0 0 0"/>
+          <joint name="FR_hfe_joint" type="hinge" axis="0 1 0" range="-1.4 2.4" armature="0.012" damping="0.05" frictionloss="0.12"/>
+          <inertial pos="-2.7e-05 -0.048395 -0.028401" mass="1.29223" fullinertia="0.004974 0.004899 0.0015 -1e-06 -2e-06 -0.000736"/>
+          <geom type="mesh" mesh="4x9x4_bearing" class="visual" pos="-0 -0.053501 -1e-06" quat="0.499992 0.500009 0.500005 -0.499995" material="structure"/>
+          <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 -0.079251 -2e-06" quat="5.00037e-07 2.32679e-06 1 1.58268e-05" material="bearing"/>
+          <geom type="mesh" mesh="belt" class="visual" pos="-0 -0.053501 -1e-06" quat="0.499992 0.500009 0.500005 -0.499995" material="structure"/>
+          <geom type="mesh" mesh="idler_bolt_m4x30" class="visual" pos="-0 -0.053501 -1e-06" quat="0.499992 0.500009 0.500005 -0.499995" material="structure"/>
+          <geom type="mesh" mesh="idler_roller" class="visual" pos="-0 -0.053501 -1e-06" quat="0.499992 0.500009 0.500005 -0.499995" material="structure"/>
+          <geom type="mesh" mesh="inline_connect" class="visual" pos="-0 -0.023001 -0" quat="0.707108 1.23636e-05 0.707105 9.53512e-06" material="structure"/>
+          <geom type="mesh" mesh="knee_output_hub" class="visual" pos="-0 -0.056001 -1e-06" quat="1.29171e-06 -1.99886e-06 -0.707117 0.707097" material="structure"/>
+          <geom type="mesh" mesh="knee_rear_plate" class="visual" pos="-0 -0.023001 -0" quat="0.707108 1.23636e-05 0.707105 9.53512e-06" material="structure"/>
+          <geom type="mesh" mesh="motor_pulley" class="visual" pos="-0 -0.056001 -1e-06" quat="1.29171e-06 -1.99886e-06 -0.707117 0.707097" material="structure"/>
+          <geom type="mesh" mesh="robstride06" class="visual" pos="-0 -0.052001 -1e-06" quat="5.00037e-07 2.32679e-06 1 1.58268e-05" material="structure"/>
+          <geom type="mesh" mesh="upperleg_cover" class="visual" pos="-0 -0.053501 -1e-06" quat="0.499992 0.500009 0.500005 -0.499995" material="structure"/>
+          <geom type="mesh" mesh="upperleg_main" class="visual" pos="-0 -0.053501 -1e-06" quat="0.499992 0.500009 0.500005 -0.499995" material="structure"/>
+          <geom name="FR_thigh_col0" type="capsule" class="collision" size="0.03" fromto="0 -0.034 -0.02 0 -0.034 -0.177"/>
+          <geom name="FR_thigh_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="-0 -0.031501 -1e-06" quat="1.29171e-06 -1.99887e-06 -0.707118 0.707096"/>
+          <body name="FR_calf" pos="0 -0.068501 -0.192">
+            <joint name="FR_kfe_joint" type="hinge" axis="0 1 0" range="-2.6 0" armature="0.048" damping="0.2" frictionloss="0.24"/>
+            <inertial pos="-0 -3.3e-05 -0.080121" mass="0.202465" fullinertia="0.00114 0.001145 3.2e-05 0 -0 -0"/>
+            <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 0.009005 -2e-06" quat="0.707107 1.49648e-05 0.707107 4.35818e-06" material="bearing"/>
+            <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 -0.008995 -2e-06" quat="1.23674e-05 -0.707107 -6.95553e-06 0.707107" material="bearing"/>
+            <geom type="mesh" mesh="foot_ball" class="visual" pos="-0 5e-06 -2e-06" quat="0.50001 -0.49999 0.499996 0.500004" material="foot"/>
+            <geom type="mesh" mesh="lower_leg" class="visual" pos="-0 5e-06 -2e-06" quat="0.50001 -0.49999 0.499996 0.500004" material="structure"/>
+            <geom type="mesh" mesh="lower_leg_cover" class="visual" pos="-0 5e-06 -2e-06" quat="0.50001 -0.49999 0.499996 0.500004" material="structure"/>
+            <geom name="FR_calf_col0" type="capsule" class="collision" size="0.017" fromto="0 0 -0.015 0 0 -0.165621"/>
+            <geom name="FR_calf_col1" type="sphere" class="foot" size="0.02" pos="0 0 -0.195621"/>
+            <site name="FR_foot_site" pos="0 0 -0.195621" size="0.0204" type="sphere" rgba="0 0 0 0"/>
           </body>
         </body>
       </body>
-      <body name="RL_hip" pos="-0.161 0.06 0">
-        <joint name="RL_haa_joint" type="hinge" axis="1 0 0" range="-0.8 0.8"/>
-        <inertial pos="-0.044247 -0.007503 -7.6e-05" mass="0.6245" fullinertia="0.000641 0.001013 0.000773 1.1e-05 1e-06 -1e-06"/>
-        <geom type="mesh" mesh="angle_motor_connect" class="visual" pos="-0.06 -0.017 1e-06" quat="0.500005 0.499992 0.499995 -0.500008" material="structure"/>
-        <geom type="mesh" mesh="robstride02" class="visual" pos="-0.06 -0.017 1e-06" quat="-0.415622 0.415634 0.572067 0.572054" material="actuator"/>
+      <body name="RL_hip" pos="-0.231 0.06 0">
+        <joint name="RL_haa_joint" type="hinge" axis="1 0 0" range="-0.8 0.8" armature="0.012" damping="0.05" frictionloss="0.12"/>
+        <inertial pos="-0.049351 -0.010323 -2.6e-05" mass="0.908648" fullinertia="0.000844 0.00132 0.001049 -2.1e-05 2e-06 -0"/>
+        <geom type="mesh" mesh="angle_motor_connect" class="visual" pos="-0.06 -0.016999 0" quat="0.500001 0.499999 0.499997 -0.500003" material="structure"/>
+        <geom type="mesh" mesh="robstride06" class="visual" pos="-0.06 0.012001 0" quat="1.55547e-06 0.994522 -2.29536e-06 -0.104527" material="structure"/>
         <geom name="RL_hip_col0" type="box" class="collision" size="0.055 0.0275 0.0375" pos="-0.03 0.008 0" quat="1 0 0 0"/>
-        <geom name="RL_hip_col1" type="cylinder" class="collision" size="0.03925 0.02075" pos="-0.06 0.03675 0" quat="0.707107 0.707107 0 0"/>
+        <geom name="RL_hip_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="-0.06 -0.008499 0" quat="0.703232 -0.703234 0.0739132 0.0739099"/>
         <body name="RL_thigh" pos="-0.06 0.016 0">
-          <joint name="RL_hfe_joint" type="hinge" axis="0 1 0" range="-1.4 2.4"/>
-          <inertial pos="0 0.04518 -0.027376" mass="0.703408" fullinertia="0.003135 0.003137 0.000699 0 -0 0.000467"/>
-          <geom type="mesh" mesh="61804_2rs" class="visual" pos="1e-06 0.07925 -1e-06" quat="1.18268e-05 1 -2.50001e-06 9.9997e-07" material="bearing"/>
-          <geom type="mesh" mesh="inline_connect" class="visual" pos="0 0.023001 -0" quat="6.50551e-06 0.707109 -1.0286e-05 -0.707105" material="structure"/>
-          <geom type="mesh" mesh="motor_pulley" class="visual" pos="1e-06 0.056 -1e-06" quat="0.707099 -0.707114 1.06069e-06 -2.47486e-06" material="structure"/>
-          <geom type="mesh" mesh="robstride02" class="visual" pos="1e-06 0.023 -0" quat="0.707099 -0.707114 1.06069e-06 -2.47486e-06" material="actuator"/>
-          <geom type="mesh" mesh="upperleg_cover" class="visual" pos="1e-06 0.0535 -1e-06" quat="-0.499996 0.500003 -0.500007 -0.499994" material="structure"/>
-          <geom type="mesh" mesh="upperleg_main" class="visual" pos="1e-06 0.0535 -1e-06" quat="-0.499996 0.500003 -0.500007 -0.499994" material="structure"/>
-          <geom name="RL_thigh_col0" type="cylinder" class="collision" size="0.03925 0.02075" pos="0 0.04775 -0.045" quat="0.707107 0.707107 0 0"/>
-          <geom name="RL_thigh_col1" type="capsule" class="collision" size="0.03" fromto="0 0.034 -0.02 0 0.034 -0.198"/>
-          <body name="RL_calf" pos="0 0.0685 -0.213">
-            <joint name="RL_kfe_joint" type="hinge" axis="0 1 0" range="-2.6 0"/>
-            <inertial pos="0 -6e-06 -0.088429" mass="0.171662" fullinertia="0.001271 0.001278 2.2e-05 -0 0 -0"/>
-            <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 -0.006004 -1e-06" quat="6.00336e-06 0.707107 -8.36963e-06 -0.707107" material="bearing"/>
-            <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 0.005996 -1e-06" quat="0.707107 -8.60071e-06 0.707107 -5.77229e-06" material="bearing"/>
-            <geom type="mesh" mesh="foot_ball" class="visual" pos="0 -4e-06 -1e-06" quat="0.500005 0.499995 0.499995 -0.500005" material="foot"/>
-            <geom type="mesh" mesh="lower_leg" class="visual" pos="0 -4e-06 -1e-06" quat="0.500005 0.499995 0.499995 -0.500005" material="structure"/>
-            <geom name="RL_calf_col0" type="capsule" class="collision" size="0.017" fromto="0 0 -0.015 0 0 -0.18732"/>
-            <geom name="RL_calf_col1" type="sphere" class="foot" size="0.02" pos="0 0 -0.21732"/>
-            <site name="RL_foot_site" pos="0 0 -0.21732" size="0.0204" type="sphere" rgba="0 0 0 0"/>
+          <joint name="RL_hfe_joint" type="hinge" axis="0 1 0" range="-1.4 2.4" armature="0.012" damping="0.05" frictionloss="0.12"/>
+          <inertial pos="2.7e-05 0.048396 -0.0284" mass="1.29223" fullinertia="0.004974 0.004899 0.0015 -1e-06 2e-06 0.000736"/>
+          <geom type="mesh" mesh="4x9x4_bearing" class="visual" pos="0 0.053501 -0" quat="-0.500002 0.499997 -0.500003 -0.499998" material="structure"/>
+          <geom type="mesh" mesh="61804_2rs" class="visual" pos="1e-06 0.079251 -0" quat="1.82679e-06 1 -2e-06 -5.00004e-07" material="bearing"/>
+          <geom type="mesh" mesh="belt" class="visual" pos="0 0.053501 -0" quat="-0.500002 0.499997 -0.500003 -0.499998" material="structure"/>
+          <geom type="mesh" mesh="idler_bolt_m4x30" class="visual" pos="0 0.053501 -0" quat="-0.500002 0.499997 -0.500003 -0.499998" material="structure"/>
+          <geom type="mesh" mesh="idler_roller" class="visual" pos="0 0.053501 -0" quat="-0.500002 0.499997 -0.500003 -0.499998" material="structure"/>
+          <geom type="mesh" mesh="inline_connect" class="visual" pos="0 0.023001 -0" quat="-1.40629e-07 0.707105 -2.93275e-06 -0.707109" material="structure"/>
+          <geom type="mesh" mesh="knee_output_hub" class="visual" pos="0 0.056001 -0" quat="0.707107 -0.707107 1.76777e-06 -1.06066e-06" material="structure"/>
+          <geom type="mesh" mesh="knee_rear_plate" class="visual" pos="0 0.023001 -0" quat="-1.40629e-07 0.707105 -2.93275e-06 -0.707109" material="structure"/>
+          <geom type="mesh" mesh="motor_pulley" class="visual" pos="0 0.056001 -0" quat="0.707107 -0.707107 1.76777e-06 -1.06066e-06" material="structure"/>
+          <geom type="mesh" mesh="robstride06" class="visual" pos="0 0.052001 -0" quat="1.82679e-06 1 -2e-06 -5.00004e-07" material="structure"/>
+          <geom type="mesh" mesh="upperleg_cover" class="visual" pos="0 0.053501 0" quat="-0.500002 0.499997 -0.500003 -0.499998" material="structure"/>
+          <geom type="mesh" mesh="upperleg_main" class="visual" pos="0 0.053501 -0" quat="-0.500002 0.499997 -0.500003 -0.499998" material="structure"/>
+          <geom name="RL_thigh_col0" type="capsule" class="collision" size="0.03" fromto="0 0.034 -0.02 0 0.034 -0.177"/>
+          <geom name="RL_thigh_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="0 0.031501 -0" quat="0.707105 -0.707108 1.76777e-06 -1.06066e-06"/>
+          <body name="RL_calf" pos="0 0.068501 -0.192">
+            <joint name="RL_kfe_joint" type="hinge" axis="0 1 0" range="-2.6 0" armature="0.048" damping="0.2" frictionloss="0.24"/>
+            <inertial pos="0 4e-05 -0.080119" mass="0.202465" fullinertia="0.00114 0.001145 3.2e-05 -0 -7e-06 0"/>
+            <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 -0.009 -0" quat="3.05951e-06 -0.707107 3.05951e-06 0.707107" material="bearing"/>
+            <geom type="mesh" mesh="61804_2rs" class="visual" pos="0 0.009 -0" quat="0.707107 7.07107e-07 0.707107 -7.07107e-07" material="bearing"/>
+            <geom type="mesh" mesh="foot_ball" class="visual" pos="0 0 -0" quat="0.499999 0.500001 0.499998 -0.500001" material="foot"/>
+            <geom type="mesh" mesh="lower_leg" class="visual" pos="0 0 -0" quat="0.499999 0.500001 0.499998 -0.500001" material="structure"/>
+            <geom type="mesh" mesh="lower_leg_cover" class="visual" pos="0 0 -0" quat="0.499999 0.500001 0.499998 -0.500001" material="structure"/>
+            <geom name="RL_calf_col0" type="capsule" class="collision" size="0.017" fromto="0 0 -0.015 0 0 -0.165621"/>
+            <geom name="RL_calf_col1" type="sphere" class="foot" size="0.02" pos="0 0 -0.195621"/>
+            <site name="RL_foot_site" pos="0 0 -0.195621" size="0.0204" type="sphere" rgba="0 0 0 0"/>
           </body>
         </body>
       </body>
-      <body name="RR_hip" pos="-0.161 -0.06 0">
-        <joint name="RR_haa_joint" type="hinge" axis="1 0 0" range="-0.8 0.8"/>
-        <inertial pos="-0.044247 0.007504 7.8e-05" mass="0.6245" fullinertia="0.000641 0.001013 0.000773 -1.1e-05 -1e-06 -1e-06"/>
-        <geom type="mesh" mesh="angle_motor_connect" class="visual" pos="-0.06 0.017001 1e-06" quat="0.500007 -0.499997 -0.49999 -0.500006" material="structure"/>
-        <geom type="mesh" mesh="robstride02" class="visual" pos="-0.06 0.017001 1e-06" quat="-0.415618 -0.415632 -0.57207 0.572056" material="actuator"/>
+      <body name="RR_hip" pos="-0.231 -0.06 0">
+        <joint name="RR_haa_joint" type="hinge" axis="1 0 0" range="-0.8 0.8" armature="0.012" damping="0.05" frictionloss="0.12"/>
+        <inertial pos="-0.049351 0.010325 2.6e-05" mass="0.908648" fullinertia="0.000844 0.00132 0.001049 2.1e-05 -2e-06 -0"/>
+        <geom type="mesh" mesh="angle_motor_connect" class="visual" pos="-0.06 0.017001 -0" quat="-0.499997 0.500003 0.500001 0.499999" material="structure"/>
+        <geom type="mesh" mesh="robstride06" class="visual" pos="-0.06 -0.011999 0" quat="0.994522 -2.09357e-06 -0.104527 -1.20358e-06" material="structure"/>
         <geom name="RR_hip_col0" type="box" class="collision" size="0.055 0.0275 0.0375" pos="-0.03 -0.008 0" quat="1 0 0 0"/>
-        <geom name="RR_hip_col1" type="cylinder" class="collision" size="0.03925 0.02075" pos="-0.06 -0.03675 0" quat="0.707107 0.707107 0 0"/>
+        <geom name="RR_hip_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="-0.06 0.008501 -0" quat="0.703235 0.703232 -0.0739124 0.0739107"/>
         <body name="RR_thigh" pos="-0.06 -0.016 0">
-          <joint name="RR_hfe_joint" type="hinge" axis="0 1 0" range="-1.4 2.4"/>
-          <inertial pos="-0 -0.045179 -0.027376" mass="0.703408" fullinertia="0.003135 0.003137 0.000699 0 0 -0.000467"/>
-          <geom type="mesh" mesh="61804_2rs" class="visual" pos="-1e-06 -0.079249 -1e-06" quat="-4.99932e-07 5.3268e-06 1 1.28268e-05" material="bearing"/>
-          <geom type="mesh" mesh="inline_connect" class="visual" pos="-0 -0.022999 -0" quat="0.707107 1.28428e-05 0.707107 5.06465e-06" material="structure"/>
-          <geom type="mesh" mesh="motor_pulley" class="visual" pos="-1e-06 -0.055999 -1e-06" quat="4.12013e-06 -3.4131e-06 -0.707114 0.707099" material="structure"/>
-          <geom type="mesh" mesh="robstride02" class="visual" pos="-0 -0.022999 -0" quat="4.12013e-06 -3.4131e-06 -0.707114 0.707099" material="actuator"/>
-          <geom type="mesh" mesh="upperleg_cover" class="visual" pos="-1e-06 -0.053499 -1e-06" quat="0.499993 0.500009 0.500002 -0.499996" material="structure"/>
-          <geom type="mesh" mesh="upperleg_main" class="visual" pos="-1e-06 -0.053499 -1e-06" quat="0.499993 0.500009 0.500002 -0.499996" material="structure"/>
-          <geom name="RR_thigh_col0" type="cylinder" class="collision" size="0.03925 0.02075" pos="0 -0.04775 -0.045" quat="0.707107 0.707107 0 0"/>
-          <geom name="RR_thigh_col1" type="capsule" class="collision" size="0.03" fromto="0 -0.034 -0.02 0 -0.034 -0.198"/>
-          <body name="RR_calf" pos="0 -0.0685 -0.213">
-            <joint name="RR_kfe_joint" type="hinge" axis="0 1 0" range="-2.6 0"/>
-            <inertial pos="-0 7e-06 -0.088429" mass="0.171662" fullinertia="0.001271 0.001278 2.2e-05 0 0 0"/>
-            <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 0.006006 -1e-06" quat="0.707107 1.24881e-05 0.707107 1.17441e-06" material="bearing"/>
-            <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 -0.005994 -1e-06" quat="9.89077e-06 -0.707107 -3.77176e-06 0.707107" material="bearing"/>
-            <geom type="mesh" mesh="foot_ball" class="visual" pos="-0 6e-06 -1e-06" quat="0.500008 -0.499992 0.499998 0.500002" material="foot"/>
-            <geom type="mesh" mesh="lower_leg" class="visual" pos="-0 6e-06 -1e-06" quat="0.500008 -0.499992 0.499998 0.500002" material="structure"/>
-            <geom name="RR_calf_col0" type="capsule" class="collision" size="0.017" fromto="0 0 -0.015 0 0 -0.18732"/>
-            <geom name="RR_calf_col1" type="sphere" class="foot" size="0.02" pos="0 0 -0.21732"/>
-            <site name="RR_foot_site" pos="0 0 -0.21732" size="0.0204" type="sphere" rgba="0 0 0 0"/>
+          <joint name="RR_hfe_joint" type="hinge" axis="0 1 0" range="-1.4 2.4" armature="0.012" damping="0.05" frictionloss="0.12"/>
+          <inertial pos="-2.7e-05 -0.048394 -0.028399" mass="1.29223" fullinertia="0.004974 0.004899 0.0015 -1e-06 -2e-06 -0.000736"/>
+          <geom type="mesh" mesh="4x9x4_bearing" class="visual" pos="-0 -0.053499 0" quat="0.500001 0.5 0.499996 -0.500004" material="structure"/>
+          <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 -0.079249 0" quat="-4.99997e-07 -1.3268e-06 -1 2.3268e-06" material="bearing"/>
+          <geom type="mesh" mesh="belt" class="visual" pos="-0 -0.053499 0" quat="0.500001 0.5 0.499996 -0.500004" material="structure"/>
+          <geom type="mesh" mesh="idler_bolt_m4x30" class="visual" pos="-0 -0.053499 0" quat="0.500001 0.5 0.499996 -0.500004" material="structure"/>
+          <geom type="mesh" mesh="idler_roller" class="visual" pos="-0 -0.053499 0" quat="0.500001 0.5 0.499996 -0.500004" material="structure"/>
+          <geom type="mesh" mesh="inline_connect" class="visual" pos="-0 -0.022999 0" quat="0.707108 -5.41898e-07 0.707105 -2.66322e-06" material="structure"/>
+          <geom type="mesh" mesh="knee_output_hub" class="visual" pos="-0 -0.055999 0" quat="5.84638e-07 -1.29174e-06 -0.707104 0.70711" material="structure"/>
+          <geom type="mesh" mesh="knee_rear_plate" class="visual" pos="-0 -0.022999 0" quat="0.707108 -5.41898e-07 0.707105 -2.66322e-06" material="structure"/>
+          <geom type="mesh" mesh="motor_pulley" class="visual" pos="-0 -0.055999 0" quat="5.84638e-07 -1.29174e-06 -0.707104 0.70711" material="structure"/>
+          <geom type="mesh" mesh="robstride06" class="visual" pos="-0 -0.051999 0" quat="-4.99997e-07 -1.3268e-06 -1 2.3268e-06" material="structure"/>
+          <geom type="mesh" mesh="upperleg_cover" class="visual" pos="-0 -0.053499 1e-06" quat="0.500001 0.5 0.499996 -0.500004" material="structure"/>
+          <geom type="mesh" mesh="upperleg_main" class="visual" pos="-0 -0.053499 0" quat="0.500001 0.5 0.499996 -0.500004" material="structure"/>
+          <geom name="RR_thigh_col0" type="capsule" class="collision" size="0.03" fromto="0 -0.034 -0.02 0 -0.034 -0.177"/>
+          <geom name="RR_thigh_col1" type="cylinder" class="collision" size="0.044 0.0245" pos="-0 -0.031499 0" quat="5.84635e-07 -1.29174e-06 -0.707105 0.707108"/>
+          <body name="RR_calf" pos="0 -0.068501 -0.192">
+            <joint name="RR_kfe_joint" type="hinge" axis="0 1 0" range="-2.6 0" armature="0.048" damping="0.2" frictionloss="0.24"/>
+            <inertial pos="-0 -4.1e-05 -0.080119" mass="0.202465" fullinertia="0.00114 0.001145 3.2e-05 0 -9e-06 -0"/>
+            <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 0.009 0" quat="0.707107 2.00578e-06 0.707107 -7.18661e-06" material="bearing"/>
+            <geom type="mesh" mesh="61804_2rs" class="visual" pos="-0 -0.009 0" quat="7.00172e-07 0.707107 -4.48065e-06 -0.707107" material="bearing"/>
+            <geom type="mesh" mesh="foot_ball" class="visual" pos="-0 0 0" quat="0.500001 -0.5 0.500004 0.499996" material="foot"/>
+            <geom type="mesh" mesh="lower_leg" class="visual" pos="-0 0 0" quat="0.500001 -0.5 0.500004 0.499996" material="structure"/>
+            <geom type="mesh" mesh="lower_leg_cover" class="visual" pos="-0 0 0" quat="0.500001 -0.5 0.500004 0.499996" material="structure"/>
+            <geom name="RR_calf_col0" type="capsule" class="collision" size="0.017" fromto="0 0 -0.015 0 0 -0.165621"/>
+            <geom name="RR_calf_col1" type="sphere" class="foot" size="0.02" pos="0 0 -0.195621"/>
+            <site name="RR_foot_site" pos="0 0 -0.195621" size="0.0204" type="sphere" rgba="0 0 0 0"/>
           </body>
         </body>
       </body>
@@ -205,18 +274,18 @@
     <exclude name="RR_thigh_base" body1="base_link" body2="RR_thigh"/>
   </contact>
   <actuator>
-    <motor name="FL_haa_joint" joint="FL_haa_joint" gear="1" class="robot"/>
-    <motor name="FL_hfe_joint" joint="FL_hfe_joint" gear="1" class="robot"/>
-    <motor name="FL_kfe_joint" joint="FL_kfe_joint" gear="1" class="robot"/>
-    <motor name="FR_haa_joint" joint="FR_haa_joint" gear="1" class="robot"/>
-    <motor name="FR_hfe_joint" joint="FR_hfe_joint" gear="1" class="robot"/>
-    <motor name="FR_kfe_joint" joint="FR_kfe_joint" gear="1" class="robot"/>
-    <motor name="RL_haa_joint" joint="RL_haa_joint" gear="1" class="robot"/>
-    <motor name="RL_hfe_joint" joint="RL_hfe_joint" gear="1" class="robot"/>
-    <motor name="RL_kfe_joint" joint="RL_kfe_joint" gear="1" class="robot"/>
-    <motor name="RR_haa_joint" joint="RR_haa_joint" gear="1" class="robot"/>
-    <motor name="RR_hfe_joint" joint="RR_hfe_joint" gear="1" class="robot"/>
-    <motor name="RR_kfe_joint" joint="RR_kfe_joint" gear="1" class="robot"/>
+    <motor name="FL_haa_joint" joint="FL_haa_joint" gear="1" class="robot" ctrlrange="-36 36"/>
+    <motor name="FL_hfe_joint" joint="FL_hfe_joint" gear="1" class="robot" ctrlrange="-36 36"/>
+    <motor name="FL_kfe_joint" joint="FL_kfe_joint" gear="1" class="robot" ctrlrange="-68.4 68.4"/>
+    <motor name="FR_haa_joint" joint="FR_haa_joint" gear="1" class="robot" ctrlrange="-36 36"/>
+    <motor name="FR_hfe_joint" joint="FR_hfe_joint" gear="1" class="robot" ctrlrange="-36 36"/>
+    <motor name="FR_kfe_joint" joint="FR_kfe_joint" gear="1" class="robot" ctrlrange="-68.4 68.4"/>
+    <motor name="RL_haa_joint" joint="RL_haa_joint" gear="1" class="robot" ctrlrange="-36 36"/>
+    <motor name="RL_hfe_joint" joint="RL_hfe_joint" gear="1" class="robot" ctrlrange="-36 36"/>
+    <motor name="RL_kfe_joint" joint="RL_kfe_joint" gear="1" class="robot" ctrlrange="-68.4 68.4"/>
+    <motor name="RR_haa_joint" joint="RR_haa_joint" gear="1" class="robot" ctrlrange="-36 36"/>
+    <motor name="RR_hfe_joint" joint="RR_hfe_joint" gear="1" class="robot" ctrlrange="-36 36"/>
+    <motor name="RR_kfe_joint" joint="RR_kfe_joint" gear="1" class="robot" ctrlrange="-68.4 68.4"/>
   </actuator>
   <sensor>
     <accelerometer name="imu_accel" site="imu_site"/>
@@ -252,9 +321,9 @@
     <jointvel name="RR_kfe_vel" joint="RR_kfe_joint"/>
   </sensor>
   <keyframe>
-    <key name="zero" qpos="0 0 0.45232 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
-    <key name="stand" qpos="0 0 0.322 1 0 0 0 0 0.809752 -1.59885 0 0.809752 -1.59885 0 0.809752 -1.59885 0 0.809752 -1.59885"/>
-    <key name="crouch" qpos="0 0 0.242 1 0 0 0 0 1.05113 -2.06849 0 1.05113 -2.06849 0 1.05113 -2.06849 0 1.05113 -2.06849"/>
-    <key name="rest" qpos="0 0 0.162 1 0 0 0 0 1.26876 -2.47914 0 1.26876 -2.47914 0 1.26876 -2.47914 0 1.26876 -2.47914"/>
+    <key name="zero" qpos="0 0 0.409621 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+    <key name="stand" qpos="0 0 0.322 1 0 0 0 0 0.693417 -1.37155 0 0.693417 -1.37155 0 0.693417 -1.37155 0 0.693417 -1.37155"/>
+    <key name="crouch" qpos="0 0 0.242 1 0 0 0 0 0.980868 -1.93463 0 0.980868 -1.93463 0 0.980868 -1.93463 0 0.980868 -1.93463"/>
+    <key name="rest" qpos="0 0 0.162 1 0 0 0 0 1.2255 -2.40276 0 1.2255 -2.40276 0 1.2255 -2.40276 0 1.2255 -2.40276"/>
   </keyframe>
 </mujoco>

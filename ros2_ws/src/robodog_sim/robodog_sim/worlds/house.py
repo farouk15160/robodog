@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from ..world_spec import (DOOR_W, Prim, World, Waypoint, balance_beam, gap_course,
                           ramp, stairs, stairs_down, stepping_stones, table,
-                          terrain_tiles, wall)
+                          terrain_tiles, wall, human_reference)
 
 W, H = 12.0, 9.0
 MID_X, MID_Y = 4.5, 4.5
@@ -41,6 +41,7 @@ SHOP_X = 8.0
 
 def build() -> World:
     w = World("house", size=(W, H))
+    w.add(*human_reference(1.95, 0.70))
 
     # ---------------- shell ----------------
     w.add(*wall("out_s", 0, 0, W, 0))
@@ -160,6 +161,7 @@ def build_flat() -> World:
         SW  balance beam      220 mm wide, plus a slalom
     """
     w = World("flat", size=(24.0, 24.0), centred=True)
+    w.add(*human_reference(0.10, 1.15))
 
     # ---------------- +x : measured run ----------------
     # A clean lane with metre markers. Velocity tracking is measured here, not

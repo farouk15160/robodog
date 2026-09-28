@@ -2,7 +2,7 @@
 """
 CAD -> canonical robot model pipeline.
 
-Reads the flat Onshape export (85 part-links, 12 revolute DOF, saved at an
+Reads the flat Onshape export (264 part-links, 12 revolute DOF, saved at an
 arbitrary mate pose) and produces `robot_parameters.yaml`, the single source of
 truth consumed by the URDF/Xacro and the MuJoCo model generator.
 
@@ -13,8 +13,8 @@ What it does
 3. Recover the pose-invariant leg geometry (link lengths, axis offsets).
 4. Solve the CAD joint angles against a *canonical* zero definition.
 5. Re-express every visual mesh and every inertia in canonical body frames.
-6. Substitute the CAD's RMD-X8 placeholder actuators with ROBSTRIDE02 mass
-   properties and top up to the 10 kg design target with an electronics payload.
+6. Replace motor/electronics placeholder masses with the RS06 working budget.
+   All unmeasured mass locations and envelope inertias remain estimates.
 
 Canonical convention (REP-103)
 ------------------------------
@@ -28,20 +28,20 @@ Canonical convention (REP-103)
 Run:  python3 tools/cad_to_model.py
 """
 from __future__ import annotations
-import collections, json, math, os, pickle, sys
+import collections, math, os
 import xml.etree.ElementTree as ET
 import numpy as np
 from scipy.spatial.transform import Rotation
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CAD_URDF = os.path.join(ROOT, "cad/robot/onshape_export/urdf/urdf.urdf")
+CAD_URDF = os.path.join(ROOT, "cad/urdf/urdf/urdf.urdf")
 OUT_YAML = os.path.join(ROOT, "ros2_ws/src/robodog_description/config/robot_parameters.yaml")
-RS02_YAML = os.path.join(ROOT, "ros2_ws/src/robodog_description/config/robstride02.yaml")
+ACTUATOR_CONFIG = "robstride06.yaml"
 
-TARGET_MASS_KG = 10.0            # design target for the complete robot
-RS02_MASS_KG = 0.380             # ROBSTRIDE02, replaces the CAD RMD-X8 placeholder
-RS02_RADIUS_M = 0.03925
-RS02_DEPTH_M = 0.0415
+TARGET_MASS_KG = 19.72           # working estimate, not a mass normalization
+MOTOR_MASS_KG = 0.621
+MOTOR_RADIUS_M = 0.044          # RS06 maximum flange envelope [ESTIMATE inertia]
+MOTOR_DEPTH_M = 0.049           # RS06 manufacturer outline overall axial depth
 
 # CAD leg id -> canonical leg id.  h* = hind -> R* = rear.
 LEGS = {
@@ -116,9 +116,10 @@ def parse_cad():
             d["com"] = np.array(origin(i.find("origin"))[0])
             it = i.find("inertia")
             g = lambda k: float(it.get(k))
-            d["I"] = np.array([[g("ixx"), g("ixy"), g("ixz")],
+            Ri = rpy2R(*origin(i.find("origin"))[1])
+            d["I"] = Ri @ np.array([[g("ixx"), g("ixy"), g("ixz")],
                                [g("ixy"), g("iyy"), g("iyz")],
-                               [g("ixz"), g("iyz"), g("izz")]])
+                               [g("ixz"), g("iyz"), g("izz")]]) @ Ri.T
         for v in l.findall("visual"):
             m = v.find("geometry/mesh")
             if m is None:
@@ -195,10 +196,8 @@ def extract_geometry(jf, W, links):
     for leg, cfg in LEGS.items():
         j0, j1, j2 = cfg["cad"]
         a, b, c = jf[j0], jf[j1], jf[j2]
-        foot = W[[n for n in links if n.startswith("foot_ball")][0]]  # placeholder
         # HAA -> HFE : split into "along the HAA axis" and "radial in the y-z plane"
         d01 = b["p"] - a["p"]
-        n0 = a["axis"] * cfg["sx"]          # CAD HAA axis flips sign front/rear
         g["haa_x"].append(abs(a["p"][0]))
         g["haa_y"].append(abs(a["p"][1]))
         g["haa_z"].append(a["p"][2])
@@ -301,9 +300,17 @@ def aggregate(body_links, links, W, Fb, mass_override):
             continue
         Tb = Finv @ W[n]                              # part frame in body frame
         com_b = (Tb @ np.append(links[n]["com"], 1))[:3]
-        # scale the CAD inertia tensor with the mass substitution
-        s = m / links[n]["mass"] if links[n]["mass"] > 0 else 1.0
-        parts.append((m, com_b, Tb[:3, :3] @ (links[n]["I"] * s) @ Tb[:3, :3].T))
+        # Electronics retain their CAD shape. Motors use an RS06 envelope,
+        # because the CAD motor geometry is an RS02 placeholder (axis local y).
+        scale = m / links[n]["mass"] if links[n]["mass"] > 0 else 1.0
+        inertia = links[n]["I"] * scale
+        if n == "part_1" or n.startswith("part_1_"):
+            motor_frame = links[n]["visuals"][0]["T"]
+            com_b = (Tb @ motor_frame @ np.array([0.0, MOTOR_DEPTH_M / 2 - 0.004, 0.0, 1.0]))[:3]
+            transverse = m * (3 * MOTOR_RADIUS_M**2 + MOTOR_DEPTH_M**2) / 12
+            inertia = motor_frame[:3, :3] @ np.diag(
+                [transverse, m * MOTOR_RADIUS_M**2 / 2, transverse]) @ motor_frame[:3, :3].T
+        parts.append((m, com_b, Tb[:3, :3] @ inertia @ Tb[:3, :3].T))
         m_tot += m
         mc += m * com_b
     com = mc / m_tot if m_tot > 0 else np.zeros(3)
@@ -314,7 +321,7 @@ def aggregate(body_links, links, W, Fb, mass_override):
     return m_tot, com, I
 
 
-def visuals_in_body(body_links, links, W, Fb, mesh_rename):
+def visuals_in_body(body_links, links, W, Fb):
     Finv = inv(Fb)
     out = []
     for n in sorted(body_links):
@@ -330,44 +337,50 @@ def visuals_in_body(body_links, links, W, Fb, mesh_rename):
 
 
 # --------------------------------------------------------------------------- #
-# 5. mass budget: swap the CAD's RMD-X8 placeholders for ROBSTRIDE02
+# 5. working mass budget, replacing near-zero CAD placeholders
 # --------------------------------------------------------------------------- #
-# The CAD assembly was drawn around RMD-X8 V3 actuators (760.8 g each). The
-# design uses ROBSTRIDE02 (380 g each), so every `rmdx8v3*` part is re-massed.
-# Inertia tensors are scaled by the mass ratio, which is exact for a uniform
-# density change and a good approximation here because the RS02 envelope
-# (78.5 x 41.5 mm) is slightly smaller than the RMD-X8 (98 x 45.5 mm) -- i.e.
-# the result is marginally conservative (over-estimates distal inertia).
+# CAD masses for real structural parts remain untouched. These listed devices
+# have geometry but placeholder densities in the supplied export.
+DEVICE_MASSES = {
+    "battery_6s_10000mah_1": 1.250,
+    "battery_6s_10000mah_2": 1.250,
+    "jetson_orin_nano_super_8gb": 0.174,
+    "albright_sw80_48v": 0.350,
+    "meanwell_rsd_60l_12": 0.290,
+    "nuwa_hp60c": 0.0,  # mass lives on the separate ROS camera link
+}
+# Remaining user-listed additions as point masses [ESTIMATE positions].
 PAYLOAD = [
-    # name,                       mass kg, position in base_link (x, y, z)
-    ("battery_12s_lipo",          0.700,  (-0.010,  0.000, -0.018)),
-    ("onboard_computer",          0.200,  (-0.060,  0.000,  0.030)),
-    ("power_distribution_wiring", 0.130,  ( 0.040,  0.000,  0.025)),
-    ("imu",                       0.010,  ( 0.000,  0.000,  0.000)),
+    ("usb_can_interfaces", 0.120, (0.0, 0.0, 0.025)),
+    ("imu_microcontroller", 0.080, (0.0, 0.0, 0.015)),
+    ("fuse_sensor_distribution", 0.120, (-0.010, 0.0, 0.025)),
+    ("aluminium_plate_130x160x3", 0.168, (0.0, 0.0, 0.008)),
+    ("wiring_connectors", 0.300, (0.0, 0.0, 0.0)),
+    ("additional_fasteners_shafts", 0.250, (0.0, 0.0, 0.0)),
+    ("battery_tray_straps", 0.100, (0.0, 0.0, -0.035)),
 ]
-CAMERA_MASS_KG = 0.068          # Yahboom NUWA HP60C, separate link
+CAMERA_MASS_KG = 0.150          # user's planning estimate
+BELT_UPGRADE_PER_LEG_KG = 0.030  # net addition to the existing CAD belts
 
 MESH_RENAME = {
-    "RMDX8V3.stl": "robstride02.stl",   # actuator swap, see above
-    "XYZ_frame.stl": None,              # CAD construction frames: drop
+    "Part_1.stl": "robstride06.stl",
+    "XYZ_frame.stl": None,
 }
 
 
 def normalise_mesh(name: str) -> str | None:
-    """Mirror the naming rule in tools/prepare_meshes.py, which strips the
-    leading underscore Onshape adds to digit-initial part names and lowercases
-    everything, so the two tools cannot drift apart."""
-    if name in MESH_RENAME:
-        return MESH_RENAME[name]
-    return name.lstrip("_").lower()
+    """The same mesh naming rule used by tools/prepare_meshes.py."""
+    return MESH_RENAME.get(name, name.lstrip("_").lower())
 
 
 def build_mass_override(links):
-    ov = {}
-    for n in links:
-        if n.startswith("rmdx8v3"):
-            ov[n] = RS02_MASS_KG
-    return ov
+    motors = [n for n in links if n == "part_1" or n.startswith("part_1_")]
+    if len(motors) != 12:
+        raise ValueError(f"expected 12 CAD actuator placeholders, got {len(motors)}")
+    missing = set(DEVICE_MASSES) - links.keys()
+    if missing:
+        raise ValueError(f"missing CAD payload parts: {sorted(missing)}")
+    return {**DEVICE_MASSES, **{n: MOTOR_MASS_KG for n in motors}}
 
 
 # --------------------------------------------------------------------------- #
@@ -383,20 +396,12 @@ JOINT_LIMITS = {
 }
 # Named poses are specified as a BASE HEIGHT, not as joint angles.
 #
-# Each foot hangs vertically below its own HFE axis. That single rule gives all
-# four of the properties a nominal stance needs at once:
-#   * identical joint angles on all four legs, despite the non-mirrored axis
-#     convention (a foot under the HAA axis instead would need different front
-#     and rear angles, because the HFE sits 60 mm outboard of the HAA);
-#   * a support polygon of 442 x 289 mm whose centroid is at x = 0, within
-#     3.5 mm of the body centre of mass;
-#   * the lowest peak joint torque of any centred foot placement -- 62.5% of
-#     the 6 N.m continuous rating at the nominal height, which settles at about
-#     43 C, so the robot can stand indefinitely.
-#
-# See tools/optimise_stance.py for the scan this came from.
+# Each foot hangs vertically below its own HFE axis. The nominal 320mm height
+# gives symmetric joint angles and a centred 582 x289mm support polygon.
+# These remain initial tuning poses; new mass/motor gait performance must be
+# evaluated with the simulator instead of reusing the old RS02 conclusions.
 NAMED_POSE_HEIGHTS = {
-    "stand":  0.320,   # 69.7% leg extension: clear of the singularity, good margin
+    "stand":  0.320,   # 77.4% of the new link reach, excluding the foot radius
     "crouch": 0.240,
     "rest":   0.160,   # folded; disable the joints after arriving
 }
@@ -461,8 +466,8 @@ def main():
         print(f"  {leg}: HAA={math.degrees(q[0]):+7.2f}  HFE={math.degrees(q[1]):+7.2f}"
               f"  KFE={math.degrees(q[2]):+7.2f}   FK residual max {max(errs)*1e6:6.2f} um")
     print(f"\n  >> canonical chain reproduces the CAD to {max_err*1e6:.2f} um")
-    if max_err > 1e-5:
-        print("  !! WARNING: residual above 10 um, canonical model does not match CAD")
+    if max_err > 2e-5:
+        raise ValueError("canonical chain differs from CAD by more than 20 um")
 
     # ---- bodies -----------------------------------------------------------
     Fb = body_world_frames(canon, q_cad)
@@ -479,22 +484,34 @@ def main():
     for name, cadtag in cad_body.items():
         pl = parts_of[cadtag]
         m, com, I = aggregate(pl, links, W, Fb[name], mass_ov)
-        vis = visuals_in_body(pl, links, W, Fb[name], MESH_RENAME)
-        bodies[name] = dict(mass=m, com=com, I=I, visuals=vis, cad_parts=sorted(pl))
+        if name.endswith("_thigh"):
+            # Extra 2:1 belt/pulley mass distributed over the transmission span.
+            extra = BELT_UPGRADE_PER_LEG_KG
+            center = np.array([0.0, LEGS[name[:2]]["sy"] * canon.lat, -canon.L1 / 2])
+            new_com = (m * com + extra * center) / (m + extra)
+            for mass, point in ((m, com), (extra, center)):
+                delta = point - new_com
+                I = I + mass * (np.dot(delta, delta) * np.eye(3) - np.outer(delta, delta))
+            m, com = m + extra, new_com
+        vis = visuals_in_body(pl, links, W, Fb[name])
+        bodies[name] = dict(mass=m, com=com, I=I, visuals=vis, cad_parts=sorted(pl),
+                            motor_collisions=motor_collisions(pl, links, W, Fb[name]))
         total += m
 
     payload_m = sum(p[1] for p in PAYLOAD)
     print("\n" + "=" * 74)
     print("MASS BUDGET")
     print("=" * 74)
-    print(f"  CAD structure + 12x ROBSTRIDE02          {total:8.4f} kg")
+    print(f"  CAD + 12x RS06 + installed devices          {total:8.4f} kg")
     print(f"  electronics payload (base_link)          {payload_m:8.4f} kg")
     print(f"  camera link (Yahboom NUWA HP60C)         {CAMERA_MASS_KG:8.4f} kg")
     print(f"  {'-'*54}")
     print(f"  TOTAL                                    {total + payload_m + CAMERA_MASS_KG:8.4f} kg"
           f"   (target {TARGET_MASS_KG:.1f} kg)")
 
-    emit(canon, bodies, q_cad, geo, L2, total, payload_m)
+    emit(canon, bodies, q_cad, geo, L2, total, payload_m,
+         sum(part["mass"] for part in links.values()),
+         sum(links[name]["mass"] for name in mass_ov))
 
 
 
@@ -503,28 +520,33 @@ def main():
 # 7. emit robot_parameters.yaml
 # --------------------------------------------------------------------------- #
 FOOT_RADIUS_M = 0.020            # foot_ball.stl bounding box is 40 x 40 x 40 mm
-BODY_BOX = (0.235, 0.120, 0.115)  # body.stl core, excluding the HAA actuators
+BODY_BOX = (0.384, 0.220, 0.120)  # full CAD body/front/rear/panel envelope, excluding the actuators
 
-# Depth-camera mount. Single source of truth for BOTH the URDF and the MuJoCo
-# model, which previously carried the same numbers independently.
-#
-# Height is set by self-occlusion, not by styling. The front hip assemblies --
-# the HAA actuator, the bracket and the HFE actuator -- occupy roughly
-# x = 0.11..0.26 m and reach z = +0.05 m. A camera on the body front face looks
-# straight into them: rendering the simulated depth image from z = 0.020 put
-# 95% of the frame on the robot's own legs at 74 mm, and z = 0.090 still left
-# 48%. Clearing the hip corner at (0.26, 0.05) with the bottom edge of a 49 deg
-# vertical frustum pitched down 0.26 rad needs
-#     z > 0.05 + (0.26 - 0.1315) * tan(0.26 + 49deg/2) = 0.155 m
-# so the camera sits on a short mast, as it does on every production quadruped.
-# The 68 g at this height moves the robot's centre of mass up by 0.6 mm.
-CAMERA_MOUNT_XYZ = (BODY_BOX[0] / 2 + 0.014, 0.0, 0.175)
-CAMERA_MOUNT_PITCH_RAD = 0.26    # down-tilt; the ground enters view ~0.6 m ahead
-CAMERA_MAST_SECTION_M = 0.028    # square bracket section carrying the camera
+# Camera geometry is already present in the CAD head. Keep its COM and place
+# the optical point 1mm ahead of the front face. Calibration remains pending.
+CAMERA_MOUNT_XYZ = (0.297, 0.002036, 0.108013)
+CAMERA_MOUNT_PITCH_RAD = 0.0    # CAD camera is horizontal
+CAMERA_MAST_SECTION_M = 0.0    # square bracket section carrying the camera
 
 
 def r6(x):
     return round(float(x), 6)
+
+
+def motor_collisions(parts, links, world, body_frame):
+    """Orient RS06 envelopes at the supplied CAD mounting interfaces."""
+    result = []
+    for part in parts:
+        if part != "part_1" and not part.startswith("part_1_"):
+            continue
+        transform = inv(body_frame) @ world[part] @ links[part]["visuals"][0]["T"]
+        center = transform @ np.array([0.0, MOTOR_DEPTH_M / 2 - 0.004, 0.0, 1.0])
+        rotation = transform[:3, :3] @ rpy2R(math.pi / 2, 0.0, 0.0)
+        result.append(dict(type="cylinder", radius=MOTOR_RADIUS_M, length=MOTOR_DEPTH_M,
+                           xyz=[r6(v) for v in center[:3]],
+                           rpy=[r6(v) for v in R2rpy(rotation)],
+                           note=f"RS06 envelope at CAD motor mount {part}"))
+    return result
 
 
 def collisions_for(name, canon, leg=None):
@@ -533,10 +555,6 @@ def collisions_for(name, canon, leg=None):
     if name == "base":
         prims = [dict(type="box", size=[r6(v) for v in BODY_BOX], xyz=[0, 0, 0], rpy=[0, 0, 0],
                       note="body shell")]
-        for lg, c in LEGS.items():
-            prims.append(dict(type="cylinder", radius=RS02_RADIUS_M, length=RS02_DEPTH_M,
-                              xyz=[r6(c["sx"] * (canon.bx - RS02_DEPTH_M / 2)), r6(c["sy"] * canon.by), 0.0],
-                              rpy=[0, r6(math.pi / 2), 0], note=f"{lg} HAA actuator"))
         return prims
     sy = LEGS[leg]["sy"]
     sx = LEGS[leg]["sx"]
@@ -546,15 +564,9 @@ def collisions_for(name, canon, leg=None):
             dict(type="box", size=[r6(canon.hfe_dx + 0.05), 0.055, 0.075],
                  xyz=[r6(sx * canon.hfe_dx / 2), r6(sy * canon.hfe_dr / 2), 0.0], rpy=[0, 0, 0],
                  note="HAA-HFE bracket"),
-            dict(type="cylinder", radius=RS02_RADIUS_M, length=RS02_DEPTH_M,
-                 xyz=[r6(sx * canon.hfe_dx), r6(sy * (canon.hfe_dr + RS02_DEPTH_M / 2)), 0.0],
-                 rpy=[r6(math.pi / 2), 0, 0], note="HFE actuator"),
         ]
     if kind == "thigh":
         return [
-            dict(type="cylinder", radius=RS02_RADIUS_M, length=RS02_DEPTH_M,
-                 xyz=[0.0, r6(sy * (canon.lat - RS02_DEPTH_M / 2)), -0.045],
-                 rpy=[r6(math.pi / 2), 0, 0], note="KFE actuator, proximally mounted"),
             dict(type="capsule", radius=0.030, from_=[0.0, r6(sy * 0.034), -0.020],
                  to_=[0.0, r6(sy * 0.034), r6(-canon.L1 + 0.015)], note="thigh structure"),
         ]
@@ -568,8 +580,8 @@ def collisions_for(name, canon, leg=None):
     raise ValueError(name)
 
 
-def emit(canon, bodies, q_cad, geo, L2, struct_mass, payload_m):
-    import yaml, hashlib, subprocess
+def emit(canon, bodies, q_cad, geo, L2, struct_mass, payload_m, cad_mass, placeholder_mass):
+    import yaml, hashlib
 
     sha = hashlib.sha256(open(CAD_URDF, "rb").read()).hexdigest()[:16]
     L1 = canon.L1
@@ -591,16 +603,17 @@ def emit(canon, bodies, q_cad, geo, L2, struct_mass, payload_m):
             "generated_by": "tools/cad_to_model.py -- DO NOT EDIT BY HAND, regenerate instead",
             "cad_source": os.path.relpath(CAD_URDF, ROOT),
             "cad_sha256_16": sha,
-            "actuator": "ROBSTRIDE02 (see robstride02.yaml)",
+            "actuator": "ROBSTRIDE06 (see robstride06.yaml)",
             "target_mass_kg": TARGET_MASS_KG,
         },
+        "actuator_config": ACTUATOR_CONFIG,
         "conventions": {
             "frame": "REP-103: x forward, y left, z up; base_link at the body geometric centre",
             "axes": "NOT mirrored -- every HAA axis is +x, every HFE/KFE axis is +y in base_link orientation",
             "haa_sign": "positive HAA abducts the LEFT legs and adducts the RIGHT legs",
             "hfe_sign": "positive HFE swings the thigh backward (-x)",
             "kfe_sign": "negative KFE folds the knee backward; 0 = fully extended, no hyperextension",
-            "zero_pose": "all joints 0 -> legs straight down, feet at (+/-0.221, +/-0.1445, -0.43032)",
+            "zero_pose": "all joints 0 -> legs straight down; positions derived from geometry",
             "leg_order": ["FL", "FR", "RL", "RR"],
             "joint_order_per_leg": ["haa", "hfe", "kfe"],
         },
@@ -621,21 +634,35 @@ def emit(canon, bodies, q_cad, geo, L2, struct_mass, payload_m):
         "joint_limits": {k: dict(lower=v["lower"], upper=v["upper"]) for k, v in JOINT_LIMITS.items()},
         "named_poses": poses,
         "payload": {"items": [{"name": n, "mass_kg": m, "xyz": list(p)} for n, m, p in PAYLOAD],
-                    "total_kg": r6(payload_m)},
+                    "total_kg": r6(payload_m),
+                    "installed_cad_devices": [{"name": name, "mass_kg": mass}
+                                              for name, mass in DEVICE_MASSES.items() if mass > 0]},
         "camera_mount": {
             "xyz": [r6(v) for v in CAMERA_MOUNT_XYZ],
             "pitch_rad": CAMERA_MOUNT_PITCH_RAD,
+            "visual_in_base": True,
+            "com_xyz": [-0.015280, 0.0, 0.0],
+            "inertia": [1.0e-4, 2.0e-5, 1.1e-4],
             "mass_kg": CAMERA_MASS_KG,
             # The bracket from the body shell up to the camera. Its mass is
             # inside the electronics payload, so it is visual only.
             "mast_section_m": CAMERA_MAST_SECTION_M,
             "mast_base_z_m": r6(BODY_BOX[2] / 2 - 0.01),
-            "note": ("front face on a bracket, above the HAA actuators; see "
-                     "tools/cad_to_model.py for why the height is not lower"),
+            "note": "Optical point 1mm ahead of CAD camera front; CAD head/mesh retained. Optical calibration pending.",
         },
         "mass_budget": {
-            "cad_structure_and_actuators_kg": r6(struct_mass),
-            "electronics_payload_kg": r6(payload_m),
+            "cad_structure_and_actuators_kg": r6(struct_mass - sum(DEVICE_MASSES.values())),
+            "electronics_payload_kg": r6(payload_m + sum(DEVICE_MASSES.values())),
+            "cad_export_kg": r6(cad_mass),
+            "replaced_placeholder_kg": r6(placeholder_mass),
+            "actuators_kg": 12 * MOTOR_MASS_KG,
+            "belt_upgrade_kg": 4 * BELT_UPGRADE_PER_LEG_KG,
+            "assumptions": [
+                "Known motor/device placeholder masses replaced, not added twice.",
+                "RS06 inertias use a uniform 88mm x 49mm envelope; mounting requires CAD fit validation.",
+                "Unmodelled equipment/fasteners use estimated point-mass locations.",
+                "2:1 belt geometry remains the supplied old belt visual; extra 120g is included.",
+            ],
             "camera_kg": CAMERA_MASS_KG,
             "total_kg": r6(struct_mass + payload_m + CAMERA_MASS_KG),
         },
@@ -662,7 +689,7 @@ def emit(canon, bodies, q_cad, geo, L2, struct_mass, payload_m):
                         dict(ixx=(0, 0), ixy=(0, 1), ixz=(0, 2),
                              iyy=(1, 1), iyz=(1, 2), izz=(2, 2)).items()},
             "visuals": b["visuals"],
-            "collisions": collisions_for(name, canon, leg),
+            "collisions": collisions_for(name, canon, leg) + b["motor_collisions"],
             "cad_parts": b["cad_parts"],
         }
 

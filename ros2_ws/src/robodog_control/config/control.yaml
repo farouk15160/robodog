@@ -15,7 +15,7 @@
   ros__parameters:
     # -------------------------------------------------------------------------
     # Rates. 400 Hz is set by the CAN bus budget on the real robot (2 buses,
-    # 6 motors each, 72% load -- see robstride02.yaml). Simulation deliberately
+    # 6 motors each, 72% load -- see robstride06.yaml). Simulation deliberately
     # uses the SAME rate so gains tuned in MuJoCo transfer unchanged.
     # -------------------------------------------------------------------------
     control_rate_hz: 400.0
@@ -23,16 +23,10 @@
     joint_state_rate_hz: 100.0       # sensor_msgs/JointState for RViz and TF
 
     # -------------------------------------------------------------------------
-    # Impedance gains, in the actuator's own units (N.m/rad, N.m.s/rad). These
-    # are sent to the RS02 and evaluated in its firmware; the host never closes
-    # this loop itself.
-    #
-    # Sizing: effective joint inertia is the reflected rotor inertia (4.8e-3)
-    # plus roughly 2e-3 of link, so about 7e-3 kg.m2.
-    #     omega_n = sqrt(kp / J)        kd_critical = 2 * sqrt(kp * J)
-    #     kp = 120 -> 131 rad/s (21 Hz), kd_critical = 1.83
-    # Values are set slightly over-damped. The RS02 accepts kp <= 500, kd <= 5.
-    # -------------------------------------------------------------------------
+    # Joint-side impedance gains (N.m/rad, N.m.s/rad). The backend converts
+    # knee gains by ratio^2 * efficiency before sending motor-side CAN frames.
+    # RS06 output inertia is specified; thermal impedance remains uncalibrated.
+    # These gains are verified with the current flat-ground gait report.
     gains:
       position_kp: 80.0    # named-pose moves and joint tests
       position_kd: 2.0
@@ -53,7 +47,12 @@
 
     # Gait entered when a cmd_vel arrives while merely standing.
     default_travel_gait: "trot"
+    # Control-node command caps are independent of the browser GUI limits.
+    # 2 m/s is for simulation experiments only; hardware stays conservative.
+    max_cmd_linear_velocity_sim_m_s: 2.0
+    max_cmd_linear_velocity_hardware_m_s: 0.5
+    max_cmd_yaw_rate_rad_s: 2.0
 
     state_estimator:
       tau_attitude_s: 1.0             # complementary filter time constant
-      contact_force_threshold_n: 8.0  # ~1/3 of the 24.5 N static per-foot load
+      contact_force_threshold_n: 8.0  # conservative contact threshold; ~48 N static load per foot

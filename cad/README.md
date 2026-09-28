@@ -1,54 +1,40 @@
 # CAD
 
-Input to the model pipeline. Nothing here is edited by hand as part of the
-software build; `tools/cad_to_model.py` reads it and produces
-`ros2_ws/src/robodog_description/config/robot_parameters.yaml`, from which the
-URDF, the MuJoCo model, the inverse kinematics and the documentation are all
-derived.
+The active source is `cad/urdf/urdf/urdf.urdf`, with its original meshes in
+`cad/urdf/meshes/`. The earlier `cad/robot/onshape_export/` assembly and RS02
+vendor STEP remain historical reference material.
 
-```
-cad/
-  robot/onshape_export/      the robot assembly, exported from Onshape
-    urdf/urdf.urdf           85 part-links, 12 revolute joints, flat tree
-    meshes/*.stl             per-part geometry, ~41 MB
-  actuators/
-    robstride02_official.step   vendor CAD for the actuator
-    provenance.json             where it came from, and its SHA-256
-```
+`tools/cad_to_model.py` aggregates the export into the canonical floating base
+and twelve joint bodies. It transforms mesh origins, mass centers and inertia
+tensors into the same frame convention used by the URDF, IK and MuJoCo.
+`robot_parameters.yaml` records source provenance and the generated mass budget.
 
-## About the export
+The new approximately 7.549 kg CAD export includes tiny motor placeholders,
+not twelve correctly weighted RS06 actuators. Their existing mass and inertia
+must be removed before adding twelve 621 g RS06 units (7.452 kg). The working
+ROS model is approximately 19.72 kg after battery, electronics and mounting
+allowances. Payload placement and several component masses remain estimates.
 
-The Onshape export is a **flat** tree: every part is its own link, welded
-together by fixed joints, and the assembly is saved at an arbitrary mate pose
-with the legs splayed. It is not usable as a robot description directly. The
-pipeline turns it into a canonical 13-body model — see
-`docs/robodog_architecture.pdf` §3.1 for the six steps, and note two things it
-does that matter:
+The knee actuator remains on the upper leg and drives the knee through a
+2:1 belt reduction: two actuator-output turns per knee turn. Pulley/belt mass
+allowances do not establish geometry clearance or belt strength. The CAD mate
+limits are not treated as verified mechanical stops; check actual assembly
+clearance before hardware calibration.
 
-- **The mate limits are ignored.** They are modelling artefacts (for example
-  `dof_fl0` spans `[-0.704, 0.866]`, asymmetric and different on every leg) and
-  describe how the assembly was posed, not what the mechanism can do.
-- **The actuators are substituted.** The assembly was drawn around MyActuator
-  RMD-X8 V3 parts at 760.8 g each; the pipeline replaces their mass properties
-  with the ROBSTRIDE02's 380 g and swaps the visual mesh for a generated
-  envelope of the correct 78.5 × 41.5 mm size.
-
-## Regenerating after a CAD change
+## Regeneration
 
 ```bash
-python3 tools/cad_to_model.py        # geometry, inertia, visual transforms
-python3 tools/prepare_meshes.py      # decimate visual meshes, 41 MB -> 2.3 MB
-ros2 run robodog_sim generate_models # rebuild the MuJoCo models
-cd docs && make                      # rebuild the figures and the PDF
+python3 tools/cad_to_model.py
+python3 tools/prepare_meshes.py
+ros2 run robodog_sim generate_models
+python3 tools/make_doc_facts.py
 ```
 
-`cad_to_model.py` prints a verification report. The canonical chain should
-reproduce the CAD joint positions to within a few micrometres and the four legs
-should agree with each other to under 2 µm; if either number grows, the
-assembly has changed in a way the pipeline's assumptions did not expect.
+Build/source the ROS workspace before running installed executables. Verify
+URDF/MJCF mass, transforms, mesh availability, joint ranges and unobstructed hip
+motion after regeneration. A model that stands can still contain a collision
+that prevents locomotion.
 
-## Third-party geometry
-
-Two files here are not ours. See `NOTICE` in the repository root for their
-origin and terms. `provenance.json` records the exact source URL and a SHA-256
-of the RS02 STEP file as downloaded, so it can be verified or re-fetched.
+See `NOTICE` and `cad/actuators/provenance.json` for the archived third-party
+actuator geometry. RS06 specifications are sourced in
+`ros2_ws/src/robodog_description/config/robstride06.yaml`.

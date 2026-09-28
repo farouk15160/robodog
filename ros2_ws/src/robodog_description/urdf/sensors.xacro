@@ -58,10 +58,11 @@
     </xacro:if>
     <link name="camera_link">
       <inertial>
-        <mass value="0.068"/>
-        <origin xyz="${back} 0 0" rpy="0 0 0"/>
-        <inertia ixx="1.0e-5" ixy="0" ixz="0" iyy="5.0e-5" iyz="0" izz="5.0e-5"/>
+        <mass value="${CM['mass_kg']}"/>
+        <origin xyz="${CM['com_xyz'][0]} ${CM['com_xyz'][1]} ${CM['com_xyz'][2]}" rpy="0 0 0"/>
+        <inertia ixx="${CM['inertia'][0]}" ixy="0" ixz="0" iyy="${CM['inertia'][1]}" iyz="0" izz="${CM['inertia'][2]}"/>
       </inertial>
+      <xacro:unless value="${CM['visual_in_base']}">
       <visual>
         <origin xyz="${back} 0 0" rpy="0 0 0"/>
         <geometry><box size="${bx} ${by} ${bz}"/></geometry>
@@ -71,6 +72,7 @@
         <origin xyz="${back} 0 0" rpy="0 0 0"/>
         <geometry><box size="${bx} ${by} ${bz}"/></geometry>
       </collision>
+      </xacro:unless>
     </link>
     <joint name="camera_mount_joint" type="fixed">
       <parent link="${parent}"/>

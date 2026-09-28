@@ -4,9 +4,9 @@
 
 \title{\vspace{-12mm}\textbf{robodog}\\[2mm]
 \large Software architecture for a 12-DOF quadruped\\
-\normalsize 12 $\times$ ROBSTRIDE02 QDD actuators \textbullet\ \RdMassTotal\,kg \textbullet\ ROS 2 Jazzy}
+\normalsize 12 $\times$ ROBSTRIDE06 QDD actuators \textbullet\ \RdMassTotal\,kg \textbullet\ ROS 2 (Humble local validation)}
 \author{\small Generated from the Onshape CAD export \texttt{\RdCadSha}}
-\date{\small Revision 0.1 --- simulation-complete, hardware-ready}
+\date{\small Revision 0.2 --- RS06 model migration; hardware unvalidated}
 
 \begin{document}
 \maketitle
@@ -14,14 +14,13 @@
 
 \begin{abstract}\noindent\small
 This document specifies the first software architecture for a 12-DOF quadruped
-built around twelve ROBSTRIDE02 quasi-direct-drive actuators. The robot model is
+built around twelve ROBSTRIDE06 quasi-direct-drive actuators. The robot model is
 derived programmatically from the CAD assembly; the control stack runs at
 \RdControlRate\,Hz behind a hardware abstraction that has three
-implementations, two simulated and one for the real CAN bus. Everything is
-implemented and running in simulation. Nothing above the hardware boundary
-changes when the real actuators and camera are connected --- that is the
-property the architecture is organised around, and Section~\ref{sec:migration}
-states exactly what remains to be done.
+implementations, two simulated and one for the real CAN bus. The current RS06 configuration is evaluated in simulation. The shared
+interfaces preserve command and telemetry semantics across backends; hardware
+calibration, sensor integration and physical validation remain outstanding.
+Section~\ref{sec:migration} records the original migration design.
 \end{abstract}
 
 \vspace{-2mm}
@@ -31,26 +30,140 @@ states exactly what remains to be done.
 % =====================================================================
 \section{Scope and status}
 
-\paragraph{What exists.} Eight ROS 2 packages, 217 tests, a MuJoCo
-model generated from the same parameters as the URDF, a five-room test house,
-a modular web GUI, and the complete ROBSTRIDE02 CAN frame codec with 29 unit
-tests. In simulation the robot stands, holds pose, and walks and trots at the
-commanded velocity --- 0.30\,m/s tracked to within 3\,mm/s at 90\,\% of the
-continuous torque rating.
+\paragraph{Current configuration.} The active source is
+\code{cad/urdf/urdf/urdf.urdf}, with twelve RS06 actuators and a working mass
+of approximately 19.72\,kg. Generated geometry, inertias and actuator macros
+below describe the active model. The external knee belt is 2:1 with an assumed
+95\,\% efficiency: the 8\,N$\cdot$m continuous-stall reference becomes
+15.2\,N$\cdot$m at the knee. The 11\,N$\cdot$m rotating rating becomes
+20.9\,N$\cdot$m, and 36\,N$\cdot$m peak becomes 68.4\,N$\cdot$m.
+These are transmission calculations, not belt or shaft strength validation.
 
-\paragraph{What does not.} No hardware has been driven. The CAN backend is
-written but unvalidated; per-joint direction and offset are unknown until the
-robot is assembled and calibrated. Of the five gaits, pace and bound do not
-track velocity --- neither is intended for travel, but neither is finished
-either. Turning is implemented and untested beyond straight-line commands. The camera depth path is a placeholder in
-one respect only (how the HP60C delivers depth over USB). Estimated quantities
---- rotor inertia, thermal constants, joint friction --- are marked as such
-throughout and listed in Section~\ref{sec:assumptions}.
+\begin{caveat}{Historical measurements are superseded}
+Sections explicitly labeled historical, and legacy stance-height and terrain
+examples, describe the earlier 10\,kg RS02 model. They are retained
+as engineering history, not acceptance evidence for the RS06 configuration.
+Current architecture diagrams reflect the RS06 configuration. Use the current
+\code{tools/torque\_report.py} output for new per-joint measurements; generated
+macros update configuration facts but do not rerun empirical experiments.
+\end{caveat}
 
-\paragraph{How to read this.} Every quantity quoted here is generated from
-\code{robot\_parameters.yaml} and \code{robstride02.yaml} by
-\code{tools/make\_doc\_facts.py}. If the CAD changes and the model is
-regenerated, the numbers in this document change with it.
+\paragraph{Cooling, overload and power assumptions.} The manufacturer's
+September 17 specification rates RS06 at 11\,N$\cdot$m at 100\,rpm with a
+200\,$\times$\,200\,mm aluminum heat sink. Its separate stall table specifies
+8\,N$\cdot$m continuous; the controller uses that holding value as its
+continuous budget. At 36\,N$\cdot$m the maximum is 1 second stalled or
+4 seconds rotating. These are published test points, not permission to repeat
+peak pulses indefinitely. Installed cooling and recovery remain unverified.
+
+The latest source publishes line resistance and equivalent output inertia;
+thermal impedance, friction and belt losses still require identification.
+Simulation temperatures remain estimates. The battery assumption is two 6S
+packs in series: 44.4\,V nominal and 50.4\,V fully charged. Pack wiring and
+discharge behavior must be verified separately from mass. The central electronics
+plate does not establish equivalent heat removal for twelve actuators.
+
+\paragraph{Hardware status.} No hardware has been driven. Direction, zero
+reference, firmware scaling, wiring and cooling require physical validation.
+The real IMU/base-state input is not integrated. Missing feedback remains
+explicitly unavailable, and travel commands are refused until live base feedback
+is connected. Hardware startup defaults to disabled; RS06 normal enable/motion
+requires joints marked calibrated after physical commissioning.
+MuJoCo supplies exact base feedback, so successful simulated motion does not
+validate the physical estimator. Turning tests below expose tracking error;
+stairs, jumps, pace and bound still need separate validation.
+
+\paragraph{Sources.} Configuration facts come from
+\code{robot\_parameters.yaml} and the file selected by its
+\code{actuator\_config}, through \code{tools/make\_doc\_facts.py}.
+Performance and electrical values follow the manufacturer's September 17, 2026
+RS-series specification; the July RS06 manual supplies protocol details.
+\href{rs06_datasheet_audit.md}{The RS06 datasheet audit} records source links,
+page references, source hashes and differences between these documents.
+
+\paragraph{Current gait settings and report.} Walk uses 1.5\,Hz, duty
+factor 0.78, 30\,mm swing clearance and 320\,mm stance height. Trot uses 2.2\,Hz, 40\,mm clearance
+and 330\,mm stance. Stance impedance remains 90/2 and swing impedance 60/1.5
+in joint-space stiffness/damping units. Current measurements and their limits
+are in \href{rs06_speed_study.md}{docs/rs06\_speed\_study.md}; the associated
+JSON and CSV retain all twelve joint results. The accompanying
+\code{rs06\_speed\_study.xml} uses an obstacle-free plane for sustained travel.
+The GUI proving ground's barrier at 9\,m makes it unsuitable for these longer
+speed runs. \href{locomotion_validation.md}{The locomotion validation report}
+compares speeds, turning and the official Go2 model.
+
+\subsection{Current RS06 simulation measurements}
+
+Each case ran for 20 seconds with the configured gains, motor envelope and
+safety monitor active. Commands step from a standing keyframe with 2\,mm ground
+clearance. The controller runs at 400\,Hz, physics at 2\,kHz, and command delay
+is two physics steps (1\,ms). Applied actuator torque is read from MuJoCo
+\code{qfrc\_actuator} every physics step, after limits and transmission gears;
+it is neither the requested PD effort nor the total structural/contact load.
+RMS excludes the first second; peaks and overload durations include startup.
+For knees, inferred motor-output torque is joint torque divided by
+$2\times0.95$; hips are direct drive. These measurements supersede earlier
+RS06 results collected before the delay correction and physics-rate sampling.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrl@{}}
+\toprule
+\textbf{Gait} & \textbf{Command} & \textbf{Actual} & \textbf{Motor RMS} &
+\textbf{Motor peak} & \textbf{Clamped} & \textbf{Stable/tracks} \\
+ & (m/s) & (m/s) & (N$\cdot$m) & (N$\cdot$m) & (\% cycles) & \\
+\midrule
+Stand & 0.00 & $\approx$0.000 & 3.28 & 4.05 & 0.0 & yes/yes \\
+Walk & 0.15 & 0.171 & 4.94 & 10.77 & 0.0 & yes/yes \\
+Walk & 0.40 & 0.420 & 5.36 & 23.59 & 0.0 & yes/yes \\
+Walk & 0.50 & 0.521 & 5.91 & 29.30 & 60.6 & yes/yes \\
+Trot & 0.40 & 0.414 & 4.73 & 11.78 & 0.0 & yes/yes \\
+Trot & 0.50 & 0.515 & 4.79 & 13.34 & 0.0 & yes/yes \\
+Trot & 0.75 & 0.756 & 4.99 & 21.19 & 0.0 & yes/yes \\
+Trot & 1.00 & 0.979 & 5.38 & 28.15 & 26.8 & yes/yes \\
+Trot & 1.50 & 1.477 & 6.49 & 30.37 & 99.4 & yes/yes \\
+Trot & 2.00 & 0.052 & 7.21 & 35.12 & 99.9 & no/no \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+RMS and peak are the worst individual motor values and may belong to different
+joints. The clamped column counts safety-limited control cycles; separate
+motor-envelope reductions and fault flags are retained in the full report.
+Walk at 0.4\,m/s tracks but raises a velocity-limit flag; at 0.5\,m/s it
+frequently activates safety limiting. Walk commands from 0.75 through
+2.0\,m/s fail stability/tracking. Trot remains stable through the tested
+1.5\,m/s command, but limiting starts at 1.0\,m/s and affects almost every
+cycle at 1.5\,m/s. Trot at 2.0\,m/s fails. Failed-run loads include the fallen
+portion and are not successful operating points. Accepting a 2\,m/s GUI
+command therefore does not establish that the robot can execute it.
+
+At 0.4 and 0.5\,m/s trot, worst motor RMS is 59\,\% and 60\,\% of the
+8\,N$\cdot$m continuous-stall reference, respectively. The separate
+11\,N$\cdot$m rotating rating requires the specified heatsink. These short
+runs do not validate installed cooling, belt/pulley strength, mounting fit,
+battery sag, regenerative power or physical sensor integration. Estimated
+thermal values remain uncalibrated.
+
+\paragraph{Turning.} With a requested yaw rate of 0.30\,rad/s, the 0.4 and
+0.5\,m/s trot cases achieve only 0.127 and 0.144\,rad/s, respectively.
+They stay upright and track forward speed, but fail the requested turn rate.
+Feedback and forward-speed measurements use the body's yaw frame.
+
+\paragraph{Go2 comparison and system smoke test.}
+\href{go2_benchmark.md}{The pinned official Go2 MJCF benchmark} uses the same
+plane, effective contacts, solver, timestep, 20-second duration, 1-second RMS
+warmup, startup clearance, delay and shared trot generator/gains. Go2's
+15.206\,kg model retains its native inertias and torque caps; Robodog retains
+its RS06 envelope and safety policy. This is a shared-controller model
+comparison, not Unitree factory-controller performance. Both floating bases
+move only through joint actuation and ground contact. At 0.4/0.5\,m/s,
+Go2 achieves 0.393/0.492\,m/s; its worst knee joint RMS is 7.95/8.02\,N$\cdot$m
+versus Robodog's 8.99/9.10\,N$\cdot$m. Compare joint-output effort before
+separately accounting for Robodog's knee belt.
+\href{go2_runner_smoke.md}{The official viewer/SDK runner test} advances
+781 steps on loopback DDS, then exits with a segmentation fault during
+shutdown; it is not a clean runtime pass. The headless benchmark completes
+normally. The shutdown failure remains unresolved.
 
 % =====================================================================
 \section{System overview}
@@ -66,44 +179,29 @@ hardware/software boundary: two abstract interfaces, \code{JointBackend} and
 \toprule
 \textbf{Quantity} & \textbf{Target} & \textbf{Achieved} \\
 \midrule
-Total mass            & 10\,kg              & \RdMassTotal\,kg \\
+Total mass            & 19.72\,kg              & \RdMassTotal\,kg \\
 Degrees of freedom    & 12 (HAA/HFE/KFE)    & 12 \\
 Nominal stance height & ---                 & \RdStandHeight\,mm (\RdStandExtension\,\% of leg reach) \\
-Static torque margin  & within continuous   & 62.5\,\% of \RdTorqueCont\,N$\cdot$m \\
+Static torque margin  & within continuous   & requires current per-motor report \\
 Control rate          & ---                 & \RdControlRate\,Hz, sim and hardware alike \\
-Actuator              & ROBSTRIDE02         & \RdTorqueCont/\RdTorquePeak\,N$\cdot$m cont/peak \\
+Actuator              & ROBSTRIDE06         & \RdTorqueCont/\RdTorquePeak\,N$\cdot$m cont/peak \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \subsection{Mass budget}
 
-The CAD assembly was drawn around RMD-X8 actuators at 760.8\,g each. Substituting
-ROBSTRIDE02 at \RdMassActuator\,g removes 4.57\,kg and lands the structure at
-\RdMassStruct\,kg, leaving \RdMassPayload\,kg for electronics and
-\RdMassCamera\,kg for the camera.
+The new CAD export totals approximately 7.549\,kg. Its small placeholder
+motor masses are removed before adding twelve 0.621\,kg RS06 actuators.
+The working model totals \RdMassTotal\,kg, including an estimated battery,
+electronics and mounting allowance. Two 1.250\,kg battery packs contribute
+2.500\,kg; the twelve actuators contribute 7.452\,kg. The remaining component
+masses and their placement must be checked against the assembled machine.
 
-\begin{center}\small
-\begin{tabular}{@{}lrl@{}}
-\toprule
-\textbf{Item} & \textbf{Mass (kg)} & \textbf{Note} \\
-\midrule
-CAD structure                       & 4.332 & body, brackets, legs, bearings \\
-12 $\times$ ROBSTRIDE02             & \RdMassTwelve & \RdMassActuator\,g each \\
-Battery, 12S LiPo                   & 0.700 & \RdVoltage\,V nominal \\
-Onboard computer                    & 0.200 & \\
-Power distribution and wiring       & 0.130 & \\
-IMU                                 & 0.010 & \\
-Camera (NUWA HP60C)                 & \RdMassCamera & separate link \\
-\midrule
-\textbf{Total}                      & \textbf{\RdMassTotal} & \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Per-link masses after aggregation: base \RdMassBase\,kg, hip \RdMassHip\,g,
-thigh \RdMassThigh\,g, calf \RdMassCalf\,g. The whole-robot centre of mass sits
-\RdComX\,mm from the body centre longitudinally.
+Generated per-link examples are base \RdMassBase\,kg, front-left hip
+\RdMassHip\,g, thigh \RdMassThigh\,g and calf \RdMassCalf\,g. The base-link
+mass center has longitudinal coordinate \RdComX\,mm; this is not a measurement
+of the whole-robot center of mass in an arbitrary pose.
 
 \subsection{Coordinate systems and conventions}
 \label{sec:conventions}
@@ -130,20 +228,22 @@ and adducts the right legs.} Sim-to-real then reduces to one sign per joint in
 \end{decision}
 
 \paragraph{Zero and sign.} All joints at zero puts the legs straight down, feet
-at $(\pm 0.221,\ \pm 0.1445,\ -0.430)$\,m. Positive HFE swings the thigh
+at longitudinal offsets $\pm(h_{\rm aa,x}+h_{\rm fe,dx})$, lateral offsets
+$\pm(h_{\rm aa,y}+h_{\rm fe,dr}+d_{\rm thigh,y})$, and height
+$-(L_1+L_2)$ relative to the base. Positive HFE swings the thigh
 backward. Negative KFE folds the knee backward; KFE\,$=0$ is fully extended and
 the upper limit, so the knee cannot hyperextend.
 
 \begin{decision}{Named poses are specified as a base height, not joint angles}
 Each foot hangs vertically below its own HFE axis. That one rule yields, at
 once: identical joint angles on all four legs despite the non-mirrored axes; a
-support polygon of \RdFootprintL\,$\times$\,\RdFootprintW\,mm centred within
-\RdComX\,mm of the centre of mass; and the lowest peak joint torque of any
-centred foot placement.
+nominal support polygon of \RdFootprintL\,$\times$\,\RdFootprintW\,mm.
+The whole-robot center of mass depends on payload placement and leg pose.
 
 Placing the feet under the \emph{HAA} axes instead would need different front
 and rear angles, because the HFE sits \RdHfeDx\,mm outboard of the HAA, and
-would cost 73\,\% of the continuous rating on the rear knees instead of 62.5\,\%.
+changes the support lever arms and joint utilization; compare motor-side
+loads through the active knee transmission.
 \end{decision}
 
 % =====================================================================
@@ -151,7 +251,7 @@ would cost 73\,\% of the continuous rating on the rear knees instead of 62.5\,\%
 
 \subsection{CAD to URDF pipeline}
 
-The Onshape export is a flat tree of 85 part-links with 12 revolute joints,
+The Onshape export is a flat tree of 264 part-links with 12 revolute joints,
 saved at an arbitrary mate pose. \code{tools/cad\_to\_model.py} turns it into a
 canonical 13-body model:
 
@@ -161,12 +261,12 @@ canonical 13-body model:
 \item recover the pose-invariant leg geometry (link lengths, axis offsets);
 \item solve the CAD mate angles against the canonical zero definition;
 \item re-express every visual mesh and inertia tensor in canonical body frames;
-\item substitute ROBSTRIDE02 mass properties for the CAD's RMD-X8 placeholders.
+\item substitute RS06 mass properties for the new CAD motor placeholders.
 \end{enumerate}
 
-The canonical chain reproduces the CAD joint positions to within
-\textbf{9.9\,$\mu$m}, and the four legs agree with each other to under 2\,$\mu$m
---- the CAD is exactly symmetric, and the residual is mesh float precision.
+The generation tool prints canonical-chain residuals against the active CAD.
+Review these together with link masses and mesh transforms after each export;
+a small kinematic residual alone does not verify self-collision clearance.
 
 \begin{decision}{The URDF is generated, never hand-edited}
 \code{robot\_parameters.yaml} is the single source of truth. The Xacro, the
@@ -213,18 +313,19 @@ $10^{-6}$.
 
 \subsection{Knee drive topology}
 
-The knee actuator is mounted \emph{proximally} on the thigh --- 48\,mm from the
-HFE axis, 179\,mm from the knee --- and drives the joint through a 1:1 belt.
-
-\begin{decision}{Proximal knee actuator, modelled as a simple revolute joint}
-This is the standard low-distal-inertia arrangement. Its effect is measurable in
-the generated model: the thigh's centre of mass sits only 27\,mm below the hip,
-and the calf masses just \RdMassCalf\,g. Because the motor rotates \emph{with}
-the thigh, the knee angle is not kinematically coupled to the hip angle, so the
-URDF needs no mimic joint or transmission --- the belt ratio is a parameter that
-is currently 1.0. Should a non-unity ratio be fitted, it enters in one place:
-the joint-to-motor map.
-\end{decision}
+The knee actuator is mounted proximally on the upper leg and drives the knee
+through a 2:1 external belt. The internal 9:1 actuator gearbox is already
+included in the RS06 output specifications. With external ratio $r=2$ and
+assumed efficiency $\eta=0.95$,
+\[
+ q_m=rq_j,\qquad \dot q_m=r\dot q_j,\qquad
+ \tau_j=r\eta\tau_m,\qquad J_{j}=r^2J_{m}.
+\]
+The belt does not kinematically couple hip and knee angles. The gait and
+Jacobian use joint coordinates; the shared transmission map converts at the
+hardware/simulation boundary. Motor-side torque, not knee joint torque, drives
+current and thermal estimates. Constant efficiency approximates motoring and
+does not model compliance, backlash or regenerative braking.
 
 \subsection{Joint limits}
 
@@ -249,7 +350,7 @@ should be refined once self-collision checking runs against the real geometry.
 \end{caveat}
 
 % =====================================================================
-\section{Actuator: ROBSTRIDE02}
+\section{Actuator: ROBSTRIDE06}
 \label{sec:actuator}
 
 \subsection{Specification and derived quantities}
@@ -260,36 +361,42 @@ should be refined once self-collision checking runs against the real geometry.
 \textbf{Quantity} & \textbf{Source} & \textbf{Value} \\
 \midrule
 Mass                    & spec    & \RdMassActuator\,g $\pm$ 3\,g \\
-Envelope                & spec    & 78.5\,mm dia $\times$ 41.5\,mm \\
+Envelope                & spec    & 88\,mm flange $\times$ 49\,mm \\
 Gear ratio              & spec    & \RdGearRatio:1, machined steel \\
-Rated / peak torque     & spec    & \RdTorqueRated\,/\,\RdTorquePeak\,N$\cdot$m \\
+Rotating rated / peak   & spec    & \RdTorqueRated\,/\,\RdTorquePeak\,N$\cdot$m \\
+Continuous stall        & spec    & 8\,N$\cdot$m \\
 Rated speed             & spec    & 100\,rpm $=$ \RdSpeedRated\,rad/s \\
-No-load speed           & spec    & 410\,rpm $=$ \RdSpeedNoLoad\,rad/s \\
+No-load speed           & spec    & 480\,rpm $=$ \RdSpeedNoLoad\,rad/s \\
 Torque constant $K_t$   & spec    & \RdKt\,N$\cdot$m/A$_{\mathrm{rms}}$ \\
-Line resistance         & spec    & 0.58\,$\Omega$ (phase \RdRphase\,$\Omega$) \\
+Line resistance         & spec & 0.23\,$\Omega$ $\pm10\,\%$ \\
+Phase equivalent        & derived & 0.115\,$\Omega$ (equivalent wye) \\
 Voltage                 & spec    & \RdVoltage\,V rated, \RdVoltMin--\RdVoltMax\,V \\
-Encoders                & spec    & 2 $\times$ \RdEncoderBits-bit absolute magnetic \\
-Output resolution       & derived & \RdEncoderRes\,rad \\
+Encoders                & spec    & two magnetic encoders \\
+Encoder resolution      & unverified & not used to certify position accuracy \\
 Rated phase current     & derived & \RdRatedArms\,A$_{\mathrm{rms}}$ \\
 Copper loss at rating   & derived & \RdCopperLoss\,W \\
-Reflected rotor inertia & estimate& \RdArmature\,kg$\cdot$m$^2$ \\
+Output equivalent inertia & spec & \RdArmature\,kg$\cdot$m$^2$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\paragraph{$K_t$ is output-referred.} Dividing the rated torque by the torque
-constant gives $\RdTorqueRated / \RdKt = 4.92\,\mathrm{A_{rms}}$, which matches
-the rated phase current of 7\,A peak $/\sqrt{2} = \RdRatedArms\,\mathrm{A_{rms}}$.
-The constant is therefore quoted \emph{after} the \RdGearRatio:1 reduction. This
-matters: it makes the torque-to-current conversion used by the thermal observer
-a single multiplication, with no gear ratio in it.
+\paragraph{Motor-side electrical model.} The published output-referred
+$K_t=\RdKt$\,N$\cdot$m/A$_{\mathrm{rms}}$ provides a low-load phase-current
+estimate. Knee torque is first divided by $2\times0.95$. The published
+0.23\,$\Omega$ line resistance gives 0.115\,$\Omega$ under an equivalent-wye
+model; the latter is a modeling conversion, not a separately specified winding
+resistance. The constant-$K_t$ approximation does not reproduce the published
+peak-current limit and is not a DC-bus current estimate or a verified Iq-to-RMS
+conversion. Thermal resistance and heat capacity remain uncalibrated, so
+steady-temperature predictions are illustrative.
 
-\paragraph{Reflected inertia dominates the distal link.} With
-$J_{\mathrm{rotor}} \approx \RdRotorInertia\,\mathrm{kg\,m^2}$ estimated for a
-28-pole outrunner, the inertia seen at the output is
-$J_{\mathrm{rotor}} \times \RdGearRatio^2 = \RdArmature\,\mathrm{kg\,m^2}$ ---
-larger than the calf's own inertia about the knee. Omitting it from the
-simulation would make the legs roughly four times too easy to accelerate.
+\paragraph{Equivalent output inertia.} The manufacturer specifies
+0.012\,kg$\cdot$m$^2$ at the actuator's low-speed output. The external 2:1
+knee reduction multiplies it by four to 0.048\,kg$\cdot$m$^2$. This includes
+the internal drive's equivalent inertia, not a direct bare-rotor measurement.
+Dividing by the internal ratio squared would only infer an equivalent rotor-side
+quantity. Validate assembly dynamics and friction without discarding the
+published output inertia.
 
 \subsection{CAN interface}
 
@@ -327,7 +434,7 @@ needs one command and one feedback frame per cycle.
 \end{center}
 
 \begin{decision}{Two buses at \RdControlRate\,Hz, split front/rear}
-\RdControlRate\,Hz is not a compromise on control quality: because the RS02
+\RdControlRate\,Hz is not a compromise on control quality: because the RS06
 closes its position and velocity loop in firmware, the host rate is a
 \emph{setpoint update} rate. The same rate is used in simulation so that gains
 tuned in MuJoCo transfer without change.
@@ -335,7 +442,7 @@ tuned in MuJoCo transfer without change.
 The split is front/rear rather than left/right so that each bus carries a
 complete leg \emph{pair}: a single bus failure leaves the robot in a
 recognisable posture rather than a diagonal collapse.
-\code{RobStride02Backend.check\_bus\_budget()} refuses any configuration above
+\code{RobStride06Backend.check\_bus\_budget()} refuses any configuration above
 80\,\% at start-up.
 \end{decision}
 
@@ -355,7 +462,7 @@ simulation package.}{0.96}
 \midrule
 \code{robodog\_msgs}        & ament\_cmake  & message and service contract \\
 \code{robodog\_description} & ament\_cmake  & URDF/Xacro, meshes, RViz, actuator data \\
-\code{robodog\_hardware}    & ament\_python & \code{JointBackend} + RS02 CAN codec \\
+\code{robodog\_hardware}    & ament\_python & \code{JointBackend} + RS06 CAN codec \\
 \code{robodog\_control}     & ament\_python & control loop, safety, gait, IK, estimator \\
 \code{robodog\_sim}         & ament\_python & MJCF generator, test worlds, markers \\
 \code{robodog\_perception}  & ament\_python & \code{CameraBackend}, depth, point cloud \\
@@ -393,18 +500,17 @@ class JointBackend(ABC):
 \begin{decision}{\code{base\_state()} returns \code{None} on the real robot}
 A simulator knows the floating-base state exactly; the real robot has no sensor
 for absolute base pose. Rather than inventing one, the contract makes the
-absence explicit and forces every consumer to handle it. The state estimator
-fills the gap from the IMU and leg kinematics, and marks its output
-\code{ground\_truth = False}. Returning a plausible-looking zero would hide the
-difference that matters most when a controller tuned in simulation is first run
-on hardware.
+absence explicit and forces every consumer to handle it. Real IMU integration
+is currently missing, so hardware travel is refused rather than synthesizing
+gravity and zero gyro samples. The estimator design below describes a future
+integration path; it does not establish a working hardware balance loop.
 \end{decision}
 
 Three implementations exist. \code{KinematicBackend} models each joint as an
 independent second-order system with the reflected rotor inertia --- no physics
 engine, no contact, no gravity --- so the entire stack above the boundary is
 runnable and testable with nothing installed. \code{MujocoBackend} adds
-rigid-body dynamics and contact. \code{RobStride02Backend} drives the real
+rigid-body dynamics and contact. \code{RobStride06Backend} drives the real
 motors.
 
 \subsection{Interfaces}
@@ -479,11 +585,12 @@ The actuator evaluates
 \[
 \tau = k_p\,(q^{*} - q) + k_d\,(\dot q^{*} - \dot q) + \tau_{\mathrm{ff}}
 \]
-in firmware. Effective joint inertia is the reflected rotor inertia
-(\RdArmature) plus roughly $2\times10^{-3}$ of link, so $J \approx
-7\times10^{-3}\,\mathrm{kg\,m^2}$; $k_p = 120$ then gives
-$\omega_n = \sqrt{k_p/J} \approx 131$\,rad/s (21\,Hz) and a critical damping of
-$k_d = 2\sqrt{k_p J} = 1.83$.
+in firmware. Effective joint inertia includes the published equivalent actuator
+output inertia, reflected through the external belt, plus configuration-dependent
+link inertia. For an identified effective inertia $J$, the local linear estimates
+are $\omega_n=\sqrt{k_p/J}$ and $k_{d,\mathrm{critical}}=2\sqrt{k_pJ}$.
+The knee's actuator contribution is four times that of a direct-drive hip, so
+one old RS02 inertia calculation cannot characterize every current joint.
 
 \begin{center}\small
 \begin{tabular}{@{}lrrl@{}}
@@ -530,7 +637,7 @@ fixed offset and is in stance for \code{duty\_factor} of its period.
 \textbf{Gait} & \textbf{Offsets} & \textbf{Duty} & \textbf{Freq (Hz)} & \textbf{Character} \\
 \midrule
 stand & ---                     & 1.00 & 0.0 & all feet planted \\
-walk  & 0, 0.50, 0.75, 0.25     & 0.75 & 1.2 & statically stable, one foot up \\
+walk  & 0, 0.50, 0.75, 0.25     & 0.78 & 1.5 & one foot up, brief full support \\
 trot  & 0, 0.50, 0.50, 0        & 0.50 & 2.2 & diagonal pairs; default travel \\
 pace  & 0, 0.50, 0, 0.50        & 0.50 & 2.0 & lateral pairs; rolls this narrow body \\
 bound & 0, 0, 0.50, 0.50        & 0.45 & 2.6 & front then rear; most demanding \\
@@ -743,7 +850,7 @@ and cancels the propulsion force.
 legged robot steers by where it puts its feet. The Raibert heuristic places the
 landing point at $v\,T_{\mathrm{stance}}/2 + k_v (v - v^{*})$.
 
-\subsection{Measured locomotion performance}
+\subsection{Historical RS02 locomotion performance}
 \label{sec:locomotion-status}
 
 Six seconds of each gait from the standing keyframe, commanded in a straight
@@ -841,14 +948,13 @@ $-0.007$ to $-0.018$\,m/s. A robot that wanders 0.3\,m sideways in six seconds
 does not get through a doorway. The regression test asserts those two things
 rather than tilt.
 
-\subsection{Thermal load}
+\subsection{Historical RS02 thermal load}
 \label{sec:thermal-load}
 
-Peak torque is the wrong question to ask of a motor. What decides whether a
-winding survives is the RMS torque, because copper loss goes as current
-squared: a \RdTorquePeak\,N$\cdot$m spike lasting 20\,ms is harmless, and
-10\,N$\cdot$m sustained is not. Measured over six seconds of each gait, worst
-joint, with the start-up transient discarded:
+The following table used the old RS02 model with 6\,N$\cdot$m continuous
+and 17\,N$\cdot$m peak ratings. RMS torque tracks copper heating, but the
+temperatures were estimates rather than winding measurements. Six-second runs
+discarded the startup transient and reported the busiest joint:
 
 \begin{center}\small
 \begin{tabular}{@{}lrrrrrl@{}}
@@ -878,7 +984,7 @@ were never undersized. Standing costs 3.9\,N$\cdot$m RMS, and steady walking at
 which does no work at all. A travelling gait that costs three times the RMS of
 standing still is not doing three times the work; it is wasting the difference.
 With the waste removed, trot sits at 90\,\% of continuous and 69\,$^\circ$C,
-inside the \RdTempWarn\,$^\circ$C warning threshold.
+inside the 70\,$^\circ$C warning threshold.
 
 Bound remains over limit, which is what it is for: it is the gait used to probe
 the peak-torque and $I^2t$ path in simulation, and it should not be commanded on
@@ -891,7 +997,8 @@ standing 340\,mm tall rather than 320 --- a straighter leg has a shorter moment
 arm --- and that costs 20\,mm of the leg travel otherwise available for terrain
 and attitude correction. Walk stays at 320\,mm, where it is 91\,\%,
 because it is the gait for stairs and narrow passages and wants the travel.
-The per-gait stance heights in \code{gaits.yaml} carry the measured trade-off.
+Those historical stance heights have been replaced by the current RS06
+tuning and should not be copied from this table.
 
 None of this has been validated against hardware. The thermal model is a
 first-order estimate from datasheet resistance and an assumed thermal
@@ -902,14 +1009,17 @@ resistance; the friction and damping are estimates. Treat 90\,\% as
 \subsection{State estimation}
 
 \begin{decision}{A complementary filter and leg odometry, not an EKF}
-Attitude comes from blending gyro integration with the gravity direction, with
+The estimator module implements the intended sensor-fusion algorithm, but its
+real IMU input is not integrated into the control loop. Hardware travel is
+blocked while base feedback is unavailable. Given actual sensor input, attitude
+comes from blending gyro integration with the gravity direction, with
 the gravity term weighted by how closely the measured acceleration magnitude
 resembles $g$ --- during a hard push-off it does not. Height and velocity come
 from treating each foot in contact as a temporary fixed point.
 
 An EKF was rejected \emph{for now} because until the robot exists its process
 and measurement covariances would be invented numbers. This is honest,
-debuggable and sufficient to stand, walk and visualise. Yaw is not observable
+debuggable; it still requires sensor integration and physical validation. Yaw is not observable
 from an IMU without a magnetometer and is flagged as drifting.
 \end{decision}
 
@@ -927,13 +1037,20 @@ from an IMU without a magnetometer and is flagged as drifting.
 Torque   & \RdTorquePeak\,N$\cdot$m & \RdTorqueCont\,N$\cdot$m continuous & $I^2t$ integrator \\
 Velocity & \RdSpeedNoLoad\,rad/s & \RdSpeedOp\,rad/s & clamp \\
 Position & joint end stops & end stops inset 0.05\,rad & clamp + rate limit \\
-Winding temperature & --- & \RdTempWarn/\RdTempDerate/\RdTempFault\,$^\circ$C & derate, then latch \\
+Temperature policy & --- & \RdTempWarn/\RdTempDerate/\RdTempFault\,$^\circ$C & derate, then latch \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The URDF carries what the hardware can physically deliver; the operational tier
-is what the robot is allowed to use.
+Torque and speed values in this table are actuator-output references. The knee
+joint's continuous budget is 15.2\,N$\cdot$m and peak is 68.4\,N$\cdot$m
+with the assumed 2:1 ratio and 95\,\% efficiency; its speed limits halve.
+Enforcement uses these per-joint mappings rather than one scalar joint limit.
+
+The URDF carries modeled hard bounds, not a guarantee of sustained physical
+output; the operational tier constrains requests within the configured policy.
+Temperature thresholds are project policy and do not identify the feedback
+sensor as a winding-temperature measurement.
 
 \subsection{Design rules}
 
@@ -963,25 +1080,33 @@ commanded impedance direction.
 
 The budget is the continuous rating normally, rising to peak while $I^2t$ credit
 remains. The integrator charges as $(\tau/\tau_{\mathrm{cont}})^2 - 1$ above the
-continuous rating, so twice the continuous torque exhausts the budget four times
-faster, and discharges when below.
+continuous reference, and discharges when below. This is a project protection
+heuristic, not the manufacturer's exact overload curve or per-phase stall
+heating model. The published one-second 36\,N$\cdot$m stall limit is not an
+indefinitely repeatable pulse allowance.
 
 \subsection{Thermal model}
 
 \[
-P_{\mathrm{cu}} = 3 I_{\mathrm{rms}}^2 R_{\phi},\quad I_{\mathrm{rms}} = \tau/K_t,
+P_{\mathrm{cu}} = 3 I_{\mathrm{rms}}^2 R_{\phi},\quad I_{\mathrm{rms}} = \tau_m/K_t,
 \qquad
 C_{\mathrm{th}}\,\dot T = P_{\mathrm{cu}} - \frac{T - T_{\mathrm{amb}}}{R_{\mathrm{th}}}
 \]
 
-with $R_{\mathrm{th}} = \RdRthermal$\,K/W and $C_{\mathrm{th}} = \RdCthermal$\,J/K,
+Here $\tau_m$ is actuator-output torque before the external belt; knee joint
+torque is divided by $2\times0.95$. The phase equivalent follows from the
+published line resistance under an equivalent-wye assumption; thermal resistance
+and capacitance remain uncalibrated. The equation uses
+$R_{\mathrm{th}} = \RdRthermal$\,K/W and $C_{\mathrm{th}} = \RdCthermal$\,J/K,
 giving a time constant of \RdTauThermal\,minutes. It runs in two roles: in
 simulation it synthesises a plausible temperature, because MuJoCo has no concept
 of copper loss and the safety architecture must be exercised; on the real robot
 it runs as an \emph{observer} alongside the reported temperature, and the
-monitor takes the maximum of the two. The motor's own sensor sits on the driver
-board and lags the winding by tens of seconds --- the observer is what catches a
-stalled leg pushing against an obstacle.
+monitor takes the maximum of the two. The feedback
+temperature is not an identified winding measurement; sensor location and lag
+must be checked on delivered hardware. Taking the maximum does not make an
+uncalibrated observer a verified protection model. This single lump does not
+reproduce uneven per-phase heating with a stationary current vector at stall.
 
 Between \RdTempDerate\ and \RdTempFault\,$^\circ$C the torque budget is scaled
 down linearly rather than cut at a threshold, because cutting output abruptly
@@ -990,7 +1115,7 @@ would drop the robot.
 \subsection{Watchdog and emergency stop}
 
 \begin{decision}{A stale command holds position; it does not go limp}
-Losing torque mid-stance drops a 10\,kg robot. The watchdog substitutes an
+Losing torque mid-stance drops a roughly 19.72\,kg robot. The watchdog substitutes an
 impedance command that holds the measured position at moderate gain. If a joint
 is measured outside its soft range, the hold target is the limit, so the
 watchdog recovers the envelope gently rather than freezing outside it.
@@ -1015,13 +1140,13 @@ a controller that works in simulation and fails on the robot.
 
 \begin{enumerate}
 \item \textbf{The impedance law is evaluated at the physics rate}, not the
-      control rate. The real RS02 closes its loop in firmware at tens of kHz;
+      control rate. The real RS06 closes its loop in firmware at tens of kHz;
       holding a \RdControlRate\,Hz zero-order hold on $k_p(q^*-q)$ would make the
       simulated joints noticeably softer than the hardware and would tune gains
       that are wrong on the robot. Only the \emph{setpoint} is held.
-\item \textbf{\code{armature} carries the reflected rotor inertia}
-      (\RdArmature\,kg$\cdot$m$^2$), which is larger than the calf's own inertia
-      about the knee. Omitting it is not a small error.
+\item \textbf{\code{armature} carries equivalent output inertia}:
+      0.012\,kg$\cdot$m$^2$ for direct hips and 0.048\,kg$\cdot$m$^2$
+      after the external knee reduction. Omitting it overstates acceleration.
 \item \textbf{Command latency is injected} --- two physics steps, about 1\,ms,
       the order of a 1\,Mbit/s bus at \RdControlRate\,Hz. Controllers tuned
       against a zero-latency plant are optimistic in the wrong direction.
@@ -1037,26 +1162,16 @@ bandwidth, and CAN jitter.
 
 \subsection{Validation against the model}
 
-Standing in MuJoCo with gravity feed-forward, measured:
-
-\begin{center}\small
-\begin{tabular}{@{}lrr@{}}
-\toprule
-\textbf{Quantity} & \textbf{Predicted} & \textbf{Measured in MuJoCo} \\
-\midrule
-Total mass                & \RdMassTotal\,kg & \RdMassTotal\,kg \\
-Ground reaction, all feet & 98.10\,N & 98.10\,N \\
-Front load share          & 47.2\,\% & 47.0\,\% \\
-Body height               & \RdStandHeight\,mm & 320.31\,mm \\
-Peak joint torque         & 62.5\,\% of continuous & 64.6\,\% \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The front/rear split follows from the whole-robot centre of mass sitting
-12.3\,mm behind the body centre in the stance pose; agreement to 0.2\,\%
-confirms that the inertia aggregation, the MJCF generation and the contact model
-are mutually consistent.
+The current tests compare generated URDF and MJCF masses, origins, axes and
+joint limits and verify unobstructed hip motion. At rest, total ground reaction
+should approach $m g$; for the working 19.719\,kg model that is approximately
+193.45\,N. Equal load sharing would be \RdStaticLoad\,N per foot, but the
+actual front/rear split depends on the generated center of mass and stance.
+Current simulated displacement, tilt and per-motor loads are recorded in
+\href{rs06_speed_study.md}{docs/rs06\_speed\_study.md}, with JSON and CSV exports;
+\href{locomotion_validation.md}{the locomotion validation report} summarizes
+failed speeds, turn-rate errors and the shared-controller Go2 comparison.
+The earlier 10\,kg validation numbers are not evidence for this configuration.
 
 \subsection{Test environment}
 
@@ -1192,11 +1307,11 @@ camera metadata if no JPEG encoder is installed.
 \toprule
 \textbf{Component} & \textbf{Simulation} & \textbf{Hardware} \\
 \midrule
-Joints  & \code{MujocoBackend} & \code{RobStride02Backend} \\
+Joints  & \code{MujocoBackend} & \code{RobStride06Backend} \\
 Camera  & \code{SimCameraBackend} & \code{NuwaHP60CBackend} \\
 Base state & ground truth from the simulator & \code{StateEstimator} \\
 Temperature & thermal model & reported, with the model as observer \\
-Launch  & \code{backend:=mujoco} & \code{backend:=robstride02\_can} \\
+Launch  & \code{backend:=mujoco} & \code{backend:=robstride06\_can} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1215,9 +1330,11 @@ Nothing else: not a topic, a service, a frame, a message, a controller or a gain
       calibrate\_joint} determines \code{direction} and \code{offset\_rad}
       against the convention in Section~\ref{sec:conventions} and prints a YAML
       fragment for review. Leave \code{enable\_on\_start: false} until signed off.
-\item \textbf{Identify the estimates.} Rotor inertia from a free-spin
-      deceleration test; joint friction and damping from a swing-down test;
-      thermal constants from a stall at rated torque. Until then the margins in
+\item \textbf{Validate the remaining assumptions.} Check assembly dynamics
+      against the published output-equivalent inertia; identify friction, damping
+      and cooling through controlled measurements within manufacturer limits.
+      The 11\,N$\cdot$m rotating rating is not a continuous stall allowance.
+      Until then the margins in
       Section~\ref{sec:safety} carry the uncertainty.
 \item \textbf{Bring up on a stand}, legs free: joint test sweeps, then named
       poses, then stance with the body supported.
@@ -1233,11 +1350,11 @@ Nothing else: not a topic, a service, a frame, a message, a controller or a gain
 \toprule
 \textbf{Item} & \textbf{Status} & \textbf{Resolution} \\
 \midrule
-CAN frame layout          & from the RS02 manual & verify against delivered firmware \\
+CAN frame layout          & from the RS06 manual & verify against delivered firmware \\
 Joint direction / offset  & unknown & \code{calibrate\_joint}, per joint \\
-Rotor inertia             & estimate \RdRotorInertia & free-spin deceleration \\
+Output equivalent inertia & published 0.012\,kg$\cdot$m$^2$ & validate assembly dynamics \\
 Damping, Coulomb friction & estimate & swing-down test \\
-Thermal $R_{\mathrm{th}}$, $C_{\mathrm{th}}$ & estimate & stall at rated torque \\
+Thermal $R_{\mathrm{th}}$, $C_{\mathrm{th}}$ & estimate & controlled heating/cooling tests \\
 Temperature thresholds    & estimate & from the above, plus vendor guidance \\
 Camera intrinsics, range  & placeholder & datasheet, then \code{camera\_calibration} \\
 HP60C depth transport     & unknown & determine with the device \\
@@ -1260,28 +1377,19 @@ that is fully testable and quick to change during architecture work. The
 declared \code{ros2\_control} block is the formal statement of the interfaces a
 C++ \code{SystemInterface} must provide, and is the migration path once jitter
 or CPU headroom demands it. Note that the command interface set there is the
-RS02's native impedance command, not a single position interface, for the reason
+RS06's native impedance command, not a single position interface, for the reason
 in Section~\ref{sec:actuator}.
 \end{decision}
 
 % =====================================================================
 \section{Verification}
 
-\begin{center}\small
-\begin{tabular}{@{}lrl@{}}
-\toprule
-\textbf{Suite} & \textbf{Tests} & \textbf{What it protects} \\
-\midrule
-\code{robodog\_description} & 16 & URDF structure, conventions, limits, inertia validity \\
-\code{robodog\_hardware}    & 52 & CAN codec, backend contract, thermal, bus budget \\
-\code{robodog\_control}     & 73 & IK, Jacobian, force signs, safety, balance, gait continuity \\
-\code{robodog\_sim}         & 59 & MJCF vs URDF consistency, world geometry, physics, locomotion \\
-\code{robodog\_perception}  & 17 & intrinsics, deprojection, self-occlusion, noise model \\
-\midrule
-\textbf{Total}              & \textbf{217} & all pass \\
-\bottomrule
-\end{tabular}
-\end{center}
+Run the regression suite for the current checkout; the historical count of
+217 tests is not a current validation claim. The key checks cover URDF/MJCF
+consistency, joint-to-motor conversion, CAN scaling, bounded commands, free hip
+motion, continuous gait targets and actual simulated displacement. Tests must
+compare knee motor load after the belt conversion, not directly against joint
+torque. Record the command, test count and skips with each feasibility report.
 
 The most valuable are the cross-checks: the MJCF's per-link masses, joint
 origins, axes and ranges are asserted against the URDF, so the two descriptions
@@ -1311,14 +1419,14 @@ repository rather than in a notebook someone once ran.
 \textbf{Tool} & \textbf{Answers} \\
 \midrule
 \code{cad\_to\_model.py}      & CAD $\to$ canonical model; prints the FK residual \\
-\code{prepare\_meshes.py}     & mesh decimation, 41\,MB $\to$ 2.3\,MB \\
+\code{prepare\_meshes.py}     & active CAD mesh conversion and decimation \\
 \code{torque\_report.py}      & peak and RMS torque per gait, and the winding temperature \\
-\code{capability\_report.py}  & jump, payload, step-up, slope and power envelope \\
+\code{capability\_report.py}  & static point-load and geometric reach screening \\
 \code{design\_study.py}       & torque against leg length and stance height \\
 \code{optimise\_stance.py}    & the stance-pose search behind the named poses \\
 \code{make\_diagrams.py}      & the ten figures, as Draw.io and PDF \\
 \code{make\_torque\_figure.py} & why torque follows leg bend, not leg length \\
-\code{make\_doc\_facts.py}    & every number in this document \\
+\code{make\_doc\_facts.py}    & configuration macros; does not rerun experiments \\
 \code{render\_previews.py}    & the MuJoCo preview renders \\
 \bottomrule
 \end{tabular}
@@ -1327,34 +1435,14 @@ repository rather than in a notebook someone once ran.
 \subsection{Capability envelope}
 \label{sec:capability}
 
-Measured with \code{capability\_report.py}, using deliberately crude open-loop
-controllers so the result describes the machine rather than any particular
-control scheme. This is a separate question from whether the current gait
-works, which Section~\ref{sec:locomotion-status} answers.
-
-\begin{center}\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Capability} & \textbf{Measured} & \textbf{Limited by} \\
-\midrule
-Walking, 0.5\,m/s  & $\approx$49\,W net of 754\,W rated & nothing; 7\,\% of budget \\
-Stairs, 80\,mm     & needs 100\,mm lift, has 130\,mm & leg travel \\
-Maximum step       & 110\,mm standing, 190\,mm from a crouch & leg travel \\
-Vertical jump      & 277\,mm of flight, 308\,ms airborne & peak torque \\
-Landing            & falls over & \emph{controller}, not hardware \\
-Payload            & $\approx$5\,kg before stance exceeds continuous & continuous torque \\
-Slope              & 30$^\circ$ at 55\,\% of continuous & friction beyond 35$^\circ$ \\
-Peak power         & 2.19\,kW, 219\,W/kg & --- \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The useful number is the first one. Steady walking costs about 7\,\% of the
-rated mechanical power, because almost all the torque a quadruped spends is
-holding itself up, which does no work. That is why the gait's
-\RdTorqueCont\,N$\cdot$m-exceeding draw in Section~\ref{sec:thermal-load} is
-diagnostic rather than a sizing problem: the machine is not working hard, the
-controller is wasting what it asks for.
+The current \code{capability\_report.py} provides a static point-load screen
+with the active mass and per-joint belt conversion. It assumes equal supporting
+foot loads and omits limb gravity, acceleration and asymmetric contacts. It
+therefore does not certify payload, stair climbing, slope traction, jumps or
+landings. Reach reserve is reported as geometry, not as demonstrated step
+height. Use the full gait report and dedicated terrain experiments for dynamic
+claims. Thermal feasibility also requires identified cooling on the assembled
+robot; the estimated copper-loss model is insufficient by itself.
 
 \archfig{domain_model}{Domain model: the value types that cross the hardware
 boundary and the entities that own them.}{0.94}
@@ -1362,7 +1450,7 @@ boundary and the entities that own them.}{0.94}
 \vspace{4mm}
 \begin{center}\small\color{rdgrey}
 Generated from \code{robot\_parameters.yaml} (CAD \texttt{\RdCadSha}) and
-\code{robstride02.yaml}.\\
+\code{robstride06.yaml}.\\
 Diagrams: \code{docs/diagrams/*.drawio}, rendered by \code{tools/make\_diagrams.py}.
 \end{center}
 

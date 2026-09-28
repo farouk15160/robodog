@@ -20,6 +20,7 @@ worth more than the flexibility of a chain.
 """
 from __future__ import annotations
 
+from dataclasses import replace
 import threading
 import time
 from typing import Any
@@ -41,6 +42,8 @@ from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 
 from robodog_hardware.registry import create_backend
+from robodog_hardware.backend import BackendError
+from robodog_hardware.transmission import backend_config, transmission_arrays
 from robodog_hardware.types import JOINT_NAMES, NJ, ControlMode, JointCommand
 from robodog_msgs.msg import (ControllerState, FootState, GaitCommand, JointCommandArray,
                               JointTelemetry, RobotState, SafetyStatus, SimulationState)
@@ -48,8 +51,10 @@ from robodog_msgs.srv import (EmergencyStop, EnableJoints, SetControlMode, SetGa
 
 from .balance import roll_pitch_from_quat
 from .gait import (BodyFeedback, GaitGenerator, GaitParams, JointTestGenerator,
-                   JointTestParams)
+                   JointTestParams, body_horizontal_velocity)
 from .kinematics import LEGS, LegGeometry, forward_in_base, jacobian
+from .motion_policy import (bounded_body_velocity, can_promote_cmd_vel,
+                            joint_selection, travel_feedback_ready)
 from .safety import SafetyLimits, SafetyMonitor
 from .state_estimator import StateEstimator
 from .trajectory import JointTrajectory
@@ -92,6 +97,9 @@ class RoboDogControlNode(Node):
         self.declare_parameter("joint_state_rate_hz", 100.0)
         self.declare_parameter("pose_transition_max_velocity_rad_s", 1.0)
         self.declare_parameter("default_travel_gait", "trot")
+        self.declare_parameter("max_cmd_linear_velocity_sim_m_s", 2.0)
+        self.declare_parameter("max_cmd_linear_velocity_hardware_m_s", 0.5)
+        self.declare_parameter("max_cmd_yaw_rate_rad_s", 2.0)
         self.declare_parameter("gains.position_kp", 80.0)
         self.declare_parameter("gains.position_kd", 2.0)
         self.declare_parameter("gains.stance_kp", 120.0)
@@ -110,7 +118,11 @@ class RoboDogControlNode(Node):
         # Generated model and datasheet: plain YAML loaded by path, because
         # they are structured data, not tunable parameters.
         self.P = _load("robodog_description", "config", "robot_parameters.yaml")
-        self.RS = _load("robodog_description", "config", "robstride02.yaml")
+        self.RS = _load("robodog_description", "config",
+                        self.P.get("actuator_config", "robstride06.yaml"))
+        ratio, efficiency = transmission_arrays(self.RS, JOINT_NAMES)
+        self._torque_gain = ratio * efficiency
+        self._transmission_efficiency = efficiency
         self.GAITS = _load("robodog_control", "config", "gaits.yaml")["gaits"]
 
         self.geom = LegGeometry.from_params(self.P)
@@ -147,7 +159,8 @@ class RoboDogControlNode(Node):
         self.kd_swing = float(gp("gains.swing_kd"))
 
         # ---------------- mutable control state ----------------
-        self._lock = threading.Lock()
+        # Pose requests may enable joints while already holding this lock.
+        self._lock = threading.RLock()
         self.controller = "idle"
         self.mode = ControlMode.IDLE
         self.active_pose = ""
@@ -166,6 +179,7 @@ class RoboDogControlNode(Node):
         self._last_report: Any = None
         self._last_cmd: JointCommand = JointCommand()
         self._base = None
+        self._fault_clear_after_stamp = None
 
         # ---------------- ROS interfaces ----------------
         cb = ReentrantCallbackGroup()
@@ -212,19 +226,8 @@ class RoboDogControlNode(Node):
 
     # ------------------------------------------------------------------ #
     def _backend_config(self, name: str) -> dict:
-        rs, th, jd = self.RS["performance"], self.RS["thermal"], self.RS["joint_dynamics"]
-        el = self.RS["electrical"]
         cfg = {
-            "peak_torque_nm": rs["peak_torque_nm"],
-            "no_load_speed_rad_s": rs["no_load_speed_rad_s"],
-            "torque_constant_nm_per_arms": el["torque_constant_nm_per_arms"],
-            "phase_resistance_ohm": el["phase_resistance_ohm"],
-            "thermal_resistance_k_per_w": th["thermal_resistance_k_per_w"],
-            "thermal_capacitance_j_per_k": th["thermal_capacitance_j_per_k"],
-            "ambient_temp_c": th["ambient_temp_c"],
-            "damping_nms_per_rad": jd["damping_nms_per_rad"],
-            "coulomb_friction_nm": jd["coulomb_friction_nm"],
-            "armature_kgm2": jd["armature_kgm2"],
+            **backend_config(self.RS, JOINT_NAMES),
             "base_height_m": self.P["named_poses"]["stand"]["base_height_m"],
             "initial_position": np.array([self.P["named_poses"]["stand"][k]
                                           for k in ("haa", "hfe", "kfe")] * 4),
@@ -237,7 +240,7 @@ class RoboDogControlNode(Node):
                                     "models", "robodog_scene.xml")
             cfg.update(model_path=path, keyframe="stand",
                        viewer=bool(self.get_parameter("mujoco_viewer").value))
-        elif name == "robstride02_can":
+        elif name in ("robstride02_can", "robstride06_can"):
             cfg.update(_load("robodog_hardware", "config", "robstride_bus.yaml"))
         return cfg
 
@@ -280,11 +283,8 @@ class RoboDogControlNode(Node):
         self._last_state = st
 
         base = self.backend.base_state()
-        if base is None:                      # real hardware: estimate it
-            contact = self.estimator.contact_from_torque(st.position, st.effort)
-            base = self.estimator.update(st.position, st.velocity,
-                                         np.array([0.0, 0.0, 9.81]), np.zeros(3),
-                                         self.dt, contact)
+        # Preserve missing real sensor feedback instead of inventing an IMU
+        # sample. Hardware travel stays blocked until live estimation is wired.
         self._base = base
 
         with self._lock:
@@ -315,7 +315,7 @@ class RoboDogControlNode(Node):
             roll=roll, pitch=pitch,
             omega=(float(b.angular_velocity[0]), float(b.angular_velocity[1]),
                    float(b.angular_velocity[2])),
-            v_xy=(float(b.linear_velocity[0]), float(b.linear_velocity[1])))
+            v_xy=body_horizontal_velocity(b.linear_velocity, b.orientation))
 
     def _compute_request(self, st) -> tuple[JointCommand, float]:
         """Whichever controller is active produces the request. Exactly one."""
@@ -407,20 +407,21 @@ class RoboDogControlNode(Node):
 
         cont = self.RS["operational_limits"]["continuous_torque_nm"]
         kt = self.RS["electrical"]["torque_constant_nm_per_arms"]
+        motor_effort = st.effort / self._torque_gain
         for i, name in enumerate(JOINT_NAMES):
             j = JointTelemetry()
             j.name = name
             j.position = float(st.position[i])
             j.velocity = float(st.velocity[i])
             j.effort = float(st.effort[i])
-            j.current = float(abs(st.effort[i]) / kt)
+            j.current = float(abs(motor_effort[i]) / kt)
             j.temperature = float(st.temperature[i])
             j.position_command = float(cmd.position[i])
             j.velocity_command = float(cmd.velocity[i])
             j.effort_command = float(cmd.effort[i])
             j.kp = float(cmd.kp[i])
             j.kd = float(cmd.kd[i])
-            j.torque_utilisation = float(abs(st.effort[i]) / cont)
+            j.torque_utilisation = float(abs(motor_effort[i]) / cont)
             j.mode = int(cmd.mode[i])
             j.fault_flags = int(report.faults[i])
             j.enabled = bool(st.enabled[i])
@@ -455,10 +456,11 @@ class RoboDogControlNode(Node):
                 self._publish_odom_tf(base, now)
             self._publish_imu(base, now)
 
-        msg.battery_voltage_v = float(self.RS["electrical"]["rated_voltage_v"])
+        msg.battery_voltage_v = float(self.RS["electrical"].get(
+            "supply_voltage_v", self.RS["electrical"]["rated_voltage_v"]))
         msg.estimated_power_w = float(np.sum(
-            3.0 * (st.effort / kt) ** 2 * self.RS["electrical"]["phase_resistance_ohm"]
-            + np.abs(st.effort * st.velocity)))
+            3.0 * (motor_effort / kt) ** 2 * self.RS["electrical"]["phase_resistance_ohm"]
+            + np.abs(st.effort * st.velocity) / self._transmission_efficiency))
 
         self.state = self._derive_state(report)
         msg.state = self.state
@@ -467,7 +469,9 @@ class RoboDogControlNode(Node):
         cs = ControllerState()
         cs.header.stamp = now
         cs.active_controller = self.controller
-        cs.control_mode = int(self.mode)
+        # Report the command being applied: pose/gait generate impedance
+        # commands without going through the manual mode-selection service.
+        cs.control_mode = int(cmd.mode[0]) if np.all(cmd.mode == cmd.mode[0]) else int(self.mode)
         cs.active_gait = self.active_gait
         cs.active_pose = self.active_pose
         cs.trajectory_active = self.trajectory is not None
@@ -585,17 +589,59 @@ class RoboDogControlNode(Node):
 
     def _on_cmd_vel(self, msg: Twist) -> None:
         with self._lock:
-            if self.controller != "gait":
+            if self.safety.latched:
+                self.get_logger().warn("cmd_vel ignored while e-stop is latched",
+                                       throttle_duration_sec=5.0)
                 return
-            p = self.gait.params
-            p.vx, p.vy, p.wz = msg.linear.x, msg.linear.y, msg.angular.z
-            if self.active_gait == "stand" and (abs(p.vx) + abs(p.vy) + abs(p.wz)) > 1e-3:
+            if not travel_feedback_ready(self._base):
+                self.get_logger().warn("travel requires live base/IMU feedback",
+                                       throttle_duration_sec=5.0)
+                return
+            ok, values_or_error = self._bounded_body_velocity(
+                msg.linear.x, msg.linear.y, msg.angular.z)
+            if not ok:
+                self.get_logger().warn(values_or_error, throttle_duration_sec=5.0)
+                return
+            vx, vy, wz = values_or_error
+            moving = (abs(vx) + abs(vy) + abs(wz)) > 1e-3
+            if self.controller == "gait":
+                p = replace(self._pending_gait if self._pending_gait is not None
+                            else self.gait.params)
+            elif moving:
+                ok, why = can_promote_cmd_vel(
+                    bool(self.backend.is_simulation), self.enabled, self.safety.latched,
+                    self.controller, self.active_pose, self.trajectory is not None)
+                if not ok:
+                    self.get_logger().warn(why, throttle_duration_sec=5.0)
+                    return
+                p = GaitParams(gait=str(self.get_parameter("default_travel_gait").value))
+                self._merge_gait_defaults(p)
+                self.controller = "gait"
+                self.active_gait = p.gait
+            else:
+                self.get_logger().warn("zero cmd_vel ignored while not in gait mode",
+                                       throttle_duration_sec=5.0)
+                return
+            p.vx, p.vy, p.wz = vx, vy, wz
+            if self.active_gait == "stand" and moving:
                 # walking was requested by velocity alone: promote to the
                 # default travelling gait rather than silently ignoring it
                 p.gait = self.active_gait = str(
                     self.get_parameter("default_travel_gait").value)
                 self._merge_gait_defaults(p)
             self._pending_gait = p
+
+    def _bounded_body_velocity(self, vx, vy, wz):
+        sim = bool(self.backend.is_simulation)
+        max_linear = float(self.get_parameter(
+            "max_cmd_linear_velocity_sim_m_s" if sim
+            else "max_cmd_linear_velocity_hardware_m_s").value)
+        max_yaw = float(self.get_parameter("max_cmd_yaw_rate_rad_s").value)
+        try:
+            return True, bounded_body_velocity(
+                vx, vy, wz, max_linear=max_linear, max_yaw=max_yaw)
+        except ValueError as error:
+            return False, str(error)
 
     def _merge_gait_defaults(self, p: GaitParams) -> None:
         d = self.GAITS.get(p.gait, {})
@@ -606,6 +652,8 @@ class RoboDogControlNode(Node):
 
     def _apply_gait(self, msg: GaitCommand) -> tuple[bool, str]:
         name = msg.gait or self.active_gait
+        if name != "stand" and not travel_feedback_ready(self._base):
+            return False, "travel requires live base/IMU feedback; hardware estimation is not connected"
         if name not in self.GAITS:
             return False, f"unknown gait '{name}'; configured: {sorted(self.GAITS)}"
         p = GaitParams(gait=name)
@@ -618,7 +666,11 @@ class RoboDogControlNode(Node):
             p.stance_height_m = msg.stance_height_m
         if msg.duty_factor > 0:
             p.duty_factor = msg.duty_factor
-        p.vx, p.vy, p.wz = msg.velocity.linear.x, msg.velocity.linear.y, msg.velocity.angular.z
+        ok, values_or_error = self._bounded_body_velocity(
+            msg.velocity.linear.x, msg.velocity.linear.y, msg.velocity.angular.z)
+        if not ok:
+            return False, values_or_error
+        p.vx, p.vy, p.wz = values_or_error
         self._pending_gait = p
         self.active_gait = name
         self.controller = "gait" if msg.enable else "pose"
@@ -649,6 +701,11 @@ class RoboDogControlNode(Node):
             return False, f"unknown pose '{name}'; have {sorted(self.poses)}", 0.0
         if self.safety.latched:
             return False, "e-stop latched, clear it first", 0.0
+        if not self.enabled:
+            try:
+                self._enable(True)
+            except BackendError as error:
+                return False, str(error), 0.0
         goal = self.poses[name]
         start = self._last_state.position.copy()
         if duration and duration > 0:
@@ -660,8 +717,6 @@ class RoboDogControlNode(Node):
         self.trajectory = traj
         self.controller = "pose"
         self.active_pose = name
-        if not self.enabled:
-            self._enable(True)
         return True, f"moving to '{name}'", float(traj.duration)
 
     def _srv_gait(self, req, res):
@@ -671,33 +726,62 @@ class RoboDogControlNode(Node):
 
     def _srv_estop(self, req, res):
         if req.engage:
+            self._fault_clear_after_stamp = None
             self.safety.engage_estop(req.reason or "service")
             with self._lock:
                 self.controller = "idle"
             self._enable(False)
             res.success, res.latched, res.message = True, True, "e-stop engaged"
         else:
-            ok, msg = self.safety.clear_estop(self._last_state)
+            ok, msg = self._clear_estop_after_backend_fault_clear()
             res.success, res.latched, res.message = ok, self.safety.latched, msg
         return res
+
+    def _clear_estop_after_backend_fault_clear(self) -> tuple[bool, str]:
+        """Clear motor-side latches first, then require a post-clear sample."""
+        with self._lock:
+            self.controller = "idle"
+            try:
+                self._enable(False)
+            except Exception as error:
+                return False, f"disable failed during fault clear: {error}"
+
+            clear_backend = getattr(self.backend, "clear_faults", None)
+            if clear_backend is not None:
+                pending = getattr(self, "_fault_clear_after_stamp", None)
+                if pending is None:
+                    try:
+                        clear_backend()
+                    except Exception as error:
+                        return False, f"fault clear failed: {error}"
+                    self._fault_clear_after_stamp = time.monotonic()
+                    return False, "fault clear sent; awaiting fresh motor feedback, retry clear"
+                if float(getattr(self._last_state, "stamp", 0.0)) <= pending:
+                    return False, "fault clear sent; awaiting fresh motor feedback, retry clear"
+
+            ok, msg = self.safety.clear_estop(self._last_state)
+            if clear_backend is not None and self._fault_clear_after_stamp is not None:
+                self._fault_clear_after_stamp = None
+            return ok, msg
 
     def _srv_enable(self, req, res):
         if req.enable and self.safety.latched:
             res.success, res.message = False, "e-stop latched, clear it first"
             return res
-        self._enable(req.enable, req.joints or None)
+        try:
+            self._enable(req.enable, req.joints or None)
+        except BackendError as error:
+            res.success, res.message = False, str(error)
+            return res
         res.success = True
         res.message = f"joints {'enabled' if req.enable else 'disabled'}"
         return res
 
     def _enable(self, on: bool, joints: list[str] | None = None) -> None:
-        mask = None
-        if joints:
-            index = {n: i for i, n in enumerate(JOINT_NAMES)}
-            mask = [False] * NJ
-            for n in joints:
-                if n in index:
-                    mask[index[n]] = True
+        try:
+            mask = joint_selection(JOINT_NAMES, joints)
+        except ValueError as error:
+            raise BackendError(str(error)) from error
         (self.backend.enable if on else self.backend.disable)(mask)
         with self._lock:
             self.enabled = on

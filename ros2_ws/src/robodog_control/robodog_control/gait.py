@@ -35,9 +35,17 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from robodog_hardware.physics_metrics import body_planar_velocity
+
 from .balance import BalanceGains, BodyStabiliser
 from .kinematics import (LEGS, LegGeometry, forward, gravity_torque, hip_origin,
                          inverse, jacobian, torque_for_force)
+
+
+def body_horizontal_velocity(linear_velocity, orientation_xyzw) -> tuple[float, float]:
+    """World horizontal velocity expressed in the base/body yaw frame."""
+    v = body_planar_velocity(orientation_xyzw, linear_velocity)
+    return float(v[0]), float(v[1])
 
 # leg -> (phase offset, ...) per gait
 GAIT_OFFSETS = {

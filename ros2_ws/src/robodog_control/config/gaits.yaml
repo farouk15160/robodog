@@ -1,90 +1,37 @@
-# =============================================================================
-# Gait library. Adding a gait is a block here plus a phase-offset entry in
-# robodog_control/gait.py -> GAIT_OFFSETS.
-# =============================================================================
-# step_frequency_hz  cycles per second
-# duty_factor        fraction of the cycle a foot spends in stance
-# step_height_m      peak foot lift during swing
-# stance_height_m    base_link height above the contact plane
-#
-# Stride length is NOT configured. Swing interpolates between where the foot
-# left the ground and where foot placement says it should land, so the stride
-# is whatever those two points imply. The workspace cap is max_placement_m in
-# the balance gains, which bounds the landing offset directly.
-#
-# STANCE HEIGHT IS THE CHEAPEST TORQUE LEVER THERE IS -- and it is not free.
-# Holding a load costs torque proportional to the horizontal distance from the
-# knee to the foot, and standing taller straightens the leg and shrinks it.
-# The cost is leg travel: what is left for terrain, and for the balance layer
-# to correct attitude with. Measured with tools/torque_report.py, worst joint,
-# after the lift-off discontinuity and the jammed front hips were fixed:
-#
-#            walk 0.15     trot 0.30     trot 0.50    leg travel left
-#   300 mm        --          103%           --            150 mm
-#   320 mm        91%         100%          101%           130 mm
-#   340 mm        92%          90%           92%           110 mm
-#   360 mm        85%          83%           85%            90 mm
-#
-# These supersede an earlier table that read 173% for a 320 mm trot. That
-# measurement was real but it was measuring a jammed robot: the front hips
-# could not move, so the front legs lifted with the knee alone and the hips
-# absorbed the whole impedance error. It is left here as a warning that a
-# careful measurement of a broken system is still a measurement of a broken
-# system.
-#
-# Walk and trot pull in opposite directions -- walk is cheapest at 320 mm and
-# trot at 360 mm -- which is why this is per-gait rather than global. Trot runs
-# at 340 mm: 92% of continuous with 110 mm of travel still in hand. Walk stays
-# at 320 mm, where it is 91%, because it is the gait for stairs and
-# narrow passages and wants the travel.
+# RS06 / 19.719 kg / 192 + 195.621 mm links / 2:1 knee belt.
+# Flat-ground simulation tuning, NOT a terrain or hardware qualification.
+# The 40 mm lift reduces swing acceleration and motor load on the shorter legs.
+# Walk at1.5Hz improves speed tracking and body tilt relative to the old1.2Hz.
+# Trot at330mm leaves ~78mm extension reserve including the20mm foot radius.
+# Reproduce with tools/torque_report.py; safety and configured gains stay active.
 gaits:
   stand:
     step_frequency_hz: 0.0
     duty_factor: 1.0
     step_height_m: 0.0
     stance_height_m: 0.320
-    description: >
-      All four feet planted at the nominal stance. Costs 50.9% of the 6 N.m
-      continuous rating to hold, with the feet 10 mm from directly under the
-      hip pivots.
-
+    description: All four feet planted; RS06 loaded standing configuration.
   walk:
-    step_frequency_hz: 1.2
-    duty_factor: 0.75
-    step_height_m: 0.07
+    step_frequency_hz: 1.5
+    duty_factor: 0.78
+    step_height_m: 0.03
     stance_height_m: 0.320
-    description: >
-      One foot in swing at a time, so three feet always form a support
-      triangle. Statically stable and the right choice for stairs, narrow
-      passages and first hardware trials.
-
+    description: One foot swings at a time; reduced lift and longer support for RS06 stall limits at0.15m/s.
   trot:
     step_frequency_hz: 2.2
     duty_factor: 0.50
-    step_height_m: 0.06
-    stance_height_m: 0.340
-    description: >
-      Diagonal pairs. Dynamically stable rather than statically stable, and the
-      default travelling gait: the diagonal support line passes close to the
-      centre of mass, so it needs the least attitude correction of the
-      two-phase gaits.
-
+    step_height_m: 0.04
+    stance_height_m: 0.330
+    description: Diagonal pairs; tuned on flat ground at0.30 and0.50m/s.
   pace:
     step_frequency_hz: 2.0
     duty_factor: 0.50
     step_height_m: 0.06
     stance_height_m: 0.320
-    description: >
-      Lateral pairs. Included for comparison; it rolls the body noticeably on a
-      robot this narrow (120 mm between hip pivots) and is not recommended for
-      carrying the camera.
-
+    description: Experimental lateral pairs; unvalidated for the new configuration.
   bound:
     step_frequency_hz: 2.6
     duty_factor: 0.45
     step_height_m: 0.08
     stance_height_m: 0.310
-    description: >
-      Front pair then rear pair. The most demanding gait in the library --
-      use it to probe the peak-torque and I2t limits in simulation before ever
-      asking the hardware for it.
+    description: Experimental front/rear pairs; unvalidated for the new configuration.

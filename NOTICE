@@ -38,6 +38,17 @@ If you are the owner of either and would prefer it not be redistributed here,
 open an issue and it will be removed; the pipeline can regenerate from a
 locally supplied copy instead.
 
+3. docs/go2_benchmark.xml
+   Adapted Go2 model from Unitree Robotics' unitree_mujoco repository:
+   https://github.com/unitreerobotics/unitree_mujoco
+   Revision: 1eb6642e3f3fdfb7fb13a9794fd6a2dd93ea0e7d
+   Copyright (c) 2016-2024 HangZhou YuShu TECHNOLOGY CO.,LTD.
+   ("Unitree Robotics"). All rights reserved.
+   Distributed under BSD-3-Clause; the complete upstream copyright,
+   conditions and disclaimer are in docs/licenses/unitree_mujoco_BSD-3-Clause.txt.
+   Benchmark adaptations and source hashes are documented in
+   docs/go2_benchmark_sources.md and docs/go2_benchmark.md.
+
 --------------------------------------------------------------------------
 DEPENDENCIES
 --------------------------------------------------------------------------

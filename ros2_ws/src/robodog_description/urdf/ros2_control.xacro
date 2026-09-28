@@ -9,7 +9,7 @@
   implement now, and that the C++ SystemInterface plugins must implement when
   the control loop moves into controller_manager.
 
-  The command interface set is deliberately the ROBSTRIDE02 native impedance
+  The command interface set is deliberately the ROBSTRIDE06 native impedance
   command (position, velocity, effort, kp, kd) rather than a single position
   interface, because that is what the motor accepts on CAN in one frame. Any
   narrower interface would force the driver to close a loop the motor already
@@ -24,29 +24,31 @@
           <param name="model_path">$(find robodog_sim)/models/robodog_scene.xml</param>
         </xacro:if>
         <xacro:if value="${hardware == 'real'}">
-          <plugin>robodog_hardware/RobStride02CanSystem</plugin>
+          <plugin>robodog_hardware/RobStride06CanSystem</plugin>
           <param name="bus_config">$(find robodog_hardware)/config/robstride_bus.yaml</param>
         </xacro:if>
       </hardware>
 
       <xacro:macro name="rd_joint_iface" params="jname jkind">
+        <xacro:property name="ratio" value="${RS['transmissions'][jkind]['ratio']}"/>
+        <xacro:property name="efficiency" value="${RS['transmissions'][jkind]['efficiency']}"/>
         <joint name="${jname}">
-          <!-- command: the RS02 motion-control frame, one CAN message -->
+          <!-- command: the RS06 motion-control frame, one CAN message -->
           <command_interface name="position">
             <param name="min">${P['joint_limits'][jkind]['lower']}</param>
             <param name="max">${P['joint_limits'][jkind]['upper']}</param>
           </command_interface>
           <command_interface name="velocity">
-            <param name="min">${-RS['operational_limits']['velocity_rad_s']}</param>
-            <param name="max">${ RS['operational_limits']['velocity_rad_s']}</param>
+            <param name="min">${-RS['operational_limits']['velocity_rad_s'] / ratio}</param>
+            <param name="max">${ RS['operational_limits']['velocity_rad_s'] / ratio}</param>
           </command_interface>
           <command_interface name="effort">
-            <param name="min">${-RS['performance']['peak_torque_nm']}</param>
-            <param name="max">${ RS['performance']['peak_torque_nm']}</param>
+            <param name="min">${-RS['performance']['peak_torque_nm'] * ratio * efficiency}</param>
+            <param name="max">${ RS['performance']['peak_torque_nm'] * ratio * efficiency}</param>
           </command_interface>
-          <command_interface name="kp"><param name="min">0.0</param><param name="max">500.0</param></command_interface>
-          <command_interface name="kd"><param name="min">0.0</param><param name="max">5.0</param></command_interface>
-          <!-- state: the RS02 feedback frame -->
+          <command_interface name="kp"><param name="min">0.0</param><param name="max">${RS['can']['scaling']['kp_max'] * ratio * ratio * efficiency}</param></command_interface>
+          <command_interface name="kd"><param name="min">0.0</param><param name="max">${RS['can']['scaling']['kd_max'] * ratio * ratio * efficiency}</param></command_interface>
+          <!-- state: the RS06 feedback frame -->
           <state_interface name="position"/>
           <state_interface name="velocity"/>
           <state_interface name="effort"/>

@@ -17,13 +17,13 @@ Design rules
 
 Two-tier limits
 ---------------
-    hard   URDF / datasheet maxima (17 N.m, 42.9 rad/s, joint end stops)
-    soft   operational limits from robstride02.yaml -> operational_limits
-           (6 N.m continuous, 20 rad/s, end stops inset by 0.05 rad)
+    hard   URDF / active actuator maxima, reflected through each transmission
+    soft   active actuator operational limits, also in joint-side units
+           (RS06 hip8 N.m continuous stall; knee15.2 N.m at2:1,95% efficiency)
 
 The soft tier is what is enforced continuously. The hard tier is what the
-actuator can physically deliver, and is allowed only for `peak_torque_duration_s`
-under the I2t integrator below.
+actuator can physically deliver. `peak_torque_duration_s` is the I2t budget for
+over-continuous operation, not permission to hold full peak for that many seconds.
 """
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from robodog_hardware.transmission import joint_limits
 from robodog_hardware.types import NJ, ControlMode, Fault, JointCommand, JointState
 
 
@@ -38,9 +39,9 @@ from robodog_hardware.types import NJ, ControlMode, Fault, JointCommand, JointSt
 class SafetyLimits:
     position_lower: np.ndarray
     position_upper: np.ndarray
-    velocity_max: float = 20.0
-    continuous_torque: float = 6.0
-    peak_torque: float = 17.0
+    velocity_max: float | np.ndarray = 20.0
+    continuous_torque: float | np.ndarray = 6.0
+    peak_torque: float | np.ndarray = 17.0
     peak_duration_s: float = 2.0
     position_margin: float = 0.05
     temp_warn_c: float = 70.0
@@ -53,12 +54,15 @@ class SafetyLimits:
     def from_config(cls, params: dict, rs02: dict, joint_names: list[str]) -> "SafetyLimits":
         jl, ol = params["joint_limits"], rs02["operational_limits"]
         kinds = [n.split("_")[1] for n in joint_names]
+        reflected = joint_limits(rs02, joint_names)
+        if "transmissions" not in rs02:
+            reflected = {key: values[0] for key, values in reflected.items()}
         return cls(
             position_lower=np.array([jl[k]["lower"] + ol["position_margin_rad"] for k in kinds]),
             position_upper=np.array([jl[k]["upper"] - ol["position_margin_rad"] for k in kinds]),
-            velocity_max=ol["velocity_rad_s"],
-            continuous_torque=ol["continuous_torque_nm"],
-            peak_torque=ol["peak_torque_nm"],
+            velocity_max=reflected["velocity_rad_s"],
+            continuous_torque=reflected["continuous_torque_nm"],
+            peak_torque=reflected["peak_torque_nm"],
             peak_duration_s=rs02["performance"]["peak_torque_duration_s"],
             position_margin=ol["position_margin_rad"],
             temp_warn_c=ol["temperature_warn_c"],
@@ -121,7 +125,8 @@ class SafetyMonitor:
 
     def _hard_faults(self, m: JointState) -> np.ndarray:
         over_temp = m.temperature >= self.lim.temp_fault_c
-        motor = (m.faults & (int(Fault.OVERCURRENT) | int(Fault.UNDERVOLTAGE)
+        motor = (m.faults & (int(Fault.OVERTEMPERATURE)
+                             | int(Fault.OVERCURRENT) | int(Fault.UNDERVOLTAGE)
                              | int(Fault.ENCODER) | int(Fault.COMMUNICATION))) != 0
         return over_temp | motor
 
@@ -247,10 +252,12 @@ class SafetyMonitor:
         """Charge the integrator above the continuous rating, discharge below.
 
         Charging is scaled by (tau/continuous)^2 because heating goes as current
-        squared, so 2x the continuous torque exhausts the budget 4x faster.
+        squared, so full peak can exhaust a one-second budget much faster than
+        one wall-clock second. This is a conservative robot-side limiter, not a
+        reproduction of the vendor overload curve.
         """
         over = tau > self.lim.continuous_torque
-        excess = (tau / max(self.lim.continuous_torque, 1e-9)) ** 2 - 1.0
+        excess = (tau / np.maximum(self.lim.continuous_torque, 1e-9)) ** 2 - 1.0
         self._i2t += np.where(over, np.maximum(excess, 0.0) * self.dt, -self.dt / 4.0)
         np.clip(self._i2t, 0.0, self._i2t_budget * 2.0, out=self._i2t)
         exhausted = self._i2t >= self._i2t_budget

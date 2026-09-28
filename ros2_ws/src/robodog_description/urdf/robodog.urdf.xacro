@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <!--
   =========================================================================
-  robodog - 12-DOF quadruped, 12 x ROBSTRIDE02 QDD actuators, 10 kg target
+  robodog - 12-DOF quadruped, 12 x ROBSTRIDE06 QDD actuators, 19.72 kg working model
   =========================================================================
   Derived from cad/robot/onshape_export by tools/cad_to_model.py. Every number
   used here comes from one of two generated/curated config files; this file
   contains no hard-coded geometry.
 
     config/robot_parameters.yaml  kinematics, inertias, visuals, collisions
-    config/robstride02.yaml       actuator limits, dynamics, CAN scaling
+    config/robstride06.yaml       actuator limits, dynamics, CAN scaling
 
   Frames (REP-103): x forward, y left, z up. base_link at the body geometric
   centre, which is also within 3.6 mm of the centre of mass.
@@ -35,7 +35,7 @@
 
   <xacro:property name="PKG" value="$(find robodog_description)"/>
   <xacro:property name="P"   value="${xacro.load_yaml(PKG + '/config/robot_parameters.yaml')}"/>
-  <xacro:property name="RS"  value="${xacro.load_yaml(PKG + '/config/robstride02.yaml')}"/>
+  <xacro:property name="RS"  value="${xacro.load_yaml(PKG + '/config/' + P.get('actuator_config', 'robstride06.yaml'))}"/>
 
   <xacro:include filename="$(find robodog_description)/urdf/common.xacro"/>
   <xacro:include filename="$(find robodog_description)/urdf/leg.xacro"/>

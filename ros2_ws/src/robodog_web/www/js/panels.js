@@ -80,7 +80,7 @@ Panels.state = {
     const badge = el("div", "badge idle", "--");
     badge.style.fontSize = "15px";
     const dl = kv([["height", "--"], ["vx", "--"], ["vy", "--"], ["yaw rate", "--"],
-                   ["roll", "--"], ["pitch", "--"], ["power", "--"], ["bus", "--"]]);
+                   ["roll", "--"], ["pitch", "--"], ["est power", "--"], ["assumed bus", "--"]]);
     const wrap = el("div", "stack"); wrap.append(badge, dl); body.appendChild(wrap);
     return {
       update(s) {
@@ -214,12 +214,27 @@ Panels.gait = {
     // so a dropped connection or a slipped click cannot leave it walking.
     [vx, vy, wz].forEach(s => s.input.addEventListener("pointerup", push));
 
+    const rangeNote = el("div", "muted");
     const wrap = el("div", "stack");
-    wrap.append(row, vx.node, vy.node, wz.node, stop);
+    wrap.append(row, rangeNote, vx.node, vy.node, wz.node, stop);
     body.appendChild(wrap);
     ctx.onDisconnect(zero);
     return {
       update(s) {
+        const simulation = s.simulation.active === true;
+        const maximum = simulation
+          ? (lim.simulation_max_linear_velocity ?? lim.max_linear_velocity)
+          : lim.max_linear_velocity;
+        for (const slider of [vx, vy]) {
+          if (Number(slider.input.max) === maximum) continue;
+          slider.input.min = -maximum;
+          slider.input.max = maximum;
+          slider.input.value = Math.max(-maximum, Math.min(maximum, Number(slider.input.value)));
+          slider.input.oninput();
+        }
+        rangeNote.textContent = simulation
+          ? `Experimental simulation range ±${fmt(maximum, 2)} m/s; achievable speed must be tested.`
+          : `Hardware limit ±${fmt(maximum, 2)} m/s.`;
         active = s.controller.gait || active;
         [...row.children].forEach(b => b.classList.toggle("on", b.textContent === active));
       }
@@ -230,29 +245,46 @@ Panels.gait = {
 /* =============================== JOINTS =============================== */
 Panels.joints = {
   render(body, ctx) {
+    const note = el("div", "muted joint-note");
     const table = el("table");
     const head = el("thead");
-    head.innerHTML = "<tr><th>joint</th><th>pos</th><th>cmd</th><th>err</th>" +
-      "<th>vel</th><th>torque</th><th>load</th><th>curr</th><th>temp</th>" +
+    head.innerHTML = "<tr><th>joint</th><th>pos rad</th><th>cmd rad</th><th>err rad</th>" +
+      "<th>vel rad/s</th><th>joint N·m</th><th>motor N·m</th>" +
+      "<th>cont limit / peak N·m</th><th>load % limit</th><th>est A rms</th><th>temp °C</th>" +
       "<th>mode</th><th>status</th></tr>";
     const tbody = el("tbody");
     table.append(head, tbody);
-    body.appendChild(table);
-    const rows = ctx.info.joints.map((name, i) => {
+    body.append(note, table);
+    const rows = Object.fromEntries(ctx.info.joints.map((name, i) => {
       const tr = el("tr");
       if (i % 3 === 0 && i > 0) tr.className = "leg-sep";
       const cells = [];
-      for (let c = 0; c < 11; c++) { const td = el("td"); tr.appendChild(td); cells.push(td); }
+      for (let c = 0; c < 13; c++) { const td = el("td"); tr.appendChild(td); cells.push(td); }
       cells[0].textContent = name.replace("_joint", "");
-      const lbar = bar(); cells[6].appendChild(lbar);
+      const rating = ctx.info.joint_actuators?.[name];
+      cells[7].textContent = rating
+        ? `${fmt(rating.continuous_torque_nm, 1)} / ${fmt(rating.peak_torque_nm, 1)}` : "--";
+      const load = el("span");
+      const lbar = bar(); cells[8].append(load, lbar);
       tbody.appendChild(tr);
-      return { cells, lbar };
-    });
+      return [name, { cells, lbar, load, rating }];
+    }));
     return {
       update(s) {
         const th = ctx.cfg.thresholds;
-        s.joints.forEach((j, i) => {
-          const { cells, lbar } = rows[i];
+        const knee = ctx.info.joint_actuators?.FL_kfe_joint;
+        const continuousBasis = knee?.continuous_limit_basis || "configured limit";
+        const belt = knee ? `Knee belt ${fmt(knee.ratio, 0)}:1, ` +
+          `${pct(knee.efficiency)} assumed efficiency. ` : "";
+        note.textContent = "Signed joint and motor-output torque; limits at the joint. " +
+          belt + `Continuous limit: ${continuousBasis}. Load is instantaneous. ` +
+          "Current: τ/Kt estimate; excludes high-current saturation; not measured phase/battery/iq. " +
+          "Temperature: " + (s.simulation.active
+            ? "thermal estimate (uncalibrated), not measured; copper-loss model only."
+            : "max(reported motor temperature, thermal estimate); observer is uncalibrated.");
+        s.joints.forEach(j => {
+          if (!rows[j.name]) return;
+          const { cells, lbar, load, rating } = rows[j.name];
           cells[1].textContent = fmt(j.pos, 3);
           cells[2].textContent = fmt(j.pos_cmd, 3);
           cells[3].textContent = fmt(j.err, 3);
@@ -260,15 +292,17 @@ Panels.joints = {
             ? "var(--warn)" : "";
           cells[4].textContent = fmt(j.vel, 2);
           cells[5].textContent = fmt(j.eff, 2);
+          cells[6].textContent = rating ? fmt(j.eff / rating.torque_gain, 2) : "--";
+          load.textContent = pct(j.util);
           setBar(lbar, j.util, level(j.util, th.torque_warn, th.torque_alarm));
-          cells[7].textContent = fmt(j.cur, 2);
-          cells[8].textContent = fmt(j.temp, 1);
-          cells[8].style.color = j.temp >= th.temperature_alarm_c ? "var(--alarm)"
+          cells[9].textContent = fmt(j.cur, 2);
+          cells[10].textContent = fmt(j.temp, 1);
+          cells[10].style.color = j.temp >= th.temperature_alarm_c ? "var(--alarm)"
             : j.temp >= th.temperature_warn_c ? "var(--warn)" : "";
-          cells[9].textContent = j.mode;
-          cells[10].textContent = "";
-          if (j.faults.length) cells[10].appendChild(el("span", "badge alarm", j.faults[0]));
-          else cells[10].appendChild(el("span", "badge " + (j.enabled ? "ok" : "idle"),
+          cells[11].textContent = j.mode;
+          cells[12].textContent = "";
+          if (j.faults.length) cells[12].appendChild(el("span", "badge alarm", j.faults[0]));
+          else cells[12].appendChild(el("span", "badge " + (j.enabled ? "ok" : "idle"),
                                         j.enabled ? "on" : "off"));
         });
       }

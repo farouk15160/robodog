@@ -16,12 +16,12 @@ uint16 FAULT_NOT_ENABLED      = 256
 uint16 FAULT_WATCHDOG         = 512
 
 string  name
-float64 position           # [rad]    measured, output shaft
+float64 position           # [rad]    joint-side, after external belt
 float64 velocity           # [rad/s]  measured
-float64 effort             # [N.m]    estimated output torque
-float64 current            # [A rms]  = effort / torque_constant
-float64 temperature        # [degC]   winding; modelled in simulation
-float64 position_command   # [rad]    as sent to the actuator
+float64 effort             # [N.m]    joint-side torque
+float64 current            # [A rms]  estimated motor torque / output Kt
+float64 temperature        # [degC]   sim estimate; CAN max(feedback, observer)
+float64 position_command   # [rad]    joint-side, after safety clamping
 float64 velocity_command   # [rad/s]
 float64 effort_command     # [N.m]
 float64 kp
