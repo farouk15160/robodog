@@ -1227,11 +1227,11 @@ odometry integration remain prerequisites for enabling mapping there.}{1.0}
 \bottomrule
 \end{longtable}}
 
-The control node serves \code{set\_named\_pose}, \code{set\_gait},
-\code{set\_control\_mode}, \code{enable\_joints}, \code{emergency\_stop} and
-\code{greeting}. The map-export node serves
-\topicpath{/robodog/mapping/save_map} and calls RTAB-Map's namespaced
-\code{backup} service. No ROS actions are defined. Sensor streams use matching
+The control node serves named-pose, gait, control-mode, enable, emergency-stop
+and greeting requests. The map-export node serves
+\topicpath{/robodog/mapping/save_map} and calls RTAB-Map's namespaced backup
+service. The exact request/response schemas are defined in
+\code{robodog\_msgs/srv}. No ROS actions are defined. Sensor streams use matching
 best-effort QoS to favor recent samples; the world markers use reliable,
 transient-local depth one so late RViz subscribers receive the current world.
 
@@ -2252,7 +2252,7 @@ M. H. Raibert, \emph{Legged Robots That Balance}, MIT Press, 1986.
 \bibitem{raibert-darpa}
 M. H. Raibert, ``Dynamically Stable Legged Locomotion: Second Report to
 DARPA,'' CMU Robotics Institute, 1983.
-\url{https://publications.ri.cmu.edu/dynamically-stable-legged-locomotion-second-report-to-darpa-october-11981-december-311982}
+\url{https://www.ri.cmu.edu/pub_files/pub3/raibert_marc_h_1983_1/raibert_marc_h_1983_1.pdf}
 
 \bibitem{raibert-gaits}
 M. H. Raibert, B. Brown, M. Chepponis, H. Koechling, J. K. Hodgins,
