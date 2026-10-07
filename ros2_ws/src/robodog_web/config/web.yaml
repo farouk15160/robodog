@@ -14,6 +14,16 @@ robodog_web:
   # Command WebSockets accept localhost, literal private/link-local IPs, and
   # names explicitly listed here. Add a reverse-proxy DNS name when needed.
   allowed_command_hosts: []
+  # Advertise this read-only service descriptor over DNS-SD/mDNS so the mobile
+  # app can find the robot without a typed IP address. This does not bypass the
+  # existing same-origin command-socket checks. Requires avahi-daemon and
+  # avahi-utils on Linux.
+  discovery:
+    enabled: true
+    device_name: "RoboDog"
+    # Empty stores the stable UUID at $ROS_HOME/robodog/device.json (normally
+    # ~/.ros/robodog/device.json). An override must be an absolute path.
+    identity_file: ""
   stream_rate_hz: 20.0      # telemetry push rate; the UI redraws at this rate
   # Joysticks refresh faster than this. A dropped tab or network link then
   # publishes zero velocity; the controller has a second independent timeout.

@@ -37,6 +37,7 @@ import json
 import math
 import os
 import re
+import socket
 import threading
 import time
 from typing import Any
@@ -58,6 +59,8 @@ from std_srvs.srv import Trigger
 from robodog_msgs.msg import GaitCommand, JointCommand, JointCommandArray, RobotState
 from robodog_msgs.srv import (EmergencyStop, EnableJoints, SaveMap, SetControlMode,
                               SetGait, SetNamedPose)
+from robodog_web.discovery import (DiscoveryAdvertiser, build_descriptor,
+                                   default_identity_path, load_or_create_device_id)
 from robodog_web.telemetry import (RollingTelemetry, STATS_WINDOW_S, finite_json,
                                     joint_actuator_info)
 
@@ -76,7 +79,7 @@ FAULT_BITS = [(1, "POSITION_LIMIT"), (2, "VELOCITY_LIMIT"), (4, "TORQUE_LIMIT"),
 
 def trusted_command_hostname(hostname: str | None,
                              allowed_hosts: list[str] | None = None) -> bool:
-    """Accept literal local-network addresses or an explicit server allowlist."""
+    """Accept local addresses or an explicit server-known hostname."""
     name = (hostname or "").rstrip(".").lower()
     allowed = {str(value).rstrip(".").lower() for value in (allowed_hosts or [])}
     if name == "localhost" or name in allowed:
@@ -333,6 +336,26 @@ class WebApp:
         self._drive_last = 0.0
         self._drive_lock = threading.Lock()
         self._drive_timeout = max(float(cfg.get("drive_lease_timeout_s", 0.30)), 0.1)
+        configured_hosts = tuple(str(value) for value in
+                                 cfg.get("allowed_command_hosts", []))
+        # Avahi advertises the machine's mDNS hostname as the service target.
+        # Trust that one server-known name, while keeping arbitrary .local names
+        # subject to the same DNS-rebinding rejection as public DNS names.
+        self._allowed_command_hosts = (*configured_hosts,
+                                       f"{socket.gethostname()}.local")
+        discovery = cfg.get("discovery", {})
+        bind_host = str(cfg.get("host", "127.0.0.1")).strip().lower()
+        try:
+            loopback_only = ip_address(bind_host).is_loopback
+        except ValueError:
+            loopback_only = bind_host == "localhost"
+        self._discovery_enabled = bool(discovery.get("enabled", False)) and not loopback_only
+        self._device_name = str(discovery.get("device_name", "RoboDog"))
+        self._identity_path = default_identity_path(
+            str(discovery.get("identity_file", "")))
+        self._device_id: str | None = None
+        self._descriptor: dict | None = None
+        self._advertiser = DiscoveryAdvertiser()
         self.app = web.Application()
         self.app.add_routes([
             web.get("/", self.index),
@@ -340,6 +363,7 @@ class WebApp:
             web.get("/api/config", self.api_config),
             web.get("/api/info", self.api_info),
             web.get("/api/state", self.api_state),
+            web.get("/.well-known/robodog", self.well_known),
             web.get("/stream/color.mjpg", self.mjpeg),
             web.get("/ws", self.websocket),
             # follow_symlinks: colcon's --symlink-install makes every installed
@@ -373,6 +397,21 @@ class WebApp:
         if self.node.state is None:
             return web.json_response({"error": "no telemetry yet"}, status=503)
         return web.json_response(self.node.state)
+
+    async def well_known(self, request):
+        _, descriptor = self._ensure_discovery()
+        return web.json_response(descriptor, headers={"Cache-Control": "no-store"})
+
+    def _ensure_discovery(self) -> tuple[str, dict]:
+        if self._device_id is None or self._descriptor is None:
+            self._device_id = load_or_create_device_id(self._identity_path)
+            self._descriptor = build_descriptor(
+                device_id=self._device_id,
+                device_name=self._device_name,
+                port=int(self.cfg.get("port", 8080)),
+                camera_rate_hz=float(self.cfg.get("video_rate_hz", 0.0)),
+            )
+        return self._device_id, self._descriptor
 
     async def mjpeg(self, request):
         """Multipart JPEG stream. Separate from the WebSocket so a slow video
@@ -408,7 +447,7 @@ class WebApp:
             hostname = urlsplit(origin).hostname
         except ValueError:
             raise web.HTTPForbidden(reason="invalid command origin")
-        if not trusted_command_hostname(hostname, self.cfg.get("allowed_command_hosts")):
+        if not trusted_command_hostname(hostname, self._allowed_command_hosts):
             raise web.HTTPForbidden(
                 reason="command socket requires a local IP or allowed hostname")
         ws = web.WebSocketResponse(heartbeat=20.0)
@@ -442,8 +481,28 @@ class WebApp:
     async def _start_broadcast(self, app):
         app["broadcast"] = asyncio.create_task(self._broadcast())
         app["drive_watchdog"] = asyncio.create_task(self._drive_watchdog())
+        if self._discovery_enabled:
+            device_id, descriptor = self._ensure_discovery()
+            advertised = self._advertiser.start(
+                name=self._device_name,
+                port=descriptor["service"]["port"],
+                txt={
+                    "api": "1",
+                    "id": device_id,
+                    "model": "robodog",
+                    "path": "/.well-known/robodog",
+                },
+            )
+            logger = getattr(self.node, "get_logger", lambda: None)()
+            if logger is not None:
+                message = (f"DNS-SD advertising {self._device_name} on "
+                           f"{descriptor['service']['port']}"
+                           if advertised else
+                           "DNS-SD unavailable: install avahi-utils for mobile discovery")
+                (logger.info if advertised else logger.warning)(message)
 
     async def _stop_broadcast(self, app):
+        self._advertiser.stop()
         app["broadcast"].cancel()
         app["drive_watchdog"].cancel()
         await asyncio.gather(app["broadcast"], app["drive_watchdog"],
@@ -691,12 +750,26 @@ def main(argv=None) -> None:
     host = str(boot.get_parameter("host").value)
     cfg_path = boot.get_parameter("config").value or os.path.join(
         get_package_share_directory("robodog_web"), "config", "web.yaml")
-    boot.destroy_node()
 
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)["robodog_web"]
+    discovery_defaults = cfg.get("discovery", {})
+    boot.declare_parameter("discovery_enabled",
+                           bool(discovery_defaults.get("enabled", True)))
+    boot.declare_parameter("device_name",
+                           str(discovery_defaults.get("device_name", "RoboDog")))
+    boot.declare_parameter("device_identity_file",
+                           str(discovery_defaults.get("identity_file", "")))
+    discovery = {
+        **discovery_defaults,
+        "enabled": bool(boot.get_parameter("discovery_enabled").value),
+        "device_name": str(boot.get_parameter("device_name").value),
+        "identity_file": str(boot.get_parameter("device_identity_file").value),
+    }
+    boot.destroy_node()
+
     host = host or str(cfg.get("host", "127.0.0.1"))
-    cfg = {**cfg, "host": host}
+    cfg = {**cfg, "host": host, "port": port, "discovery": discovery}
     www = os.path.join(get_package_share_directory("robodog_web"), "www")
 
     robot_info = _robot_info()

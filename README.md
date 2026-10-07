@@ -65,7 +65,7 @@ is precisely what the two-bus CAN budget allows.
 python3 -m pip install --user mujoco  # physics and the simulated camera
 python3 -m pip install --user aiohttp # web GUI HTTP and WebSocket server
 python3 -m pip install --user python-can # only needed for real hardware
-sudo apt-get install ros-humble-rtabmap-slam ros-humble-rtabmap-util ros-humble-rtabmap-sync ros-humble-octomap-server
+sudo apt-get install avahi-daemon avahi-utils python3-pil ros-humble-rtabmap-slam ros-humble-rtabmap-util ros-humble-rtabmap-sync ros-humble-octomap-server
 
 git clone https://github.com/farouk15160/robodog.git
 cd robodog/ros2_ws
@@ -146,6 +146,20 @@ Motion is dead-man controlled: held inputs refresh at 10 Hz, and release,
 focus loss, disconnect or either server/controller timeout commands zero
 velocity. See the [remote-control runbook](docs/remote_control.md), including
 the trusted-LAN boundary for phone access.
+
+The repository also contains an Expo/React Native client in
+[`apps/robodog_mobile`](apps/robodog_mobile). The robot advertises
+`_robodog._tcp.local` with a stable device UUID, and the app also accepts a
+manual IP address when multicast discovery is unavailable. The native cockpit
+validates and shows read-only telemetry; its functional **Web Remote** loads
+the robot's same-origin `/remote` page in a navigation-restricted view, keeping
+the existing drive lease, origin checks, dead-man behavior and camera stream.
+See the [mobile app setup and security boundary](docs/mobile_app.md).
+
+The current camera path is a 10 Hz, 640-pixel-wide MJPEG preview fed by a 15 Hz
+ROS camera, so it is not a 60 fps implementation. The app isolates the media
+surface in its control screen for a later Jetson H.264/WebRTC adapter; 60 fps will only be
+advertised after sensor, encoder, decoder, latency, load and thermal validation.
 
 ---
 

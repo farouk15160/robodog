@@ -854,13 +854,21 @@ class RoboDogControlNode(Node):
         return True
 
     def _greeting_readiness(self) -> tuple[bool, str]:
-        # Greeting is simulation-only. Requiring contact and base-pose
-        # feedback here made the button impossible to use after a simulated
-        # stumble: commanding the stand joint pose cannot right a fallen free
-        # body. Wait only for the stand trajectory to settle, then run the
-        # bounded animation. Hardware remains rejected in _srv_greeting().
-        if not np.all(np.isfinite(self._last_state.position)):
-            return False, "greeting requires finite joint feedback"
+        base = self._base
+        if base is None:
+            return False, "greeting requires live body and foot-contact feedback"
+        feedback = np.concatenate((base.position, base.orientation, base.linear_velocity,
+                                   base.angular_velocity, self._last_state.position))
+        if not np.all(np.isfinite(feedback)):
+            return False, "greeting requires finite body and joint feedback"
+        if not bool(np.all(base.foot_contact)):
+            return False, "greeting requires all four feet in contact before weight shift"
+        roll, pitch = roll_pitch_from_quat(base.orientation)
+        height = self.P["named_poses"]["stand"]["base_height_m"]
+        if abs(roll) > 0.15 or abs(pitch) > 0.15 or abs(base.position[2] - height) > 0.08:
+            return False, "greeting requires a level body at stand height"
+        if np.linalg.norm(base.linear_velocity) > 0.10 or np.linalg.norm(base.angular_velocity) > 0.25:
+            return False, "greeting requires the body to be stationary"
         if np.max(np.abs(self._last_state.position - self.poses["stand"])) > 0.15:
             return False, "greeting requires joints settled at the stand pose"
         return True, "ready"

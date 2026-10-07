@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["RobotDiscoveryModule"] },
+  "android": { "modules": ["com.robodog.discovery.RobotDiscoveryModule"] }
+}

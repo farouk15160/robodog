@@ -24,10 +24,11 @@ def system_architecture() -> Diagram:
                 caption="Physical and computational stack. Everything above the red "
                         "boundary shares commands and telemetry; hardware travel is gated.")
     d.box("L1", 20, 20, 1140, 150, "OPERATOR", "off-board", kind="layer", z=0)
-    d.box("gui", 60, 60, 240, 80, "Web GUI", "joint RMS / peaks / thermal history", kind="external")
-    d.box("rviz", 330, 60, 200, 80, "RViz2", "robot + 2D / 3D maps", kind="external")
-    d.box("cli", 560, 60, 200, 80, "ros2 CLI / tools", "pose, joint_test, param", kind="external")
-    d.box("rec", 790, 60, 330, 80, "rosbag2 / diagnostics", "recording and replay",
+    d.box("gui", 45, 60, 205, 80, "Web GUI", "RMS / thermal / maps", kind="external")
+    d.box("mobile", 270, 60, 205, 80, "React Native app", "DNS-SD + Web Remote", kind="external")
+    d.box("rviz", 495, 60, 190, 80, "RViz2", "robot + 2D / 3D maps", kind="external")
+    d.box("cli", 705, 60, 190, 80, "ros2 CLI / tools", "pose, joint_test, param", kind="external")
+    d.box("rec", 915, 60, 205, 80, "rosbag2 / diagnostics", "recording and replay",
           kind="external", dashed=True)
 
     d.box("L2", 20, 200, 1140, 300, "ONBOARD COMPUTER", "ROS 2; Humble local validation",
@@ -58,6 +59,7 @@ def system_architecture() -> Diagram:
     d.box("pwr", 940, 630, 180, 85, "44.4 V battery", "2 x 6S series, 2.50 kg", kind="hardware")
 
     d.edge("gui", "web", "WebSocket JSON", style="thick")
+    d.edge("mobile", "web", "DNS-SD + HTTP; WS in WebView", style="thick")
     d.edge("rviz", "ctrl", "topics + TF")
     d.edge("cli", "ctrl", "services")
     d.edge("web", "ctrl", "cmd / telemetry")
@@ -76,6 +78,8 @@ def software_architecture() -> Diagram:
     d = Diagram("software_architecture", "Software architecture", w=1160, h=700,
                 caption="ROS 2 package graph. Arrows point from dependant to dependency. "
                         "RTAB-Map runs by default for the supported MuJoCo RGB-D pipeline.")
+    d.box("mobile", 60, 30, 280, 65, "apps/robodog_mobile", "Expo / React Native client",
+          kind="external")
     d.box("bring", 430, 30, 300, 65, "robodog_bringup", "launch composition only")
     d.box("web", 60, 150, 230, 70, "robodog_web", "GUI server + protocol", kind="package")
     d.box("ctrl", 330, 150, 250, 70, "robodog_control",
@@ -97,6 +101,7 @@ def software_architecture() -> Diagram:
 
     for a in ("web", "ctrl", "perc", "sim"):
         d.edge("bring", a)
+    d.edge("mobile", "web", "DNS-SD + API v1 / Web Remote")
     d.edge("ctrl", "hw")
     d.edge("ctrl", "msgs")
     d.edge("web", "msgs")

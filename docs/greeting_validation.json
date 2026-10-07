@@ -1,0 +1,15 @@
+{
+  "schema": "robodog.greeting_validation.v1",
+  "recorded_at": "2026-10-07T19:07:12+02:00",
+  "source_revision": "d6d54c5 plus the stable-greeting working tree",
+  "launch": "ROS_DOMAIN_ID=92 ROS_HOME=/tmp/robodog-greeting-ros MUJOCO_GL=egl ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=flat rviz:=false web:=false camera_backend:=none use_camera:=false mapping:=none mujoco_viewer:=false",
+  "measurement": "ROS_DOMAIN_ID=92 python3 tools/validate_greeting.py",
+  "service_message": "greeting accepted (8.70 s, front-left leg)",
+  "samples": 435,
+  "min_base_height_m": 0.29424703830016236,
+  "max_abs_roll_rad": 0.06696647686006126,
+  "max_abs_pitch_rad": 0.021155173079718755,
+  "min_contact_count": 3,
+  "final_controller": "pose",
+  "final_state": "STANDING"
+}

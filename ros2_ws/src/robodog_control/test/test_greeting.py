@@ -6,12 +6,23 @@ import numpy as np
 
 from robodog_control.control_node import RoboDogControlNode
 from robodog_control.greeting import GreetingMotion
+from robodog_control.kinematics import LegGeometry, forward_in_base
 from robodog_hardware.types import BaseState, JointState
 
 
 STAND = np.array([0.0, 0.693417, -1.371545] * 4)
 LOWER = np.array([-0.8, -1.4, -2.6] * 4)
 UPPER = np.array([0.8, 2.4, 0.0] * 4)
+GEOMETRY = LegGeometry(
+    haa_x=0.231,
+    haa_y=0.060,
+    hfe_dx=0.060,
+    hfe_dr=0.016,
+    thigh=0.192,
+    thigh_lat=0.068501,
+    shank=0.195621,
+    foot_radius=0.020,
+)
 
 
 def response():
@@ -48,7 +59,7 @@ def node_shell(*, simulation=True, enabled=True, controller="pose",
     return node
 
 
-def test_greeting_motion_lifts_only_front_left_and_returns_to_stand():
+def test_greeting_motion_coordinates_support_legs_and_returns_to_stand():
     motion = GreetingMotion(STAND, STAND, LOWER, UPPER)
     samples = []
     while not motion.done:
@@ -60,11 +71,55 @@ def test_greeting_motion_lifts_only_front_left_and_returns_to_stand():
 
     samples = np.asarray(samples)
     # The front-left leg visibly folds and waves at the hip-abduction joint.
-    assert np.ptp(samples[:, 0]) >= 0.35
+    assert np.ptp(samples[:, 0]) >= 0.23
     assert np.min(samples[:, 2]) <= -1.9
-    # The other three legs remain planted at the calibrated stand angles.
-    assert np.allclose(samples[:, 3:], STAND[3:])
+    # Each support leg participates in the slow body shift, but its motion is
+    # smaller than the waving leg's motion.
+    support_span = np.ptp(samples[:, 3:].reshape(-1, 3, 3), axis=0)
+    assert np.all(np.max(support_span, axis=1) >= 0.10)
+    assert np.all(np.max(support_span, axis=1) <= 0.60)
     assert np.allclose(samples[-1], STAND)
+
+
+def _support_margin_at_origin(points: np.ndarray) -> float:
+    """Signed distance from the origin to the closest triangle edge."""
+    twice_area = sum(
+        np.cross(points[i], points[(i + 1) % 3]) for i in range(3))
+    orientation = np.sign(twice_area)
+    distances = []
+    for index, start in enumerate(points):
+        edge = points[(index + 1) % 3] - start
+        cross = np.cross(edge, -start)
+        distances.append(orientation * cross / np.linalg.norm(edge))
+    return float(min(distances))
+
+
+def test_greeting_moves_center_inside_support_triangle_before_front_left_lift():
+    motion = GreetingMotion(STAND, STAND, LOWER, UPPER)
+    lifted_samples = []
+    peak_speed = 0.0
+
+    while not motion.done:
+        q, qd, _ = motion.update(0.01)
+        feet = np.asarray([
+            forward_in_base(GEOMETRY, leg, q[3 * i:3 * i + 3])
+            for i, leg in enumerate(("FL", "FR", "RL", "RR"))
+        ])
+        support_height = float(np.mean(feet[1:, 2]))
+        clearance = feet[0, 2] - support_height
+        if clearance >= 0.06:
+            lifted_samples.append(feet)
+        peak_speed = max(peak_speed, float(np.max(np.abs(qd))))
+
+    assert lifted_samples, "front-left foot never achieved useful clearance"
+    margins = [
+        # Foot coordinates are expressed in the base frame, so the origin is
+        # the body-centre projection whose support margin we need to measure.
+        _support_margin_at_origin(feet[[1, 3, 2], :2])
+        for feet in lifted_samples
+    ]
+    assert min(margins) >= 0.04
+    assert peak_speed <= 1.25
 
 
 def test_greeting_service_starts_nonblocking_motion_from_stable_sim_stand():
@@ -94,15 +149,27 @@ def test_greeting_service_refuses_hardware_and_estop_but_queues_from_motion():
     assert not stopped._srv_greeting(SimpleNamespace(), response()).success
 
 
-def test_simulation_greeting_waits_for_joint_stand_without_blocking_on_body_contact():
+def test_simulation_greeting_requires_upright_quiet_four_foot_stand():
     node = node_shell()
-    node._base.foot_contact[:] = False
-    node._base.position[2] = 0.06
-    node._base.orientation[:] = [-1.0, 0.0, 0.0, 0.0]
 
     assert node._greeting_readiness()[0]
 
-    node._last_state.position[0] = float("nan")
+    node._base.foot_contact[:] = False
+    assert not node._greeting_readiness()[0]
+
+    node._base.foot_contact[:] = True
+    node._base.position[2] = 0.06
+    assert not node._greeting_readiness()[0]
+
+    node._base.position[2] = 0.32
+    node._base.orientation[:] = [-1.0, 0.0, 0.0, 0.0]
+    assert not node._greeting_readiness()[0]
+
+    node._base.orientation[:] = [0.0, 0.0, 0.0, 1.0]
+    node._base.angular_velocity[1] = 0.4
+    assert not node._greeting_readiness()[0]
+
+    node._base.angular_velocity[1] = float("nan")
     assert not node._greeting_readiness()[0]
 
 

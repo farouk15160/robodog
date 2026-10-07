@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'org.jetbrains.kotlin.android'
+}
+
+group = 'com.robodog.discovery'
+version = '1.0.0'
+
+android {
+  namespace 'com.robodog.discovery'
+  compileSdk rootProject.ext.compileSdkVersion
+
+  defaultConfig {
+    minSdkVersion rootProject.ext.minSdkVersion
+  }
+}
+
+dependencies {
+  implementation project(':expo-modules-core')
+}

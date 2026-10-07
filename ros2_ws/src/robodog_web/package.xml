@@ -22,9 +22,12 @@
   <exec_depend>robodog_hardware</exec_depend>
   <exec_depend>python3-aiohttp</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-pil</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
-  <!-- optional: python3-pil (video streaming); without it the camera panel
-       shows metadata only -->
+  <!-- optional: the Avahi daemon and publisher advertise _robodog._tcp for
+       mobile auto-discovery; the HTTP descriptor remains available without it -->
+  <exec_depend>avahi-daemon</exec_depend>
+  <exec_depend>avahi-utils</exec_depend>
 
   <test_depend>python3-pytest</test_depend>
   <test_depend>nodejs</test_depend>

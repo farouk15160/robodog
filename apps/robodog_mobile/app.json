@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "RoboDog Control",
+    "slug": "robodog-control",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "robodog",
+    "runtimeVersion": "1.0.0",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.robodog.control",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "RoboDog Control discovers and connects to your robot on the local network.",
+        "NSBonjourServices": ["_robodog._tcp"],
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "com.robodog.control",
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE", "CHANGE_WIFI_MULTICAST_STATE"],
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": ["expo-router", "./plugins/withRobodogNetwork"],
+    "experiments": { "typedRoutes": true },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

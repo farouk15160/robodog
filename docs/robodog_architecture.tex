@@ -6,7 +6,7 @@
 \large Software architecture for a 12-DOF quadruped\\
 \normalsize 12 $\times$ ROBSTRIDE06 QDD actuators \textbullet\ \RdMassTotal\,kg \textbullet\ ROS 2 (Humble local validation)}
 \author{\small Generated from the Onshape CAD export \texttt{\RdCadSha}}
-\date{\small Revision 0.3 --- RGB-D mapping and joint diagnostics; 28 September 2026}
+\date{\small Revision 0.4 --- mobile discovery/control and stable greeting; 7 October 2026}
 
 \begin{document}
 \maketitle
@@ -487,6 +487,7 @@ engine; launch composition selects simulation assets and mapping support.}{0.96}
 \code{robodog\_perception}  & ament\_python & camera, depth, cloud, mapping launch \\
 \code{robodog\_web}         & ament\_python & GUI server, protocol, rolling diagnostics \\
 \code{robodog\_bringup}     & ament\_cmake  & launch composition only \\
+\code{apps/robodog\_mobile} & Expo/TypeScript & phone/tablet discovery, status and control shell \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1448,6 +1449,65 @@ by default because it bypasses the gait layer and is the easiest way to put a
 leg where the body cannot support it. Video is a separate MJPEG endpoint so a
 slow video consumer cannot stall telemetry, and the page falls back to showing
 camera metadata if no JPEG encoder is installed.
+
+The simulation-only Greeting action is a queued whole-body motion. One request
+first selects stand and waits for finite feedback, four contacts, stand height,
+level/stationary base feedback and settled joints. It then moves the base
+rear-right, lifts and waves the front-left paw, touches down, and only then
+recentres. Kinematic regression tests require at least 40\,mm support-triangle
+margin while paw clearance exceeds 60\,mm and bound commanded joint speed to
+1.25\,rad/s. A live 8.70\,s MuJoCo run returned to standing with minimum base
+height 0.294\,m, maximum absolute roll 0.067\,rad and maximum absolute pitch
+0.021\,rad. This establishes simulation behavior only; the service still
+rejects hardware. The reproducible command and full-precision record are in
+\href{greeting_validation.json}{the greeting validation artifact}.
+
+\subsection{LAN discovery and mobile application}
+
+The server publishes a read-only \code{\_robodog.\_tcp.local} DNS-SD service
+when \code{avahi-publish-service} and a running Avahi daemon are available. The
+service instance carries the friendly name; its TXT records contain a stable UUID,
+model, API version and the path
+\code{/.well-known/robodog}. The JSON descriptor repeats the identity and lists
+the state, MJPEG and web-remote paths. The UUID is created once below
+\code{\$ROS\_HOME/robodog/device.json} with mode 0600; it is an identifier,
+not a secret. Discovery can be disabled with \code{web\_discovery:=false}, and
+manual IP/port entry remains available where multicast is filtered.
+
+The React Native application lives outside the ROS workspace in
+\code{apps/robodog\_mobile}. Its network boundary validates discovery and
+telemetry payloads before they enter application state, deduplicates robots by
+the stable UUID, and keeps motion controls separate from discovery. Phone
+portrait stacks camera and controls; wider screens use a cockpit layout with
+mode, gait, measured speed, configured supply-voltage assumption,
+hottest-joint temperature and rolling
+torque RMS/peak kept visible.
+The current functional control view embeds the robot-served \code{/remote}
+page, so commands retain the web server's exact same-origin check, one-operator
+0.30\,s lease and the control node's independent 0.35\,s velocity timeout.
+Navigation is restricted to the selected robot origin. Direct native motion
+controls stay locked until a paired, authenticated native command endpoint is
+implemented. Setup and operator details are in the
+\href{mobile_app.md}{mobile app runbook}.
+
+\begin{decision}{Discovery does not confer control authority}
+The service advertisement and well-known descriptor are public LAN metadata.
+They do not add a native command bypass or relax the existing \code{/ws}
+Origin and private-host checks. The shipped HTTP/MJPEG/web-control path has no
+login or TLS and is therefore restricted to an isolated trusted LAN. A
+production native protocol must add TLS, pinned robot identity, a time-limited
+pairing code, revocable per-device credentials, strict message schemas, rate
+limits and a lease covering every motion-changing action.
+\end{decision}
+
+The present camera path is not a 60-fps path: ROS publishes the simulated
+camera at 15\,Hz and the Python MJPEG encoder is configured for at most 10\,Hz
+at 640 pixels wide. A later low-latency feed belongs behind a separate media
+transport using Jetson hardware H.264 and WebRTC with native decoding. Camera
+sensor output, encoder throughput, decoded frame rate, latency, packet loss,
+CPU/GPU load and temperature must be measured before a 60-fps profile is
+advertised. Command telemetry remains on a separate transport so video
+congestion cannot delay dead-man messages.
 
 % =====================================================================
 \section{Migration to hardware}

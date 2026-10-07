@@ -104,6 +104,36 @@ def test_lan_binding_accepts_a_matching_private_ip_origin():
     asyncio.run(check())
 
 
+def test_lan_binding_accepts_the_matching_mdns_local_origin():
+    """An explicitly known DNS-SD hostname works in the mobile WebView."""
+    async def check():
+        app = WebApp(SimpleNamespace(state=None),
+                     {"host": "0.0.0.0", "stream_rate_hz": 20,
+                      "allowed_command_hosts": ["robodog.local"]},
+                     str(Path(__file__).resolve().parents[1] / "www"), {"robot": "robodog"})
+        async with TestClient(TestServer(app.app)) as client:
+            async with client.ws_connect("/ws", origin="http://robodog.local:8080",
+                                         headers={"Host": "robodog.local:8080"}) as ws:
+                assert await ws.receive_json() == {"type": "info", "data": {"robot": "robodog"}}
+    asyncio.run(check())
+
+
+def test_lan_binding_rejects_an_unknown_mdns_local_origin():
+    """A matching Origin/Host pair is insufficient for an unknown mDNS name."""
+    async def check():
+        app = WebApp(SimpleNamespace(state=None),
+                     {"host": "0.0.0.0", "stream_rate_hz": 20,
+                      "allowed_command_hosts": ["robodog.local"]},
+                     str(Path(__file__).resolve().parents[1] / "www"), {})
+        async with TestClient(TestServer(app.app)) as client:
+            with pytest.raises(WSServerHandshakeError) as error:
+                async with client.ws_connect("/ws", origin="http://untrusted.local:8080",
+                                             headers={"Host": "untrusted.local:8080"}):
+                    pass
+            assert error.value.status == 403
+    asyncio.run(check())
+
+
 @pytest.mark.parametrize("simulation,expected", [(True, 2.0), (False, 0.5)])
 def test_velocity_command_allows_two_only_in_simulation(simulation, expected):
     async def check():

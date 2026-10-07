@@ -19,8 +19,20 @@ same route:
 ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house
 ```
 
+The web server also advertises `_robodog._tcp.local` by default when
+`avahi-publish-service` is installed and the Avahi daemon is running. The
+service instance has the friendly name; its TXT record contains a persistent
+device UUID, model, API version and the path `/.well-known/robodog`. It does not
+contain credentials. Mobile clients verify that descriptor after resolving the
+service. Multicast-blocked networks can still use the IP address manually.
+Set `web_discovery:=false` to disable advertisement, or set
+`device_name:="Workshop RoboDog"` to distinguish several robots.
+The React Native client uses this service and retains manual address entry; see
+the [mobile app runbook](mobile_app.md).
+
 The server listens on all network interfaces by default. To restrict it to the
-robot itself, bind it to loopback:
+robot itself, bind it to loopback. Loopback binding also suppresses DNS-SD
+advertisement:
 
 ```bash
 ros2 launch robodog_bringup robot.launch.py \
@@ -29,8 +41,9 @@ ros2 launch robodog_bringup robot.launch.py \
 
 The server requires the command WebSocket to have the GUI's same origin, but it
 also restricts command origins to `localhost`, literal private/link-local IP
-addresses, or names listed in `allowed_command_hosts` in `web.yaml`. This blocks
-DNS-rebinding hostnames. The server does not provide login, authorization or
+addresses, the robot computer's advertised `hostname.local`, or names listed
+in `allowed_command_hosts` in `web.yaml`. Other DNS hostnames remain blocked
+against rebinding. The server does not provide login, authorization or
 TLS. The default LAN binding is for an isolated, trusted network. Do not expose
 port 8080 to the internet. Put an authenticated TLS reverse proxy and network
 access control in front of it if it must cross an untrusted network, and add the
@@ -69,14 +82,27 @@ latched stop.
 
 **Greeting** performs a short front-left-leg wave and returns to the stand
 pose. One press is enough: in MuJoCo the controller first enables the joints,
-moves the joints to the stand pose, and starts the wave when they settle within
-0.15 rad. The request is rejected while the emergency stop is latched and a
-queued greeting expires if the joints do not settle within 10 seconds. Because
-this is a simulation-only animation, a fallen simulated body does not block the
-button indefinitely. A new pose, joint, gait, nonzero velocity, disable or
-emergency-stop command cancels a queued greeting. A velocity or gait command
-also cancels an active greeting and returns to stand. Hardware rejects this
-behavior until three-leg stability has been validated on the assembled robot.
+moves to stand, and waits for finite feedback, four foot contacts, a level and
+stationary body at stand height, and joints within 0.15 rad of the stand pose.
+It then shifts the body rear-right before lifting the paw, keeps the base inside
+the remaining three-foot support triangle, plants the paw, and recentres. A
+queued greeting expires after 10 seconds rather than starting from a fallen or
+unsettled body. The emergency stop rejects the request. A new pose, joint,
+gait, nonzero velocity, disable or emergency-stop command cancels a queued
+greeting; velocity or gait input also cancels an active greeting and returns to
+stand.
+
+The current MuJoCo validation covered one complete 8.70 s greeting with 435
+state samples: minimum base height 0.294 m, maximum absolute roll 0.067 rad
+(3.84 degrees), maximum absolute pitch 0.021 rad (1.21 degrees), and at least
+three contacts throughout the lifted phase. The kinematic test enforces at
+least 40 mm support-triangle margin while paw clearance is at least 60 mm and
+limits peak commanded joint speed to 1.25 rad/s. This remains a
+**simulation-only** behavior until it has been validated on the assembled
+robot; hardware rejects it. The exact launch, measurement command and raw values
+are preserved in [`greeting_validation.json`](greeting_validation.json); rerun
+the measurement with `python3 tools/validate_greeting.py` from the repository
+root after sourcing `ros2_ws/install/setup.bash`.
 
 ## Save a room scan
 

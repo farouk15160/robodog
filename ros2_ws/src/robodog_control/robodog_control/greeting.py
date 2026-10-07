@@ -7,9 +7,24 @@ from .trajectory import JointTrajectory
 
 
 class GreetingMotion:
-    """Smooth keyframe sequence that waves FL while the other feet stay planted."""
+    """Quasi-static front-left wave with a three-foot stability margin.
 
-    duration = 5.25
+    Joint offsets are relative to the calibrated stand pose.  The first move
+    shifts the body rearward and rightward while all four feet remain down.
+    This puts the base origin well inside the FR/RL/RR support triangle before
+    FL is raised.  The reverse sequence plants FL before centring the body.
+    """
+
+    _SHIFT_OFFSETS = np.array([
+        0.309087, -0.327377, 0.416214,   # FL
+        0.000000, -0.143609, 0.021779,   # FR
+        0.309087, -0.327377, 0.416214,   # RL
+        -0.309087, -0.021859, 0.496860,  # RR
+    ])
+    _LOW_LIFT_OFFSET = np.array([0.153315, 0.033181, -0.435291])
+    _LIFT_OFFSET = np.array([0.167422, 0.077489, -0.552212])
+    _WAVE_OUT_OFFSET = np.array([0.290507, 0.062641, -0.512139])
+    _WAVE_IN_OFFSET = np.array([0.054541, 0.123835, -0.685774])
 
     def __init__(self, start: np.ndarray, stand: np.ndarray,
                  lower: np.ndarray, upper: np.ndarray) -> None:
@@ -20,24 +35,30 @@ class GreetingMotion:
         if not all(v.shape == (12,) for v in (start, stand, lower, upper)):
             raise ValueError("greeting joint vectors must each contain 12 values")
 
-        lifted = stand.copy()
-        lifted[1] = 0.45
-        lifted[2] = -2.05
-        wave_left = lifted.copy()
-        wave_left[0] = 0.24
-        wave_right = lifted.copy()
-        wave_right[0] = -0.24
+        shifted = stand + self._SHIFT_OFFSETS
+        low_lift = shifted.copy()
+        low_lift[:3] = stand[:3] + self._LOW_LIFT_OFFSET
+        lifted = shifted.copy()
+        lifted[:3] = stand[:3] + self._LIFT_OFFSET
+        wave_out = shifted.copy()
+        wave_out[:3] = stand[:3] + self._WAVE_OUT_OFFSET
+        wave_in = shifted.copy()
+        wave_in[:3] = stand[:3] + self._WAVE_IN_OFFSET
         raw = (
-            (0.75, stand),       # settle before unloading a foot
-            (0.75, lifted),
-            (0.45, wave_left),
-            (0.45, wave_right),
-            (0.45, wave_left),
-            (0.45, wave_right),
+            (0.60, stand),        # settle before shifting the support polygon
+            (1.35, shifted),
+            (1.45, low_lift),
             (0.45, lifted),
-            (0.75, stand),
-            (0.75, stand),       # settle again before ordinary motion resumes
+            (0.50, wave_out),
+            (0.50, wave_in),
+            (0.50, wave_out),
+            (0.50, lifted),
+            (0.45, low_lift),
+            (1.45, shifted),      # plant FL before moving the body back
+            (1.35, stand),
+            (0.60, stand),
         )
+        self.duration = sum(duration for duration, _goal in raw)
         self._segments: list[JointTrajectory] = []
         previous = np.clip(start, lower, upper)
         for duration, goal in raw:
