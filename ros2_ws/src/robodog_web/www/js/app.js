@@ -16,6 +16,139 @@
 
   const $ = (id) => document.getElementById(id);
 
+  /* React Native uses this page as a same-origin command transport.  The
+   * bridge exists only inside our WebView and only on an explicitly opted-in
+   * URL; an ordinary browser never gets this message listener. */
+  const nativeBridge = createNativeBridge();
+
+  function createNativeBridge() {
+    let optedIn = false;
+    try {
+      optedIn = new URLSearchParams(location.search).get("native_bridge") === "1";
+    } catch { /* an invalid URL disables the bridge */ }
+    const channel = window.ReactNativeWebView;
+    if (!optedIn || !channel || typeof channel.postMessage !== "function") return null;
+
+    let pending = {};
+    let lastConnection = null;
+    const post = message => {
+      try {
+        channel.postMessage(JSON.stringify({ type: "robodog.bridge", ...message }));
+      } catch { /* a closing native view cannot receive feedback */ }
+    };
+    const error = (message, id) => post({ event: "error", ...(id ? { id } : {}), message });
+
+    const receive = event => {
+      const decoded = decodeNativeCommand(event && event.data);
+      if (!decoded.ok) {
+        error(decoded.message, decoded.id);
+        return;
+      }
+      const { id, payload } = decoded;
+      if (!send(payload)) {
+        error("robot command socket is not connected", id);
+        return;
+      }
+      const actionPending = pending[payload.action] || [];
+      pending = { ...pending, [payload.action]: [...actionPending, id] };
+    };
+    // react-native-webview dispatches on document on Android and window on iOS.
+    document.addEventListener("message", receive);
+    window.addEventListener("message", receive);
+
+    return Object.freeze({
+      ready(cfg, info) {
+        post({ event: "ready", version: 1, limits: cfg.limits, info });
+      },
+      connection(connected, message) {
+        const key = `${connected}:${message}`;
+        if (key === lastConnection) return;
+        lastConnection = key;
+        post({ event: "connection", connected, message });
+      },
+      ack(message) {
+        const actionPending = pending[message.action] || [];
+        const id = actionPending[0];
+        pending = { ...pending, [message.action]: actionPending.slice(1) };
+        post({ event: "ack", ...(id ? { id } : {}),
+          action: message.action, ok: message.ok === true,
+          message: String(message.message || ""),
+          ...(message.data && typeof message.data === "object" ? { data: message.data } : {}) });
+      },
+      state(message) {
+        post({ event: "state", seq: message.seq, t: message.t,
+          state: message.data, events: Array.isArray(message.events) ? message.events : [] });
+      },
+    });
+  }
+
+  function decodeNativeCommand(raw) {
+    if (typeof raw !== "string") return { ok: false, message: "message data must be JSON text" };
+    let envelope;
+    try { envelope = JSON.parse(raw); } catch { return { ok: false, message: "malformed JSON" }; }
+    if (!plainObject(envelope)) return { ok: false, message: "message must be a JSON object" };
+    const id = typeof envelope.id === "string" ? envelope.id : undefined;
+    if (!exactKeys(envelope, ["id", "payload", "type"]) || envelope.type !== "robodog.command") {
+      return { ok: false, id, message: "invalid command envelope" };
+    }
+    if (!id || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/.test(id)) {
+      return { ok: false, message: "invalid command id" };
+    }
+    const payload = envelope.payload;
+    if (!plainObject(payload) || typeof payload.action !== "string") {
+      return { ok: false, id, message: "invalid command payload" };
+    }
+
+    if (payload.action === "cmd_vel") {
+      const values = [payload.vx, payload.vy, payload.wz];
+      if (!exactKeys(payload, ["action", "vx", "vy", "wz"])
+          || values.some(value => typeof value !== "number" || !Number.isFinite(value))) {
+        return { ok: false, id, message: "cmd_vel requires finite vx, vy and wz" };
+      }
+      return { ok: true, id, payload: {
+        action: "cmd_vel", vx: payload.vx, vy: payload.vy, wz: payload.wz,
+      } };
+    }
+    if (payload.action === "stand" && exactKeys(payload, ["action"])) {
+      return { ok: true, id, payload: { action: "gait", gait: "stand", enable: true } };
+    }
+    if (payload.action === "gait") {
+      const known = ["stand", "walk", "trot", "pace", "bound"];
+      if (!exactKeys(payload, ["action", "enable", "gait"])
+          || !known.includes(payload.gait) || typeof payload.enable !== "boolean") {
+        return { ok: false, id, message: "invalid gait command" };
+      }
+      return { ok: true, id, payload: {
+        action: "gait", gait: payload.gait, enable: payload.enable,
+      } };
+    }
+    if (payload.action === "greeting" && exactKeys(payload, ["action"])) {
+      return { ok: true, id, payload: { action: "greeting" } };
+    }
+    if (payload.action === "estop") {
+      const withReason = exactKeys(payload, ["action", "reason"])
+        && typeof payload.reason === "string"
+        && /^[\x20-\x7E]{1,160}$/.test(payload.reason);
+      if (!exactKeys(payload, ["action"]) && !withReason) {
+        return { ok: false, id, message: "invalid emergency-stop reason" };
+      }
+      return { ok: true, id, payload: {
+        action: "estop", reason: withReason ? payload.reason : "React Native controller",
+      } };
+    }
+    return { ok: false, id, message: "command action is not allowed" };
+  }
+
+  function plainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function exactKeys(value, expected) {
+    const actual = Object.keys(value).sort();
+    return actual.length === expected.length
+      && expected.every((key, index) => actual[index] === key);
+  }
+
   /* ------------------------------ transport ------------------------------ */
   function connect() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -41,10 +174,18 @@
       if (msg.type === "state") {
         state.seq = msg.seq;
         state.lastFrame = performance.now();
+        if (nativeBridge) {
+          nativeBridge.state(msg);
+          return;
+        }
         render(msg.data, msg.events || []);
       } else if (msg.type === "info") {
         state.info = msg.data;
       } else if (msg.type === "ack") {
+        if (nativeBridge) {
+          nativeBridge.ack(msg);
+          return;
+        }
         $("command-status").textContent = `${msg.action}: ${msg.message}`;
         $("command-status").style.color = msg.ok ? "var(--accent)" : "var(--alarm)";
         if (!msg.ok) toast(`${msg.action}: ${msg.message}`);
@@ -55,13 +196,18 @@
 
   function send(payload) {
     if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
-      toast("not connected");
-      return;
+      if (!nativeBridge) toast("not connected");
+      return false;
     }
     state.ws.send(JSON.stringify({ type: "cmd", ...payload }));
+    return true;
   }
 
   function setLink(up, text) {
+    if (nativeBridge) {
+      nativeBridge.connection(up, text);
+      return;
+    }
     const dot = $("link-dot");
     dot.className = "dot " + (up ? "on" : "off");
     $("foot-link").textContent = text;
@@ -83,6 +229,12 @@
     ]);
     state.cfg = cfg;
     state.info = info;
+    if (nativeBridge) {
+      nativeBridge.ready(cfg, info);
+      connect();
+      setInterval(watchdog, 500);
+      return;
+    }
     $("brand-sub").textContent =
       `${info.joints.length}-DOF · ${info.actuator} · ${info.mass_kg.toFixed(1)} kg`;
     $("foot-proto").textContent = `protocol v${cfg.protocol}`;
@@ -203,14 +355,23 @@
     const age = (performance.now() - state.lastFrame) / 1000;
     if (age > 2.0 && state.ws && state.ws.readyState === WebSocket.OPEN) {
       setLink(false, `no telemetry for ${age.toFixed(1)} s`);
+      if (nativeBridge) return;
       document.querySelectorAll(".panel").forEach(p => p.style.opacity = 0.5);
     } else if (age <= 2.0) {
+      if (nativeBridge) {
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) setLink(true, "connected");
+        return;
+      }
       document.querySelectorAll(".panel").forEach(p => p.style.opacity = 1);
       if (state.ws && state.ws.readyState === WebSocket.OPEN) setLink(true, "connected");
     }
   }
 
   boot().catch(err => {
+    if (nativeBridge) {
+      nativeBridge.connection(false, `failed to start: ${err.message}`);
+      return;
+    }
     document.body.innerHTML =
       `<pre style="padding:24px;color:#ff5f56">failed to start: ${err.message}\n\n`
       + `Is robodog_web_server running?</pre>`;

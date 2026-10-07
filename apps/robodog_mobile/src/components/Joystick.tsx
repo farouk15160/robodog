@@ -1,39 +1,94 @@
-import { useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { clampJoystick } from '../domain/joystick';
+import { clampJoystick, joystickGeometry, joystickTranslation } from '../domain/joystick';
 import type { JoystickVector } from '../domain/joystick';
 import { colors } from '../theme';
 
 interface Props {
   readonly label: string;
   readonly disabled?: boolean;
+  readonly size?: number;
+  readonly resetKey?: number;
   readonly onChange?: (value: JoystickVector) => void;
+  readonly onActiveChange?: (active: boolean) => void;
 }
 
-const RADIUS = 54;
-
-export function Joystick({ label, disabled = false, onChange }: Props) {
+export function Joystick({
+  label,
+  disabled = false,
+  size = 142,
+  resetKey = 0,
+  onChange,
+  onActiveChange,
+}: Props) {
   const [value, setValue] = useState<JoystickVector>({ x: 0, y: 0 });
-  const emit = (next: JoystickVector) => { setValue(next); onChange?.(next); };
-  const enabledRef = useRef(!disabled);
-  enabledRef.current = !disabled;
-  const responder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => enabledRef.current,
-    onMoveShouldSetPanResponder: () => enabledRef.current,
-    onPanResponderMove: (_, gesture) => emit(clampJoystick({ x: gesture.dx / RADIUS, y: gesture.dy / RADIUS })),
-    onPanResponderRelease: () => emit({ x: 0, y: 0 }),
-    onPanResponderTerminate: () => emit({ x: 0, y: 0 }),
-  }), []);
-  return <View style={styles.wrapper} accessibilityLabel={`${label} joystick${disabled ? ', locked' : ''}`}>
-    <View style={[styles.track, disabled && styles.disabled]} {...responder.panHandlers}>
-      <View style={[styles.knob, { transform: [{ translateX: value.x * RADIUS }, { translateY: value.y * RADIUS }] }]} />
-      <View style={styles.crossHorizontal} /><View style={styles.crossVertical} />
-    </View>
+  const [pressed, setPressed] = useState(false);
+  const geometry = joystickGeometry(size);
+  const translated = joystickTranslation(value, geometry.diameter);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const onActiveChangeRef = useRef(onActiveChange);
+  onActiveChangeRef.current = onActiveChange;
+  const emit = (next: JoystickVector) => {
+    setValue(next);
+    onChangeRef.current?.(next);
+  };
+  useEffect(() => {
+    setPressed(false);
+    setValue({ x: 0, y: 0 });
+  }, [resetKey]);
+  const gesture = useMemo(() => Gesture.Pan()
+    .enabled(!disabled)
+    .minDistance(0)
+    .shouldCancelWhenOutside(false)
+    .runOnJS(true)
+    .onBegin(() => { setPressed(true); onActiveChangeRef.current?.(true); })
+    .onUpdate((event) => emit(clampJoystick({
+      x: event.translationX / geometry.travel,
+      y: event.translationY / geometry.travel,
+    })))
+    .onFinalize(() => {
+      setPressed(false); emit({ x: 0, y: 0 }); onActiveChangeRef.current?.(false);
+    }), [disabled, geometry.travel]);
+  return <View
+    style={styles.wrapper}
+    accessibilityLabel={`${label} joystick${disabled ? ', unavailable' : ''}`}
+    accessibilityState={{ disabled }}
+  >
+    <GestureDetector gesture={gesture}>
+      <View
+      style={[
+        styles.track,
+        { width: geometry.diameter, height: geometry.diameter,
+          borderRadius: geometry.diameter / 2 },
+        pressed && styles.pressed,
+        disabled && styles.disabled,
+      ]}
+      >
+        <View style={[
+          styles.knob,
+          { width: geometry.knobDiameter, height: geometry.knobDiameter,
+            borderRadius: geometry.knobDiameter / 2,
+            transform: [{ translateX: translated.x }, { translateY: translated.y }] },
+        ]} />
+        <View style={[styles.crossHorizontal, { width: geometry.diameter * 0.77 }]} />
+        <View style={[styles.crossVertical, { height: geometry.diameter * 0.77 }]} />
+      </View>
+    </GestureDetector>
     <Text style={styles.label}>{label}</Text>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  wrapper: { alignItems: 'center', gap: 9 }, track: { width: 142, height: 142, borderRadius: 71, backgroundColor: colors.elevated, borderColor: colors.line, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, disabled: { opacity: 0.68 }, knob: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.accent, position: 'absolute', zIndex: 2 }, crossHorizontal: { width: 110, height: 1, backgroundColor: colors.line }, crossVertical: { height: 110, width: 1, backgroundColor: colors.line, position: 'absolute' }, label: { color: colors.muted, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  wrapper: { alignItems: 'center', gap: 6 },
+  track: { backgroundColor: colors.elevated, borderColor: colors.line, borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  pressed: { borderColor: colors.accent, backgroundColor: '#1C3C33' },
+  disabled: { opacity: 0.5 },
+  knob: { backgroundColor: colors.accent, position: 'absolute', zIndex: 2 },
+  crossHorizontal: { height: 1, backgroundColor: colors.line },
+  crossVertical: { width: 1, backgroundColor: colors.line, position: 'absolute' },
+  label: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
 });

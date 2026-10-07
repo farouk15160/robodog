@@ -41,6 +41,15 @@ def test_remote_control_panel_has_deadman_controls_and_live_feedback():
     )
 
 
+def test_native_webview_bridge_is_opt_in_and_strictly_validates_commands():
+    package = Path(__file__).resolve().parents[1]
+    subprocess.run(
+        ["node", str(package / "test" / "native_bridge.cjs"),
+         str(package / "www" / "js" / "app.js")],
+        check=True, capture_output=True, text=True,
+    )
+
+
 def test_page_navigation_can_hide_inactive_panels():
     package = Path(__file__).resolve().parents[1]
     css = (package / "www" / "css" / "app.css").read_text()

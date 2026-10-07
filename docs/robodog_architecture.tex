@@ -1478,24 +1478,33 @@ The React Native application lives outside the ROS workspace in
 \code{apps/robodog\_mobile}. Its network boundary validates discovery and
 telemetry payloads before they enter application state, deduplicates robots by
 the stable UUID, and keeps motion controls separate from discovery. Phone
-portrait stacks camera and controls; wider screens use a cockpit layout with
-mode, gait, measured speed, configured supply-voltage assumption,
-hottest-joint temperature and rolling
-torque RMS/peak kept visible.
-The current functional control view embeds the robot-served \code{/remote}
-page, so commands retain the web server's exact same-origin check, one-operator
-0.30\,s lease and the control node's independent 0.35\,s velocity timeout.
-Navigation is restricted to the selected robot origin. Direct native motion
-controls stay locked until a paired, authenticated native command endpoint is
-implemented. Setup and operator details are in the
+portrait keeps camera and telemetry above a bottom control area with two
+side-by-side joysticks; landscape uses a split cockpit. Mode, gait, measured
+speed, configured supply-voltage assumption, hottest-joint temperature and
+rolling torque RMS/peak remain visible.
+
+The cockpit's joysticks with touch dead-man behavior, Stand, Walk, Greeting and
+emergency stop are active through a hidden, navigation-pinned WebView at
+\code{/remote?native\_bridge=1}. The robot-served page opens \code{/ws}, so
+the browser Origin and Host exactly match the selected robot. The opt-in bridge
+requires both the query flag and React Native message channel, accepts a strict
+finite command schema, and returns validated status and telemetry messages. It
+does not create a standalone native socket or relax the hostname allowlist.
+Commands retain the server's one-operator 0.30\,s lease and the control node's
+independent 0.35\,s velocity timeout. Dead-man release, backgrounding and view
+teardown send zero; disconnect or lease expiry also produces zero. A visible
+Web Remote remains available for the complete browser interface. Expo Go can
+use manual address entry; automatic DNS-SD discovery requires the included
+Swift/Kotlin module in a development build. Setup and operator details are in the
 \href{mobile_app.md}{mobile app runbook}.
 
 \begin{decision}{Discovery does not confer control authority}
 The service advertisement and well-known descriptor are public LAN metadata.
 They do not add a native command bypass or relax the existing \code{/ws}
-Origin and private-host checks. The shipped HTTP/MJPEG/web-control path has no
+Origin, Host or private-network checks. The hidden WebView bridge deliberately
+uses those existing checks. The shipped HTTP/MJPEG/web-control path has no
 login or TLS and is therefore restricted to an isolated trusted LAN. A
-production native protocol must add TLS, pinned robot identity, a time-limited
+production control layer must add TLS, pinned robot identity, a time-limited
 pairing code, revocable per-device credentials, strict message schemas, rate
 limits and a lease covering every motion-changing action.
 \end{decision}

@@ -30,6 +30,17 @@ Set `web_discovery:=false` to disable advertisement, or set
 The React Native client uses this service and retains manual address entry; see
 the [mobile app runbook](mobile_app.md).
 
+The app's portrait controller keeps the camera and telemetry above two
+side-by-side joysticks in a bottom control area; landscape uses a split cockpit.
+Its active controls use a hidden WebView at `/remote?native_bridge=1`. The
+robot-served page, rather than React Native, opens `/ws`, preserving the exact
+Origin/Host checks and hostname allowlist. Bridge input uses a strict command
+schema and retains the drive lease and dead-man timeouts described below. The
+app sends zero on dead-man release and background/screen exit; disconnect or
+lease expiry also produces zero. This does not create a standalone native
+command socket. Expo Go works with manual address entry, while automatic DNS-SD
+discovery requires the native development build.
+
 The server listens on all network interfaces by default. To restrict it to the
 robot itself, bind it to loopback. Loopback binding also suppresses DNS-SD
 advertisement:
@@ -62,6 +73,11 @@ unstable; see [locomotion validation](locomotion_validation.md).
 | `W` / `S` or up/down arrows | Forward/back |
 | `A` / `D` | Lateral left/right |
 | `Q` / `E` or left/right arrows | Turn left/right |
+
+In the React Native cockpit, **MOVE** provides forward/lateral velocity and
+**TURN** provides yaw. Once the cockpit shows **READY**, touching either stick
+enables motion. Releasing one stick recentres that axis; releasing both sticks
+commands zero velocity.
 
 The speed slider starts at **0.5 m/s**. It remains bounded by the server's
 backend limit: simulation allows up to 2.0 m/s, while hardware remains limited

@@ -150,10 +150,23 @@ the trusted-LAN boundary for phone access.
 The repository also contains an Expo/React Native client in
 [`apps/robodog_mobile`](apps/robodog_mobile). The robot advertises
 `_robodog._tcp.local` with a stable device UUID, and the app also accepts a
-manual IP address when multicast discovery is unavailable. The native cockpit
-validates and shows read-only telemetry; its functional **Web Remote** loads
-the robot's same-origin `/remote` page in a navigation-restricted view, keeping
-the existing drive lease, origin checks, dead-man behavior and camera stream.
+manual IP address when multicast discovery is unavailable. In portrait, the
+camera and telemetry stay above a bottom handheld-control area with two
+side-by-side joysticks; landscape uses a split cockpit. Motion, Stand, Walk and
+Greeting become active when the app shows **READY**; emergency stop remains
+available whenever the control link is connected. A hidden, navigation-pinned WebView loads
+`/remote?native_bridge=1` and relays strictly validated commands through the
+robot page's same-origin WebSocket. This preserves the exact Origin/Host checks,
+one-operator drive lease and independent controller timeout; it does not add a
+standalone native command socket or widen the server allowlist. Release,
+backgrounding and disconnection stop motion. The visible **Web Remote** remains
+available for the complete browser interface.
+
+Expo Go works with manual robot address entry. Automatic DNS-SD discovery uses
+the included Swift/Kotlin module and therefore requires a development build.
+The shipped HTTP, WebSocket and MJPEG path still has no authentication or TLS,
+so use it only on a trusted, isolated LAN. Pairing, credentials and TLS remain
+production-roadmap work.
 See the [mobile app setup and security boundary](docs/mobile_app.md).
 
 The current camera path is a 10 Hz, 640-pixel-wide MJPEG preview fed by a 15 Hz
