@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from robodog_sim.evaluation import joint_metrics
+from robodog_sim.evaluation import joint_metrics, operating_point_assessment
 
 
 def test_report_distinguishes_joint_load_from_motor_load():
@@ -35,6 +35,16 @@ def test_report_rejects_empty_samples_instead_of_claiming_feasibility():
         )
 
 
+def test_active_safety_limiting_rejects_comfortable_margin_verdict():
+    passed, reasons = operating_point_assessment(
+        completed=True, stable=True, tracks_velocity=True,
+        within_continuous_rating=True, safety_clamped_cycle_fraction=.306,
+        max_clamped_cycle_fraction=.01,
+    )
+    assert not passed
+    assert reasons == ["safety limiting exceeded 1.0% of control cycles"]
+
+
 @pytest.fixture
 def simulation_case():
     pytest.importorskip("mujoco")
@@ -61,6 +71,9 @@ def test_run_case_collects_applied_physics_rate_torques_during_turn(simulation_c
     assert len(result["joints"]) == 12
     for row in result["joints"]:
         assert row["threshold_metrics"]["11"]["longest_time_s"] <= .02
+        assert "36" in row["threshold_metrics"]
+        assert len(row["motor_peak_world_position_m"]) == 3
+        assert row["motor_peak_travel_m"] >= 0
         assert "safety_torque_clip_events" in row
         assert "full_run_motor_rms_nm" in row
 

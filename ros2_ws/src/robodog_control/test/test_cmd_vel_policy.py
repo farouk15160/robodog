@@ -44,9 +44,22 @@ def node_shell(*, simulation=True, enabled=True, controller="pose", active_pose=
         "max_cmd_linear_velocity_sim_m_s": 2.0,
         "max_cmd_linear_velocity_hardware_m_s": 0.5,
         "max_cmd_yaw_rate_rad_s": 2.0,
+        "cmd_vel_timeout_s": 0.35,
     }
     node.get_parameter = lambda name: SimpleNamespace(value=params[name])
     return node
+
+
+def test_stale_velocity_is_zeroed_if_publisher_disappears():
+    node = node_shell(controller="gait")
+    node.gait.params = GaitParams(gait="trot", vx=1.0, vy=-0.2, wz=0.4)
+    node._last_cmd_vel_stamp = 10.0
+
+    assert not node._stop_stale_body_velocity(now=10.3)
+    assert node._pending_gait is None
+    assert node._stop_stale_body_velocity(now=10.36)
+    assert (node._pending_gait.vx, node._pending_gait.vy, node._pending_gait.wz) == (0.0, 0.0, 0.0)
+    assert node._last_cmd_vel_stamp is None
 
 
 def twist(vx=0.0, vy=0.0, wz=0.0):

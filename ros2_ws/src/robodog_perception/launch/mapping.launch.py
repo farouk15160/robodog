@@ -21,6 +21,10 @@ def _setup(context):
     except PackageNotFoundError as exc:
         raise RuntimeError("Mapping needs RTAB-Map: install ros-humble-rtabmap-ros "
                            "and source /opt/ros/humble/setup.bash.") from exc
+    try:
+        get_package_share_directory("octomap_server")
+    except PackageNotFoundError as exc:
+        raise RuntimeError("Map export needs OctoMap server: install ros-humble-octomap-server.") from exc
     plan.database_path.parent.mkdir(parents=True, exist_ok=True)
     config = os.path.join(get_package_share_directory("robodog_perception"),
                           "config", "rtabmap.yaml")
@@ -35,6 +39,10 @@ def _setup(context):
                  ("depth/image", "/robodog/camera/depth/image_rect_raw"),
                  ("rgb/camera_info", "/robodog/camera/color/camera_info"),
              ]),
+        Node(package="robodog_perception", executable="map_export_node", name="map_export",
+             namespace="robodog/mapping", output="screen",
+             parameters=[{"database_path": str(plan.database_path),
+                          "output_directory": cfg("mapping_export_directory")}]),
     ]
 
 
@@ -46,5 +54,7 @@ def generate_launch_description():
         DeclareLaunchArgument("world", default_value="flat"),
         DeclareLaunchArgument("mapping_database", default_value="",
                               description="Existing/new database; default is a separate file per world"),
+        DeclareLaunchArgument("mapping_export_directory", default_value="",
+                              description="Absolute room-scan export root; default is under ROS_HOME"),
         OpaqueFunction(function=_setup),
     ])

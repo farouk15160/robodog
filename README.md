@@ -96,6 +96,7 @@ in the sourced terminal before launch. No temporary `PYTHONPATH` is needed.
 | `ros2 run robodog_sim viewer --world house` | MuJoCo viewer, no control stack |
 | `ros2 run robodog_control pose stand` | move to a named pose |
 | `ros2 run robodog_control joint_test --mode sweep` | chirp every joint |
+| `ros2 run robodog_perception save_map --name workshop` | save the current room scan bundle |
 
 If MuJoCo cannot open a GL context, set `MUJOCO_GL=egl` (or `osmesa`).
 
@@ -133,6 +134,14 @@ at all — are configuration too, not constants buried in JavaScript.
 It speaks a purpose-built protocol rather than rosbridge: less bandwidth, and a
 much smaller surface from a web page that can move a 19.72 kg machine.
 
+The **Remote Control** page adds two touch joysticks, `WASD`/arrow keyboard
+control, live camera and motion/safety feedback, a simulation-only Greeting,
+and an atomic **Save room scan** action. Its speed slider starts at 0.5 m/s.
+Motion is dead-man controlled: held inputs refresh at 10 Hz, and release,
+focus loss, disconnect or either server/controller timeout commands zero
+velocity. See the [remote-control runbook](docs/remote_control.md), including
+the trusted-LAN boundary for phone access.
+
 ---
 
 ## SLAM and 3D mapping
@@ -151,6 +160,9 @@ launches without the simulated camera. Use `mapping:=none` to turn it off, or
 `mapping:=rtabmap` to require mapping and report unsupported configurations.
 See [mapping setup, outputs and export](docs/mapping.md). Simulation uses exact
 odometry; real-camera depth and real odometry remain prerequisites for hardware.
+The Remote Control page can snapshot an assembled PCD, full colored OctoMap,
+RTAB-Map database backup and checksum manifest. The equivalent command is
+`ros2 run robodog_perception save_map --name workshop`.
 
 ## Architecture
 
@@ -311,10 +323,21 @@ time above 8/11 N·m, speed during overload, and clipping. These results superse
 the earlier `rs06_feasibility` measurements: applied torque is now sampled at
 every 0.5 ms physics step, and the command delay is correctly 1 ms.
 
-Each run lasts 20 simulated seconds on an obstacle-free plane; RMS excludes
-the first second while peaks include startup. The tuned walk uses 1.5 Hz,
-0.78 duty factor and 30 mm lift at 320 mm stance; trot uses 2.2 Hz and
-40 mm lift at 330 mm stance.
+The [100-second 1 m/s report](docs/rs06_1ms_100s.md) repeats the applied-torque
+measurement for tuned walk and trot after a five-second RMS warmup and compares
+the tuned heading hold with the preserved [baseline](docs/rs06_1ms_100s_baseline.md).
+Walk still falls into an unstable, heavily limited state and averages
+−0.011 m/s. Tuned trot tracks at 0.984 m/s, with worst motor-side RMS/peak of
+5.36/28.64 N·m. It still has safety limiting on 30.6% of controller cycles, but
+heading hold reduces lateral drift from 24.405 m to 1.063 m. The largest tuned
+trot spike is the rear-left hip-pitch at 0.681 s and 0.571 m travel. This
+supports a simulation feasibility finding, not hardware approval or autonomous
+navigation performance.
+
+Each speed-sweep run below lasts 20 simulated seconds on an obstacle-free
+plane; RMS excludes the first second while peaks include startup. The tuned
+walk uses 1.5 Hz, 0.78 duty factor and 30 mm lift at 320 mm stance; trot uses
+2.2 Hz and 40 mm lift at 330 mm stance.
 
 | Gait | Command / actual speed | Worst motor RMS / peak | Safety-clamped cycles | Result |
 |---|---:|---:|---:|---|

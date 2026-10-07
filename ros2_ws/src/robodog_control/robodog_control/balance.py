@@ -63,6 +63,12 @@ class BalanceGains:
     kp_velocity: float = 90.0     # N per m/s of velocity error
     # yaw is regulated by a moment, since foot placement alone is slow at it
     kp_yaw: float = 25.0          # N.m per rad/s of yaw-rate error
+    # When no turn is commanded, convert accumulated heading error into a
+    # bounded yaw-rate target. This closes the angle loop around the existing
+    # yaw-rate controller and prevents a tiny persistent rate bias becoming a
+    # large lateral path error over a long straight run.
+    kp_heading: float = 2.0       # rad/s per rad of heading error
+    max_heading_rate_rad_s: float = 0.35
     # a foot pushes, never pulls; and never past the actuator's ability
     max_foot_force_n: float = 220.0
     # Coulomb limit used to project the solution into the friction cone.
@@ -162,3 +168,15 @@ def roll_pitch_from_quat(q: np.ndarray) -> tuple[float, float]:
     roll = np.arctan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y))
     pitch = np.arcsin(np.clip(2.0 * (w * y - z * x), -1.0, 1.0))
     return float(roll), float(pitch)
+
+
+def yaw_from_quat(q: np.ndarray) -> float:
+    """Yaw in radians from an xyzw quaternion."""
+    x, y, z, w = (float(v) for v in q)
+    return float(np.arctan2(2.0 * (w * z + x * y),
+                            1.0 - 2.0 * (y * y + z * z)))
+
+
+def angle_wrap(angle: float) -> float:
+    """Wrap an angle to [-pi, pi), preserving the shortest signed error."""
+    return float((float(angle) + np.pi) % (2.0 * np.pi) - np.pi)

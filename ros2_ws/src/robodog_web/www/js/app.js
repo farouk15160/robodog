@@ -10,7 +10,8 @@
 
   const state = {
     cfg: null, info: null, ws: null, live: [],
-    seq: 0, lastFrame: 0, disconnectHooks: [], retry: 500,
+    seq: 0, lastFrame: 0, disconnectHooks: [], ackHooks: [], pageHooks: [], retry: 500,
+    page: "dashboard",
   };
 
   const $ = (id) => document.getElementById(id);
@@ -47,6 +48,7 @@
         $("command-status").textContent = `${msg.action}: ${msg.message}`;
         $("command-status").style.color = msg.ok ? "var(--accent)" : "var(--alarm)";
         if (!msg.ok) toast(`${msg.action}: ${msg.message}`);
+        state.ackHooks.forEach(fn => { try { fn(msg); } catch (e) { /* isolate panels */ } });
       }
     };
   }
@@ -88,6 +90,9 @@
     const ctx = {
       cfg, info, send,
       onDisconnect: (fn) => state.disconnectHooks.push(fn),
+      onAck: (fn) => state.ackHooks.push(fn),
+      onPageChange: (fn) => state.pageHooks.push(fn),
+      isPageActive: (page) => state.page === page,
     };
     const grid = $("grid");
     const tpl = $("tpl-panel");
@@ -96,6 +101,7 @@
       const impl = Panels[spec.id];
       const node = tpl.content.firstElementChild.cloneNode(true);
       node.classList.add("w" + (spec.width || 1));
+      node.dataset.page = spec.page || "dashboard";
       node.querySelector(".ptitle").textContent = spec.title || spec.id;
       const body = node.querySelector(".pbody");
       grid.appendChild(node);
@@ -112,6 +118,27 @@
         body.className += " muted";
       }
     }
+
+    const selectPage = (page) => {
+      const previous = state.page;
+      state.page = page;
+      document.body.dataset.page = page;
+      document.querySelectorAll(".panel[data-page]").forEach(panel => {
+        panel.hidden = panel.dataset.page !== page;
+      });
+      document.querySelectorAll(".page-tab").forEach(button => {
+        const selected = button.dataset.page === page;
+        button.classList.toggle("on", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
+      if (previous !== page) state.pageHooks.forEach(fn => {
+        try { fn(previous, page); } catch (e) { /* isolate panels */ }
+      });
+    };
+    document.querySelectorAll(".page-tab").forEach(button => {
+      button.onclick = () => selectPage(button.dataset.page);
+    });
+    selectPage("dashboard");
 
     $("btn-estop-top").onclick = () => send({ action: "estop", reason: "web GUI toolbar" });
     $("btn-theme").onclick = () => {

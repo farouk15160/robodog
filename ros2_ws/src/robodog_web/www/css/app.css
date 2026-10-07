@@ -34,6 +34,8 @@ body {
 .stat { display: flex; flex-direction: column; }
 .stat label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 .topactions { display: flex; gap: 8px; }
+.page-tabs { display: flex; gap: 6px; }
+.page-tab { min-height: 38px; }
 
 /* ---------------- grid ---------------- */
 .grid {
@@ -146,3 +148,46 @@ select, input[type=number] {
 .footer { display: flex; gap: 18px; padding: 7px 16px; color: var(--muted);
           border-top: 1px solid var(--line); background: var(--panel); font-size: 11px; }
 .disabled-note { color: var(--warn); font-size: 11px; }
+
+/* ---------------- remote control ---------------- */
+.remote-layout { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(300px, 1fr); gap: 18px; }
+.joystick-grid { display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); gap: 18px; }
+.joystick-column { display: flex; flex-direction: column; align-items: center; gap: 7px; text-align: center; }
+.joystick-pad {
+  position: relative; width: min(42vw, 190px); aspect-ratio: 1; border-radius: 50%;
+  border: 2px solid var(--line); background: radial-gradient(circle, var(--panel-2) 0 45%, var(--panel) 46% 100%);
+  touch-action: none; user-select: none; overscroll-behavior: contain; cursor: grab;
+}
+.joystick-pad:active { cursor: grabbing; border-color: var(--accent); }
+.joystick-pad:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.joystick-pad::before, .joystick-pad::after { content: ""; position: absolute; background: var(--line); }
+.joystick-pad::before { width: 1px; top: 8%; bottom: 8%; left: 50%; }
+.joystick-pad::after { height: 1px; left: 8%; right: 8%; top: 50%; }
+.joystick-knob {
+  position: absolute; width: 38%; aspect-ratio: 1; border-radius: 50%; left: 31%; top: 31%;
+  background: var(--accent); box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none; transition: transform .04s linear;
+}
+.remote-actions .btn { min-height: 44px; flex: 1 1 130px; }
+.remote-help { line-height: 1.6; }
+.remote-speed { margin: 2px 0 6px; }
+.remote-speed output { min-width: 132px; }
+.remote-video { min-height: 220px; }
+.scan-save { display: grid; grid-template-columns: minmax(120px, 1fr) auto; gap: 8px; }
+.scan-save input { min-height: 44px; }
+.scan-save .btn { min-height: 44px; }
+.scan-status { min-height: 1.5em; overflow-wrap: anywhere; }
+.ok-text { color: var(--ok); }
+.alarm-text { color: var(--alarm); }
+@media (max-width: 850px) {
+  .remote-layout { grid-template-columns: 1fr; }
+  .topbar { gap: 10px; }
+  .page-tabs { order: 4; width: 100%; }
+  .page-tab { flex: 1; }
+}
+@media (max-width: 430px) {
+  .pbody { padding: 10px; }
+  .joystick-grid { gap: 8px; }
+  .joystick-pad { width: min(39vw, 165px); }
+  .scan-save { grid-template-columns: 1fr; }
+}

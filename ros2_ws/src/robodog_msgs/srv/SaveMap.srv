@@ -1,0 +1,6 @@
+string output_directory
+string name
+---
+bool success
+string message
+string manifest_path

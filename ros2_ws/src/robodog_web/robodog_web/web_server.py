@@ -23,10 +23,11 @@ PROTOCOL (v1)
 -------------
   server -> client   {"type": "state",  "seq": n, "t": secs, "data": {...}}
                      {"type": "info",   "data": {joints, limits, ...}}   once
-                     {"type": "ack",    "action": "...", "ok": bool, "message": ""}
+                     {"type": "ack",    "action": "...", "ok": bool, "message": "",
+                                                "data": {...}}  data is optional
   client -> server   {"type": "cmd", "action": "estop"|"clear_estop"|"enable"|
                                                "pose"|"gait"|"cmd_vel"|"jog"|
-                                               "mode", ...}
+                                               "mode"|"greeting"|"save_map", ...}
 """
 from __future__ import annotations
 
@@ -34,6 +35,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import threading
 import time
 from typing import Any
@@ -49,11 +51,12 @@ from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallb
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, PointCloud2
+from std_srvs.srv import Trigger
 
 from robodog_msgs.msg import GaitCommand, JointCommand, JointCommandArray, RobotState
-from robodog_msgs.srv import (EmergencyStop, EnableJoints, SetControlMode, SetGait,
-                              SetNamedPose)
+from robodog_msgs.srv import (EmergencyStop, EnableJoints, SaveMap, SetControlMode,
+                              SetGait, SetNamedPose)
 from robodog_web.telemetry import (RollingTelemetry, STATS_WINDOW_S, finite_json,
                                     joint_actuator_info)
 
@@ -87,6 +90,9 @@ class WebBridgeNode(Node):
         self.jpeg: bytes | None = None
         self.jpeg_seq = 0
         self.camera_meta: dict[str, Any] = {"available": False}
+        self._mapping = {"active": False, "status": "waiting for SLAM",
+                         "points": 0, "frame": "", "last_saved_manifest": ""}
+        self._mapping_received = 0.0
         self._events: list[dict] = []
         self._last_faults = 0
 
@@ -98,6 +104,8 @@ class WebBridgeNode(Node):
                                  callback_group=self._state_callbacks)
         self.create_subscription(Image, "robodog/camera/color/image_raw",
                                  self._on_image, SENSOR_QOS, callback_group=cb)
+        self.create_subscription(PointCloud2, "/robodog/mapping/cloud_map",
+                                 self._on_cloud_map, SENSOR_QOS, callback_group=cb)
 
         self.pub_joint = self.create_publisher(JointCommandArray, "robodog/joint_command", 10)
         self.pub_gait = self.create_publisher(GaitCommand, "robodog/gait_command", 10)
@@ -109,6 +117,8 @@ class WebBridgeNode(Node):
             "enable": self.create_client(EnableJoints, "robodog/enable_joints", callback_group=cb),
             "gait": self.create_client(SetGait, "robodog/set_gait", callback_group=cb),
             "mode": self.create_client(SetControlMode, "robodog/set_control_mode", callback_group=cb),
+            "greeting": self.create_client(Trigger, "robodog/greeting", callback_group=cb),
+            "save_map": self.create_client(SaveMap, "robodog/mapping/save_map", callback_group=cb),
         }
         self._video_period = 1.0 / max(float(cfg.get("video_rate_hz", 10.0)), 0.1)
         self._last_video = 0.0
@@ -186,6 +196,7 @@ class WebBridgeNode(Node):
                 "rtf": sim.realtime_factor, "timestep": sim.timestep_s, "steps": sim.steps,
             },
             "camera": self.camera_meta,
+            "mapping": WebBridgeNode.mapping_snapshot(self),
             "diagnostics": diagnostics,
         })
         self.state_seq += 1
@@ -223,19 +234,41 @@ class WebBridgeNode(Node):
             self.get_logger().warn("failed to encode a camera frame",
                                    throttle_duration_sec=10.0)
 
+    def _on_cloud_map(self, m: PointCloud2) -> None:
+        """Cache map metadata only; never retain or traverse the large payload."""
+        points = int(m.width) * int(m.height)
+        self._mapping = {
+            **self._mapping, "active": True, "status": "live" if points else "empty",
+            "points": points, "frame": m.header.frame_id,
+        }
+        self._mapping_received = time.monotonic()
+
+    def mapping_snapshot(self) -> dict:
+        age = (max(time.monotonic() - self._mapping_received, 0.0)
+               if self._mapping["active"] else None)
+        return {**self._mapping, "age_s": age}
+
+    def _record_map_save(self, manifest_path: str) -> None:
+        self._mapping = {**self._mapping, "status": "saved",
+                         "last_saved_manifest": manifest_path}
+
     # ------------------------------------------------------------------ #
-    def call(self, which: str, request) -> tuple[bool, str]:
+    def call(self, which: str, request) -> tuple[bool, str] | tuple[bool, str, dict]:
         cli = self.cli[which]
         if not cli.service_is_ready():
             return False, f"service '{which}' is not available"
         fut = cli.call_async(request)
         start = time.monotonic()
-        while not fut.done() and time.monotonic() - start < 3.0:
+        timeout = (float(self.cfg.get("map_save_timeout_s", 60.0))
+                   if which == "save_map" else 3.0)
+        while not fut.done() and time.monotonic() - start < timeout:
             time.sleep(0.005)
         if not fut.done():
             return False, f"service '{which}' timed out"
         r = fut.result()
-        return bool(getattr(r, "success", False)), getattr(r, "message", "")
+        result = bool(getattr(r, "success", False)), getattr(r, "message", "")
+        manifest_path = str(getattr(r, "manifest_path", ""))
+        return (*result, {"manifest_path": manifest_path}) if manifest_path else result
 
 
 def _make_encoder(quality: int, max_width: int):
@@ -281,6 +314,10 @@ class WebApp:
         self.www = www
         self.info = robot_info
         self.clients: set[web.WebSocketResponse] = set()
+        self._drive_owner: object | None = None
+        self._drive_last = 0.0
+        self._drive_lock = threading.Lock()
+        self._drive_timeout = max(float(cfg.get("drive_lease_timeout_s", 0.30)), 0.1)
         self.app = web.Application()
         self.app.add_routes([
             web.get("/", self.index),
@@ -371,19 +408,30 @@ class WebApp:
                     await ws.send_json({"type": "ack", "ok": False,
                                         "message": "malformed JSON"})
                     continue
-                ok, text = await asyncio.get_running_loop().run_in_executor(
-                    None, self.handle_command, payload)
-                await ws.send_json({"type": "ack", "action": payload.get("action"),
-                                    "ok": ok, "message": text})
+                result = await asyncio.get_running_loop().run_in_executor(
+                    None, self.handle_command, payload, ws)
+                ok, text, *extra = result
+                action = payload.get("action") if isinstance(payload, dict) else None
+                ack = {"type": "ack", "action": action,
+                       "ok": ok, "message": text}
+                if extra:
+                    ack["data"] = extra[0]
+                await ws.send_json(ack)
         finally:
+            self._release_drive(ws)
             self.clients.discard(ws)
         return ws
 
     async def _start_broadcast(self, app):
         app["broadcast"] = asyncio.create_task(self._broadcast())
+        app["drive_watchdog"] = asyncio.create_task(self._drive_watchdog())
 
     async def _stop_broadcast(self, app):
         app["broadcast"].cancel()
+        app["drive_watchdog"].cancel()
+        await asyncio.gather(app["broadcast"], app["drive_watchdog"],
+                             return_exceptions=True)
+        self._release_drive(self._drive_owner)
         for ws in list(self.clients):
             await ws.close()
 
@@ -407,13 +455,23 @@ class WebApp:
                 except Exception:
                     dead.append(ws)
             for ws in dead:
+                self._release_drive(ws)
                 self.clients.discard(ws)
 
+    async def _drive_watchdog(self):
+        while True:
+            await asyncio.sleep(min(self._drive_timeout / 2.0, 0.1))
+            self._expire_drive_lease()
+
     # ---------------- commands ----------------
-    def handle_command(self, p: dict) -> tuple[bool, str]:
+    def handle_command(self, p: dict, client: object | None = None):
+        if not isinstance(p, dict):
+            return False, "command must be a JSON object"
         action = p.get("action")
         lim = self.cfg["limits"]
         try:
+            if action in {"estop", "mode", "pose", "gait", "greeting"}:
+                self._force_stop_drive()
             if action == "estop":
                 return self.node.call("estop", EmergencyStop.Request(
                     engage=True, reason=str(p.get("reason", "web GUI"))))
@@ -429,6 +487,31 @@ class WebApp:
                 return self.node.call("pose", SetNamedPose.Request(
                     pose=str(p.get("pose", "stand")),
                     duration_s=float(p.get("duration", 0.0))))
+            if action == "greeting":
+                return self.node.call("greeting", Trigger.Request())
+            if action == "save_map":
+                name = str(p.get("name", "")).strip()
+                if name and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", name) is None:
+                    return False, "map name must use 1-64 letters, digits, '.', '_' or '-'"
+                output = str(self.cfg.get("map_output_directory", "")).strip()
+                if output:
+                    output = os.path.abspath(os.path.expanduser(output))
+                result = self.node.call("save_map", SaveMap.Request(
+                    output_directory=output, name=name))
+                ok, message, *extra = result
+                if not ok:
+                    return result
+                service_data = extra[0] if extra else {}
+                manifest = str(service_data.get("manifest_path", ""))
+                record = getattr(self.node, "_record_map_save", None)
+                if record is not None:
+                    record(manifest)
+                snapshot = getattr(self.node, "mapping_snapshot", None)
+                mapping = snapshot() if snapshot is not None else {
+                    "active": False, "status": "saved", "points": 0,
+                    "frame": "", "age_s": None, "last_saved_manifest": manifest,
+                }
+                return True, message, {**service_data, "mapping": mapping}
             if action == "gait":
                 cmd = GaitCommand()
                 cmd.gait = str(p.get("gait", "stand"))
@@ -439,7 +522,7 @@ class WebApp:
                 cmd.duty_factor = float(p.get("duty", 0.0))
                 return self.node.call("gait", SetGait.Request(command=cmd))
             if action == "cmd_vel":
-                return self._velocity(p, lim)
+                return self._velocity(p, lim, client)
             if action == "jog":
                 if not lim.get("enable_joint_jog", False):
                     return False, ("joint jog is disabled in web.yaml; it bypasses the "
@@ -450,7 +533,8 @@ class WebApp:
         except Exception as e:                                  # pragma: no cover
             return False, f"{type(e).__name__}: {e}"
 
-    def _velocity(self, p: dict, lim: dict) -> tuple[bool, str]:
+    def _velocity(self, p: dict, lim: dict,
+                  client: object | None = None) -> tuple[bool, str]:
         state = self.node.state
         if state is None:
             return False, "no telemetry yet; velocity command not sent"
@@ -460,6 +544,19 @@ class WebApp:
         requested = tuple(float(p.get(key, 0.0)) for key in ("vx", "vy", "wz"))
         accepted = tuple(_clamp(value, limit) for value, limit in zip(
             requested, (linear_limit, linear_limit, lim["max_angular_velocity"])))
+        moving = sum(abs(value) for value in accepted) > 1e-4
+        token = self if client is None else client
+        with self._drive_lock:
+            if moving:
+                if self._drive_owner is not None and self._drive_owner is not token:
+                    return False, "remote control is in use by another connected operator"
+                self._drive_owner = token
+                self._drive_last = time.monotonic()
+            elif self._drive_owner is not None and self._drive_owner is not token:
+                return False, "only the active remote operator can release its drive lease"
+            else:
+                self._drive_owner = None
+                self._drive_last = 0.0
         command = Twist()
         command.linear.x, command.linear.y, command.angular.z = accepted
         self.node.pub_vel.publish(command)
@@ -467,6 +564,34 @@ class WebApp:
         status = f"clamped to {context} limits" if accepted != requested else context
         return True, (f"{status}: vx={accepted[0]:.2f} vy={accepted[1]:.2f} "
                       f"wz={accepted[2]:.2f}")
+
+    def _release_drive(self, client: object | None) -> bool:
+        with self._drive_lock:
+            if client is None or self._drive_owner is not client:
+                return False
+            self._drive_owner = None
+            self._drive_last = 0.0
+        self.node.pub_vel.publish(Twist())
+        return True
+
+    def _force_stop_drive(self) -> bool:
+        with self._drive_lock:
+            if self._drive_owner is None:
+                return False
+            self._drive_owner = None
+            self._drive_last = 0.0
+        self.node.pub_vel.publish(Twist())
+        return True
+
+    def _expire_drive_lease(self, now: float | None = None) -> bool:
+        current = time.monotonic() if now is None else float(now)
+        with self._drive_lock:
+            if self._drive_owner is None or current - self._drive_last <= self._drive_timeout:
+                return False
+            self._drive_owner = None
+            self._drive_last = 0.0
+        self.node.pub_vel.publish(Twist())
+        return True
 
     def _jog(self, p: dict, lim: dict) -> tuple[bool, str]:
         name = str(p.get("joint", ""))

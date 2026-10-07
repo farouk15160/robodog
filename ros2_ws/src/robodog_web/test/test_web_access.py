@@ -35,6 +35,22 @@ def test_local_gui_origin_can_receive_telemetry():
     asyncio.run(check())
 
 
+def test_command_socket_rejects_non_object_json_without_closing():
+    async def check():
+        app = WebApp(SimpleNamespace(state=None),
+                     {"host": "127.0.0.1", "stream_rate_hz": 20},
+                     str(Path(__file__).resolve().parents[1] / "www"), {})
+        async with TestClient(TestServer(app.app)) as client:
+            async with client.ws_connect("/ws", origin=str(client.make_url(""))) as ws:
+                await ws.receive_json()
+                await ws.send_json(["cmd_vel"])
+                ack = await ws.receive_json()
+                assert ack == {"type": "ack", "action": None, "ok": False,
+                               "message": "command must be a JSON object"}
+                assert not ws.closed
+    asyncio.run(check())
+
+
 def test_local_binding_rejects_foreign_host_even_with_matching_origin():
     """A rebound DNS name must not become an accepted localhost GUI origin."""
     async def check():

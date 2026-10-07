@@ -43,10 +43,14 @@ ARGS = [
     ("auto_stand", "auto", ["auto", "true", "false"], "auto stands simulation only"),
     ("control_rate_hz", "400.0", None, "control loop rate"),
     ("web_port", "8080", None, "web GUI port"),
+    ("web_host", "127.0.0.1", None,
+     "web GUI bind address; use 0.0.0.0 only on a trusted LAN"),
     ("use_camera", "true", None, "include the camera in the robot model"),
     ("mapping", "auto", ["auto", "none", "rtabmap"],
      "auto enables RTAB-Map and OctoMap for MuJoCo with a simulated camera"),
     ("mapping_database", "", None, "map database path; default preserves a separate database per world"),
+    ("mapping_export_directory", "", None,
+     "absolute room-scan export root; default is ~/.ros/robodog/exports"),
 ]
 
 
@@ -129,7 +133,8 @@ def _setup(context, *a, **kw):
                 get_package_share_directory("robodog_perception"), "launch", "mapping.launch.py")),
             launch_arguments={"backend": backend, "camera_backend": cam_backend,
                               "use_camera": cfg("use_camera"), "world": world,
-                              "mapping_database": str(mapping.database_path)}.items()))
+                              "mapping_database": str(mapping.database_path),
+                              "mapping_export_directory": cfg("mapping_export_directory")}.items()))
 
     # web.yaml holds a list of panel definitions, which is structured data
     # rather than ROS parameters; the server loads it by path. Only the
@@ -137,7 +142,8 @@ def _setup(context, *a, **kw):
     nodes.append(Node(
         package="robodog_web", executable="web_server", name="robodog_web_server",
         output="screen", condition=IfCondition(LaunchConfiguration("web")),
-        parameters=[{"port": LaunchConfiguration("web_port")}]))
+        parameters=[{"port": LaunchConfiguration("web_port"),
+                     "host": LaunchConfiguration("web_host")}]))
 
     rviz_config = (os.path.join(get_package_share_directory("robodog_perception"),
                                "config", "mapping.rviz") if mapping.enabled else

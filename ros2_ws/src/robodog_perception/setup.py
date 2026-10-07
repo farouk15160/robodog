@@ -22,5 +22,7 @@ setup(
     tests_require=["pytest"],
     entry_points={"console_scripts": [
         "camera_node = robodog_perception.camera_node:main",
+        "map_export_node = robodog_perception.map_export_node:main",
+        "save_map = robodog_perception.save_map_cli:main",
     ]},
 )

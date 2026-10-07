@@ -52,6 +52,9 @@
     max_cmd_linear_velocity_sim_m_s: 2.0
     max_cmd_linear_velocity_hardware_m_s: 0.5
     max_cmd_yaw_rate_rad_s: 2.0
+    # Body velocity is a live command. If its publisher disappears, keep the
+    # gait controller active but command zero translation/yaw.
+    cmd_vel_timeout_s: 0.35
 
     state_estimator:
       tau_attitude_s: 1.0             # complementary filter time constant

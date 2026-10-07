@@ -37,7 +37,7 @@ import numpy as np
 
 from robodog_hardware.physics_metrics import body_planar_velocity
 
-from .balance import BalanceGains, BodyStabiliser
+from .balance import BalanceGains, BodyStabiliser, angle_wrap
 from .kinematics import (LEGS, LegGeometry, forward, gravity_torque, hip_origin,
                          inverse, jacobian, torque_for_force)
 
@@ -115,6 +115,7 @@ class BodyFeedback:
     vz: float = 0.0
     roll: float = 0.0
     pitch: float = 0.0
+    yaw: float | None = None
     omega: tuple[float, float, float] = (0.0, 0.0, 0.0)
     v_xy: tuple[float, float] = (0.0, 0.0)
 
@@ -157,22 +158,57 @@ class GaitGenerator:
         self._land = {leg: self.nominal[leg].copy() for leg in LEGS}
         #: last position actually commanded, so touchdown resumes from it
         self._last_cmd = {leg: self.nominal[leg].copy() for leg in LEGS}
+        # Heading is latched from feedback when straight travel begins. During
+        # an intentional turn the angle loop is disabled and tracks the actual
+        # yaw, so releasing the turn command cannot snap back to an old angle.
+        self._heading_target: float | None = None
+        self._heading_latch_pending = True
 
     def set_params(self, p: GaitParams) -> None:
         if p.gait not in GAIT_OFFSETS:
             raise ValueError(f"unknown gait '{p.gait}'; have {sorted(GAIT_OFFSETS)}")
         if p.duty_factor <= 0.0:
             p.duty_factor = DEFAULT_DUTY[p.gait]
+        if abs(p.wz) > 1e-6:
+            self._heading_latch_pending = True
         self.params = p
 
     def reset(self) -> None:
         self.phase = 0.0
+        self._heading_target = None
+        self._heading_latch_pending = True
         for leg in LEGS:
             self._was_stance[leg] = True
             self._stance_pos[leg] = self.nominal[leg].copy()
             self._liftoff[leg] = self.nominal[leg].copy()
             self._land[leg] = self.nominal[leg].copy()
             self._last_cmd[leg] = self.nominal[leg].copy()
+
+    def heading_rate_command(self, feedback: BodyFeedback) -> float:
+        """Yaw-rate target with bounded heading hold for straight travel.
+
+        Explicit turn commands pass through unchanged. While they are active,
+        the old heading target is discarded. The first zero-yaw cycle latches
+        the current orientation, which makes releasing a turn command smooth.
+        """
+        commanded = float(self.params.wz)
+        if abs(commanded) > 1e-6:
+            self._heading_latch_pending = True
+            if feedback.yaw is not None:
+                self._heading_target = float(feedback.yaw)
+            return commanded
+
+        if feedback.yaw is None:
+            return 0.0
+        yaw = float(feedback.yaw)
+        if self._heading_latch_pending or self._heading_target is None:
+            self._heading_target = yaw
+            self._heading_latch_pending = False
+            return 0.0
+
+        desired = self.stabiliser.g.kp_heading * angle_wrap(self._heading_target - yaw)
+        limit = self.stabiliser.g.max_heading_rate_rad_s
+        return float(np.clip(desired, -limit, limit))
 
     # ---------------- per-cycle update ----------------
     def update(self, dt: float, feedback: BodyFeedback | None = None) -> GaitOutput:
@@ -305,10 +341,11 @@ class GaitGenerator:
             out.foot_force[:] = 0.0
             out.foot_force[out.contact, 2] = self.mass * 9.81 / n_stance
         else:
+            yaw_rate_des = self.heading_rate_command(feedback)
             force, moment = self.stabiliser.wrench(
                 feedback.height, p.stance_height_m, feedback.vz,
                 feedback.roll, feedback.pitch, np.asarray(feedback.omega, float),
-                np.asarray(feedback.v_xy, float), np.array([p.vx, p.vy]), p.wz)
+                np.asarray(feedback.v_xy, float), np.array([p.vx, p.vy]), yaw_rate_des)
             # foot positions relative to the body centre, which is where the
             # wrench is defined
             r = np.zeros((4, 3))

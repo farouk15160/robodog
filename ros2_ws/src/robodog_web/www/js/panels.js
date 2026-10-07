@@ -212,6 +212,226 @@ Panels.pose = {
   }
 };
 
+/* ============================ REMOTE CONTROL ============================ */
+Panels.remote = {
+  render(body, ctx) {
+    const limits = ctx.cfg.limits;
+    let serverLinearLimit = Number(limits.max_linear_velocity);
+    let linearLimit = Math.min(.5, serverLinearLimit);
+    let turnLimit = Number(limits.max_angular_velocity);
+    const drive = { leftX: 0, leftY: 0, turnX: 0, keys: new Set(), pointers: new Set() };
+
+    const feedback = kv([
+      ["state / gait", "--"], ["speed / yaw rate", "--"],
+      ["position xyz", "--"], ["maximum joint load", "--"],
+      ["hottest motor", "--"], ["backend / world", "--"],
+      ["mapping", "waiting for telemetry"],
+    ]);
+    const video = el("div", "videoframe remote-video");
+    const image = el("img");
+    image.src = "/api/video";
+    image.alt = "Live robot camera";
+    video.append(image);
+
+    const makeStick = (label, kind) => {
+      let pointerId = null;
+      const pad = el("div", "joystick-pad");
+      pad.setAttribute("role", "application");
+      pad.setAttribute("tabindex", "0");
+      pad.setAttribute("aria-label", label);
+      pad.dataset.kind = kind;
+      const knob = el("span", "joystick-knob");
+      pad.append(knob);
+      const move = event => {
+        event.preventDefault();
+        const rect = pad.getBoundingClientRect();
+        const x = Math.max(-1, Math.min(1, (event.clientX - rect.left - rect.width / 2) /
+          (rect.width * .36)));
+        const y = Math.max(-1, Math.min(1, (event.clientY - rect.top - rect.height / 2) /
+          (rect.height * .36)));
+        knob.style.transform = `translate(${x * 70}%, ${y * 70}%)`;
+        if (kind === "translation") {
+          drive.leftX = x; drive.leftY = y;
+        } else {
+          drive.turnX = x;
+        }
+        publishVelocity();
+      };
+      const release = (event, publish = true) => {
+        if (event && (pointerId === null || event.pointerId !== pointerId)) return;
+        if (event) event.preventDefault();
+        if (kind === "translation") { drive.leftX = 0; drive.leftY = 0; }
+        else drive.turnX = 0;
+        knob.style.transform = "translate(0, 0)";
+        const captured = pointerId;
+        if (captured !== null) drive.pointers.delete(captured);
+        pointerId = null;
+        if (captured !== null) {
+          try { pad.releasePointerCapture?.(captured); } catch { /* already released */ }
+        }
+        if (publish) publishVelocity();
+      };
+      pad.addEventListener("pointerdown", event => {
+        if (pointerId !== null) return;
+        pointerId = event.pointerId;
+        drive.pointers.add(pointerId);
+        pad.setPointerCapture?.(pointerId); move(event);
+      });
+      pad.addEventListener("pointermove", event => {
+        if (event.pointerId === pointerId) move(event);
+      });
+      ["pointerup", "pointercancel", "lostpointercapture"].forEach(type =>
+        pad.addEventListener(type, release));
+      return { pad, release };
+    };
+    const translation = makeStick("Forward and lateral joystick", "translation");
+    const turning = makeStick("Turn joystick", "turn");
+    const sticks = el("div", "joystick-grid");
+    const stickColumn = (title, stick, hint) => {
+      const column = el("div", "joystick-column");
+      column.append(el("strong", null, title), stick.pad, el("div", "muted", hint));
+      return column;
+    };
+    sticks.append(stickColumn("Move", translation, "drag: forward / lateral"),
+      stickColumn("Turn", turning, "drag left / right"));
+
+    const currentVelocity = () => {
+      let vx = -drive.leftY * linearLimit;
+      let vy = -drive.leftX * linearLimit;
+      let wz = -drive.turnX * turnLimit;
+      if (drive.keys.has("KeyW") || drive.keys.has("ArrowUp")) vx += linearLimit;
+      if (drive.keys.has("KeyS") || drive.keys.has("ArrowDown")) vx -= linearLimit;
+      if (drive.keys.has("KeyA")) vy += linearLimit;
+      if (drive.keys.has("KeyD")) vy -= linearLimit;
+      if (drive.keys.has("ArrowLeft") || drive.keys.has("KeyQ")) wz += turnLimit;
+      if (drive.keys.has("ArrowRight") || drive.keys.has("KeyE")) wz -= turnLimit;
+      return {
+        vx: Math.max(-linearLimit, Math.min(linearLimit, vx)),
+        vy: Math.max(-linearLimit, Math.min(linearLimit, vy)),
+        wz: Math.max(-turnLimit, Math.min(turnLimit, wz)),
+      };
+    };
+    function publishVelocity() {
+      const value = currentVelocity();
+      ctx.send({ action: "cmd_vel", vx: value.vx, vy: value.vy, wz: value.wz });
+    }
+    const zero = () => {
+      drive.keys.clear(); drive.leftX = 0; drive.leftY = 0; drive.turnX = 0;
+      drive.pointers.clear();
+      translation.release(null, false); turning.release(null, false);
+      ctx.send({ action: "cmd_vel", vx: 0, vy: 0, wz: 0 });
+    };
+
+    const driveCodes = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE",
+      "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+    document.addEventListener("keydown", event => {
+      if (!driveCodes.has(event.code) || event.repeat ||
+          ["INPUT", "SELECT", "TEXTAREA"].includes(event.target?.tagName) ||
+          (ctx.isPageActive && !ctx.isPageActive("remote"))) return;
+      event.preventDefault(); drive.keys.add(event.code); publishVelocity();
+    });
+    document.addEventListener("keyup", event => {
+      if (!driveCodes.has(event.code) || !drive.keys.has(event.code)) return;
+      event.preventDefault(); drive.keys.delete(event.code); publishVelocity();
+    });
+    window.addEventListener("blur", zero);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) zero(); });
+    ctx.onDisconnect(zero);
+    ctx.onPageChange?.((previous, next) => { if (previous === "remote" && next !== "remote") zero(); });
+    setInterval(() => {
+      if ((drive.pointers.size || drive.keys.size) &&
+          (!ctx.isPageActive || ctx.isPageActive("remote"))) publishVelocity();
+    }, 100);
+
+    const speed = el("div", "slider remote-speed");
+    const speedLabel = el("label", null, "max speed");
+    const speedLimit = el("input");
+    speedLimit.type = "range"; speedLimit.min = .1; speedLimit.max = serverLinearLimit;
+    speedLimit.step = .1; speedLimit.value = linearLimit;
+    speedLimit.setAttribute("aria-label", "Maximum driving speed");
+    const speedOutput = el("output", null, `${fmt(linearLimit, 2)} m/s / ${fmt(turnLimit, 2)} rad/s`);
+    speedLimit.oninput = () => {
+      linearLimit = Math.max(.1, Math.min(serverLinearLimit, Number(speedLimit.value)));
+      speedOutput.textContent = `${fmt(linearLimit, 2)} m/s / ${fmt(turnLimit, 2)} rad/s`;
+    };
+    speed.append(speedLabel, speedLimit, speedOutput);
+
+    const actions = el("div", "btnrow remote-actions");
+    const walk = el("button", "btn primary", "Start travel (trot)");
+    const stand = el("button", "btn", "Stand");
+    const greeting = el("button", "btn", "Greeting");
+    const stop = el("button", "btn danger", "STOP MOVEMENT");
+    walk.onclick = () => ctx.send({ action: "gait", gait: "trot", enable: true });
+    stand.onclick = () => { ctx.send({ action: "gait", gait: "stand", enable: true }); zero(); };
+    greeting.onclick = () => ctx.send({ action: "greeting" });
+    stop.onclick = () => { ctx.send({ action: "gait", gait: "stand", enable: true }); zero(); };
+    actions.append(walk, stand, greeting, stop);
+
+    const scan = el("div", "scan-save");
+    const scanName = el("input");
+    scanName.type = "text"; scanName.maxLength = 64; scanName.placeholder = "optional scan name";
+    scanName.setAttribute("aria-label", "Room scan name");
+    scanName.setAttribute("pattern", "[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
+    const save = el("button", "btn", "Save room scan");
+    const saveStatus = el("div", "muted scan-status", "Saves the accumulated point cloud and OctoMap.");
+    save.onclick = () => {
+      const name = String(scanName.value || "").trim();
+      if (name && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)) {
+        saveStatus.textContent = "Use 1–64 letters, numbers, dot, underscore, or dash.";
+        saveStatus.className = "scan-status alarm-text";
+        return;
+      }
+      save.disabled = true; saveStatus.textContent = "Saving room scan…";
+      saveStatus.className = "muted scan-status";
+      ctx.send({ action: "save_map", name });
+    };
+    ctx.onAck?.(ack => {
+      if (ack.action !== "save_map") return;
+      save.disabled = false;
+      saveStatus.textContent = ack.ok
+        ? `Saved: ${ack.data?.manifest_path || ack.message}` : `Save failed: ${ack.message}`;
+      saveStatus.className = `scan-status ${ack.ok ? "ok-text" : "alarm-text"}`;
+    });
+    scan.append(scanName, save);
+
+    const keyboard = el("div", "muted remote-help",
+      "Laptop: W/S forward, A/D lateral, Q/E or ←/→ turn. Hold keys or a joystick to move; release, focus loss, hidden tab, or disconnect commands zero velocity.");
+    const layout = el("div", "remote-layout");
+    const controls = el("div", "stack");
+    controls.append(actions, speed, sticks, keyboard, scan, saveStatus);
+    const live = el("div", "stack"); live.append(video, feedback);
+    layout.append(controls, live); body.append(layout);
+
+    return {
+      update(s) {
+        serverLinearLimit = s.simulation.active
+          ? Number(limits.simulation_max_linear_velocity ?? limits.max_linear_velocity)
+          : Number(limits.max_linear_velocity);
+        speedLimit.max = serverLinearLimit;
+        if (Number(speedLimit.value) > serverLinearLimit) speedLimit.value = serverLinearLimit;
+        linearLimit = Math.min(serverLinearLimit, Number(speedLimit.value));
+        translation.pad.dataset.linearLimit = String(serverLinearLimit);
+        turnLimit = Number(limits.max_angular_velocity);
+        speedOutput.textContent = `${fmt(linearLimit, 2)} m/s / ${fmt(turnLimit, 2)} rad/s`;
+        const velocity = s.base.vel?.every(finite) ? Math.hypot(...s.base.vel) : null;
+        const mapping = s.mapping || {};
+        setKv(feedback, [
+          `${s.state} / ${s.controller.gait || "--"}`,
+          `${fmt(velocity, 2)} m/s / ${fmt(s.base.omega?.[2], 2)} rad/s`,
+          (s.base.pos || []).map(v => fmt(v, 2)).join(", ") + " m",
+          `${pct(s.safety.max_util)} · ${s.safety.most_loaded || "--"}`,
+          `${fmt(s.safety.max_temp, 1)} °C · ${s.safety.hottest || "--"}`,
+          `${s.simulation.active ? s.simulation.backend : "hardware"} / ${s.simulation.world || "--"}`,
+          mapping.status || mapping.message || (mapping.active ? "building map" : "telemetry unavailable"),
+        ]);
+        const locked = s.safety.estop || !s.safety.watchdog_ok;
+        walk.disabled = locked; greeting.disabled = locked;
+        if (locked && (drive.pointers.size || drive.keys.size)) zero();
+      }
+    };
+  }
+};
+
 /* =========================== GAIT + VELOCITY =========================== */
 Panels.gait = {
   render(body, ctx) {

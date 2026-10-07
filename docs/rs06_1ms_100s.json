@@ -1,0 +1,2023 @@
+{
+  "study_label": "tuned_heading_hold",
+  "mass_kg": 19.719271,
+  "actuator": "ROBSTRIDE06",
+  "supply_voltage_v": 44.4,
+  "cad_sha256_16": "b95d92fd9159f4f7",
+  "world": "obstacle-free sizing plane",
+  "model_sha256": "79847892eaea90e819ff6a74d9c478baef61a296637006d18f4a151842ced6f8",
+  "reproduction_command": "/usr/bin/python3 tools/torque_report.py --gaits walk trot --velocity 1.0 --seconds 100 --warmup 5 --study-label tuned_heading_hold --baseline-report docs/rs06_1ms_100s_baseline.json --output docs/rs06_1ms_100s.json",
+  "measurement_protocol": {
+    "controller_rate_hz": 400.0,
+    "physics_timestep_s": 0.0005,
+    "physics_sample_rate_hz": 2000.0,
+    "rms_warmup_s": 5.0,
+    "peak_and_exposure_window": "full run including startup",
+    "rms_window": "after warmup through end of run",
+    "knee_external_reduction_ratio": 2.0,
+    "knee_belt_efficiency_assumed": 0.95
+  },
+  "baseline_reference": {
+    "path": "docs/rs06_1ms_100s_baseline.json",
+    "sha256": "e79116c0975b7550bc6424d6b628f5ff2ddf570d68f92fd2bcabd68d6c836b50",
+    "study_label": "baseline_before_heading_hold",
+    "cases": [
+      {
+        "gait": "walk",
+        "commanded_vx_m_s": 1.0,
+        "commanded_wz_rad_s": 0.0,
+        "actual_vx_m_s": -0.011216096919935319,
+        "lateral_drift_m": 0.32072179999419276,
+        "safety_clamped_cycle_fraction": 0.997625,
+        "worst_motor_rms_nm": 7.673286701376908,
+        "peak_motor_nm": 31.626219235160644
+      },
+      {
+        "gait": "trot",
+        "commanded_vx_m_s": 1.0,
+        "commanded_wz_rad_s": 0.0,
+        "actual_vx_m_s": 0.9838006147275197,
+        "lateral_drift_m": 24.404929579136322,
+        "safety_clamped_cycle_fraction": 0.306075,
+        "worst_motor_rms_nm": 5.36117483612892,
+        "peak_motor_nm": 28.14855555231221
+      }
+    ]
+  },
+  "configuration": {
+    "actuator": {
+      "model": "ROBSTRIDE06",
+      "revision": "RS series product specification 2026-09-17; RS06 CAN manual 260713",
+      "mechanical": {
+        "mass_kg": 0.621,
+        "mass_tolerance_kg": 0.003,
+        "diameter_m": 0.088,
+        "body_depth_m": 0.049,
+        "gear_ratio": 9.0,
+        "reflected_inertia_kgm2": 0.012
+      },
+      "electrical": {
+        "rated_voltage_v": 48.0,
+        "supply_voltage_v": 44.4,
+        "voltage_min_v": 15.0,
+        "voltage_max_v": 60.0,
+        "torque_constant_nm_per_arms": 1.1,
+        "phase_resistance_ohm": 0.115,
+        "line_resistance_ohm": 0.23,
+        "resistance_tolerance_fraction": 0.1,
+        "phase_resistance_basis": "Equivalent-wye inference from manufacturer line resistance; actual winding connection unspecified",
+        "inductance_mh": 0.165,
+        "rated_phase_current_a_peak": 14.3,
+        "peak_phase_current_a_peak": 57.0,
+        "rated_phase_current_arms": 10.1116,
+        "peak_phase_current_arms": 40.3051,
+        "no_load_current_arms": 0.98
+      },
+      "performance": {
+        "rated_torque_nm": 11.0,
+        "stall_continuous_torque_nm": 8.0,
+        "continuous_torque_basis": "Published 8 Nm continuous stall rating; robot cooling unverified",
+        "peak_torque_nm": 36.0,
+        "rated_speed_rpm": 100.0,
+        "rated_speed_rad_s": 10.4719755,
+        "no_load_speed_rpm": 480.0,
+        "no_load_speed_rad_s": 50.2654825,
+        "peak_torque_duration_s": 1.0,
+        "vendor_curve": {
+          "source_pdf_pages": [
+            31,
+            32,
+            33
+          ],
+          "heat_sink_dimensions_mm": [
+            200,
+            200
+          ],
+          "heat_sink_basis": "Explicit for rotating tests; stall table does not restate all conditions",
+          "stall_peak_duration_s": 1.0,
+          "rotating_peak_duration_s": 4.0,
+          "rotating_overload_nm_s": [
+            [
+              17,
+              200
+            ],
+            [
+              20,
+              36
+            ],
+            [
+              25,
+              18
+            ],
+            [
+              30,
+              8
+            ],
+            [
+              36,
+              4
+            ]
+          ],
+          "stall_overload_nm_s": [
+            [
+              11,
+              200
+            ],
+            [
+              17,
+              15
+            ],
+            [
+              25,
+              5
+            ],
+            [
+              30,
+              1
+            ],
+            [
+              36,
+              1
+            ]
+          ],
+          "torque_speed_48v_nm_rpm": [
+            [
+              5,
+              430
+            ],
+            [
+              11,
+              426
+            ],
+            [
+              20,
+              390
+            ],
+            [
+              30,
+              320
+            ],
+            [
+              36,
+              280
+            ]
+          ]
+        }
+      },
+      "thermal": {
+        "thermal_resistance_k_per_w": 1.31,
+        "thermal_capacitance_j_per_k": 310.5,
+        "time_constant_s": 406.755,
+        "ambient_temp_c": 20.0,
+        "calibrated": false,
+        "basis": "Unmeasured thermal resistance/capacitance; equivalent-wye electrical inference; indicative only"
+      },
+      "can": {
+        "bitrate_bps": 1000000,
+        "bits_per_frame_design": 150,
+        "max_bus_load_fraction": 0.8,
+        "recommended_control_rate_hz": 400,
+        "recommended_bus_count": 2,
+        "scaling": {
+          "position_min_rad": -12.57,
+          "position_max_rad": 12.57,
+          "velocity_min_rad_s": -50.0,
+          "velocity_max_rad_s": 50.0,
+          "torque_min_nm": -36.0,
+          "torque_max_nm": 36.0,
+          "kp_min": 0.0,
+          "kp_max": 5000.0,
+          "kd_min": 0.0,
+          "kd_max": 100.0,
+          "temperature_scale_c": 0.1
+        }
+      },
+      "sensing": {
+        "encoder_count": 2,
+        "encoder_bits": 14,
+        "output_resolution_rad": 0.0003834952
+      },
+      "joint_dynamics": {
+        "damping_nms_per_rad": 0.05,
+        "coulomb_friction_nm": 0.12,
+        "armature_kgm2": 0.012
+      },
+      "transmissions": {
+        "haa": {
+          "ratio": 1.0,
+          "efficiency": 1.0
+        },
+        "hfe": {
+          "ratio": 1.0,
+          "efficiency": 1.0
+        },
+        "kfe": {
+          "ratio": 2.0,
+          "efficiency": 0.95
+        }
+      },
+      "operational_limits": {
+        "continuous_torque_nm": 8.0,
+        "peak_torque_nm": 36.0,
+        "velocity_rad_s": 20.0,
+        "position_margin_rad": 0.05,
+        "temperature_warn_c": 70.0,
+        "temperature_derate_c": 85.0,
+        "temperature_fault_c": 100.0
+      }
+    },
+    "gaits": {
+      "stand": {
+        "step_frequency_hz": 0.0,
+        "duty_factor": 1.0,
+        "step_height_m": 0.0,
+        "stance_height_m": 0.32,
+        "description": "All four feet planted; RS06 loaded standing configuration."
+      },
+      "walk": {
+        "step_frequency_hz": 1.5,
+        "duty_factor": 0.78,
+        "step_height_m": 0.03,
+        "stance_height_m": 0.32,
+        "description": "One foot swings at a time; reduced lift and longer support for RS06 stall limits at0.15m/s."
+      },
+      "trot": {
+        "step_frequency_hz": 2.2,
+        "duty_factor": 0.5,
+        "step_height_m": 0.04,
+        "stance_height_m": 0.33,
+        "description": "Diagonal pairs; tuned on flat ground at0.30 and0.50m/s."
+      },
+      "pace": {
+        "step_frequency_hz": 2.0,
+        "duty_factor": 0.5,
+        "step_height_m": 0.06,
+        "stance_height_m": 0.32,
+        "description": "Experimental lateral pairs; unvalidated for the new configuration."
+      },
+      "bound": {
+        "step_frequency_hz": 2.6,
+        "duty_factor": 0.45,
+        "step_height_m": 0.08,
+        "stance_height_m": 0.31,
+        "description": "Experimental front/rear pairs; unvalidated for the new configuration."
+      }
+    },
+    "controls": {
+      "control_rate_hz": 400.0,
+      "state_publish_rate_hz": 50.0,
+      "joint_state_rate_hz": 100.0,
+      "gains": {
+        "position_kp": 80.0,
+        "position_kd": 2.0,
+        "stance_kp": 90.0,
+        "stance_kd": 2.0,
+        "swing_kp": 60.0,
+        "swing_kd": 1.5
+      },
+      "pose_transition_max_velocity_rad_s": 1.0,
+      "default_travel_gait": "trot",
+      "max_cmd_linear_velocity_sim_m_s": 2.0,
+      "max_cmd_linear_velocity_hardware_m_s": 0.5,
+      "max_cmd_yaw_rate_rad_s": 2.0,
+      "cmd_vel_timeout_s": 0.35,
+      "state_estimator": {
+        "tau_attitude_s": 1.0,
+        "contact_force_threshold_n": 8.0
+      }
+    }
+  },
+  "cases": [
+    {
+      "gait": "walk",
+      "commanded_vx_m_s": 1.0,
+      "commanded_vy_m_s": 0.0,
+      "commanded_wz_rad_s": 0.0,
+      "duration_s": 100.00000000029546,
+      "requested_duration_s": 100.0,
+      "warmup_s": 5.0,
+      "actual_vx_m_s": -0.011006198509649557,
+      "actual_body_vx_m_s": -0.011006198509649557,
+      "actual_vy_m_s": 0.0019858015873173494,
+      "world_average_vx_m_s": -0.010213888889591394,
+      "actual_body_vy_m_s": 0.0019858015873173494,
+      "actual_wz_rad_s": -0.00018712785239691988,
+      "travel_m": -1.0213888889621572,
+      "lateral_drift_m": 0.247174757388109,
+      "max_tilt_deg": 25.283296369302548,
+      "min_height_m": 0.14449218216828574,
+      "final_height_m": 0.15403433957520735,
+      "safety_enabled": true,
+      "safety_latched": false,
+      "safety_clamp_events": 79769,
+      "safety_clamped_cycle_fraction": 0.997625,
+      "fault_flags": 7,
+      "stable": false,
+      "completed": true,
+      "failure_reason": null,
+      "stability_failure_reasons": [
+        "excessive tilt",
+        "body height below limit"
+      ],
+      "tracks_velocity": false,
+      "within_continuous_rating": true,
+      "effort_source": "MuJoCo qfrc_actuator at joint DOFs",
+      "physics_samples": 200000,
+      "physics_timestep_s": 0.0005,
+      "torque_velocity_pairing": "Applied force with velocity at start of each implicitfast physics step",
+      "foot_strike_events_control_rate": {
+        "FL": 5958,
+        "FR": 6048,
+        "RL": 1120,
+        "RR": 1114
+      },
+      "joints": [
+        {
+          "name": "FL_haa_joint",
+          "joint_peak_nm": 22.104442902266822,
+          "motor_peak_nm": 22.104442902266822,
+          "motor_peak_signed_nm": -22.104442902266822,
+          "motor_peak_time_s": 59.33350000010128,
+          "motor_peak_world_position_m": [
+            -0.32535046441222765,
+            0.20399779208342017,
+            0.15339917141107287
+          ],
+          "motor_peak_travel_m": 6.664504948245828,
+          "motor_speed_at_peak_rad_s": -0.4923739555947471,
+          "motor_peak_speed_rad_s": 6.199047117327039,
+          "joint_rms_nm": 5.078733585861026,
+          "motor_rms_nm": 5.078733585861026,
+          "full_run_joint_rms_nm": 5.092633100511886,
+          "full_run_motor_rms_nm": 5.092633100511886,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 7.437999999998597,
+              "longest_time_s": 0.10350000000000008,
+              "peak_abs_motor_speed_rad_s": 5.786209280264257,
+              "rms_motor_speed_rad_s": 2.093931205558248
+            },
+            "11": {
+              "total_time_s": 1.8224999999998548,
+              "longest_time_s": 0.07300000000000005,
+              "peak_abs_motor_speed_rad_s": 4.795880091582107,
+              "rms_motor_speed_rad_s": 2.366451502543978
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 4.795880091582107,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 2482,
+              "steps": 145477,
+              "duration_s": 72.73850000016529
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.6348416982326283,
+          "peak_utilisation": 0.614012302840745,
+          "fraction_above_continuous": 0.07437999999976622,
+          "estimated_rms_current_a": 4.617030532600932,
+          "estimated_final_temperature_c": 22.110612716425983,
+          "estimated_steady_temperature_c": 29.634205015867153,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "FL_hfe_joint",
+          "joint_peak_nm": 27.918871183213962,
+          "motor_peak_nm": 27.918871183213962,
+          "motor_peak_signed_nm": -27.918871183213962,
+          "motor_peak_time_s": 0.2435000000000002,
+          "motor_peak_world_position_m": [
+            0.1208578919429073,
+            0.031122431394324288,
+            0.364846822365026
+          ],
+          "motor_peak_travel_m": 0.12507486066768084,
+          "motor_speed_at_peak_rad_s": -4.145354770082704,
+          "motor_peak_speed_rad_s": 13.090257429116376,
+          "joint_rms_nm": 7.673056416233392,
+          "motor_rms_nm": 7.673056416233392,
+          "full_run_joint_rms_nm": 7.708628686608403,
+          "full_run_motor_rms_nm": 7.708628686608403,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 51.99100000006622,
+              "longest_time_s": 0.2885000000000002,
+              "peak_abs_motor_speed_rad_s": 11.097455993318032,
+              "rms_motor_speed_rad_s": 1.7534317479059165
+            },
+            "11": {
+              "total_time_s": 0.4255000000000003,
+              "longest_time_s": 0.09150000000000007,
+              "peak_abs_motor_speed_rad_s": 8.09040621039488,
+              "rms_motor_speed_rad_s": 2.100938423379084
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 8.09040621039488,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1203,
+              "steps": 84059,
+              "duration_s": 42.02950000001866
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.959132052029174,
+          "peak_utilisation": 0.7755241995337212,
+          "fraction_above_continuous": 0.5199099999991261,
+          "estimated_rms_current_a": 6.975505832939446,
+          "estimated_final_temperature_c": 24.832322854129014,
+          "estimated_steady_temperature_c": 41.990839210586984,
+          "safety_torque_clipped_cycles": 37784,
+          "safety_torque_clip_events": 363,
+          "safety_torque_clipped_duration_s": 94.46000000000001
+        },
+        {
+          "name": "FL_kfe_joint",
+          "joint_peak_nm": 22.401873548928567,
+          "motor_peak_nm": 11.790459762593983,
+          "motor_peak_signed_nm": -11.790459762593983,
+          "motor_peak_time_s": 59.49850000010207,
+          "motor_peak_world_position_m": [
+            -0.3322263913500608,
+            0.20697595986333212,
+            0.15853077912550406
+          ],
+          "motor_peak_travel_m": 6.679497530086849,
+          "motor_speed_at_peak_rad_s": 14.485196474559409,
+          "motor_peak_speed_rad_s": 32.303056573173556,
+          "joint_rms_nm": 7.340858717252789,
+          "motor_rms_nm": 3.8636098511856782,
+          "full_run_joint_rms_nm": 7.376237256158194,
+          "full_run_motor_rms_nm": 3.882230134820102,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 5.633499999999597,
+              "longest_time_s": 0.1570000000000001,
+              "peak_abs_motor_speed_rad_s": 28.035620301284094,
+              "rms_motor_speed_rad_s": 9.607646658662818
+            },
+            "11": {
+              "total_time_s": 0.02750000000000002,
+              "longest_time_s": 0.0035,
+              "peak_abs_motor_speed_rad_s": 15.007831020297944,
+              "rms_motor_speed_rad_s": 13.292884821776413
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 15.007831020297944,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 943,
+              "steps": 150077,
+              "duration_s": 75.03850000017627
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.4829512313982098,
+          "peak_utilisation": 0.3275127711831662,
+          "fraction_above_continuous": 0.05633499999982953,
+          "estimated_rms_current_a": 3.51237259198698,
+          "estimated_final_temperature_c": 21.22611886515593,
+          "estimated_steady_temperature_c": 25.575599235612238,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "FR_haa_joint",
+          "joint_peak_nm": 25.500777405393634,
+          "motor_peak_nm": 25.500777405393634,
+          "motor_peak_signed_nm": 25.500777405393634,
+          "motor_peak_time_s": 1.665999999999872,
+          "motor_peak_world_position_m": [
+            0.6950480656553678,
+            0.09007191063828054,
+            0.15286488702738044
+          ],
+          "motor_peak_travel_m": 0.8080593359463508,
+          "motor_speed_at_peak_rad_s": 0.19733444061387778,
+          "motor_peak_speed_rad_s": 6.377496411160754,
+          "joint_rms_nm": 5.0142183305737795,
+          "motor_rms_nm": 5.0142183305737795,
+          "full_run_joint_rms_nm": 5.010297562499926,
+          "full_run_motor_rms_nm": 5.010297562499926,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 6.955999999998864,
+              "longest_time_s": 0.04400000000000003,
+              "peak_abs_motor_speed_rad_s": 5.777884982331298,
+              "rms_motor_speed_rad_s": 2.1934648435960575
+            },
+            "11": {
+              "total_time_s": 1.6499999999998738,
+              "longest_time_s": 0.022500000000000017,
+              "peak_abs_motor_speed_rad_s": 4.92545801323149,
+              "rms_motor_speed_rad_s": 2.4976183960425757
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 4.92545801323149,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 2707,
+              "steps": 146667,
+              "duration_s": 73.33350000016813
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.6267772913217224,
+          "peak_utilisation": 0.7083549279276009,
+          "fraction_above_continuous": 0.06955999999978313,
+          "estimated_rms_current_a": 4.558380300521617,
+          "estimated_final_temperature_c": 22.043997881990574,
+          "estimated_steady_temperature_c": 29.390992654262757,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "FR_hfe_joint",
+          "joint_peak_nm": 31.629820174651233,
+          "motor_peak_nm": 31.629820174651233,
+          "motor_peak_signed_nm": 31.629820174651233,
+          "motor_peak_time_s": 0.33350000000000024,
+          "motor_peak_world_position_m": [
+            0.19583887306719516,
+            0.04939591654864879,
+            0.3863470784361956
+          ],
+          "motor_peak_travel_m": 0.20225112730631345,
+          "motor_speed_at_peak_rad_s": -3.16012199309883,
+          "motor_peak_speed_rad_s": 16.71264549555235,
+          "joint_rms_nm": 7.674812080819681,
+          "motor_rms_nm": 7.674812080819681,
+          "full_run_joint_rms_nm": 7.7013149953422815,
+          "full_run_motor_rms_nm": 7.7013149953422815,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 51.42250000006351,
+              "longest_time_s": 0.2675000000000002,
+              "peak_abs_motor_speed_rad_s": 15.011136993837116,
+              "rms_motor_speed_rad_s": 1.7991491554014771
+            },
+            "11": {
+              "total_time_s": 0.4275000000000003,
+              "longest_time_s": 0.18950000000000014,
+              "peak_abs_motor_speed_rad_s": 12.916884351977915,
+              "rms_motor_speed_rad_s": 2.9677849498935753
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 12.916884351977915,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1549,
+              "steps": 84990,
+              "duration_s": 42.49500000002088
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.9593515101024601,
+          "peak_utilisation": 0.8786061159625342,
+          "fraction_above_continuous": 0.5142249999991158,
+          "estimated_rms_current_a": 6.977101891654255,
+          "estimated_final_temperature_c": 24.824521564616187,
+          "estimated_steady_temperature_c": 42.00090376700915,
+          "safety_torque_clipped_cycles": 37768,
+          "safety_torque_clip_events": 357,
+          "safety_torque_clipped_duration_s": 94.42
+        },
+        {
+          "name": "FR_kfe_joint",
+          "joint_peak_nm": 22.252164670183436,
+          "motor_peak_nm": 11.71166561588602,
+          "motor_peak_signed_nm": 11.71166561588602,
+          "motor_peak_time_s": 0.2960000000000002,
+          "motor_peak_world_position_m": [
+            0.16565884019821522,
+            0.04211902265201284,
+            0.3856078995132666
+          ],
+          "motor_peak_travel_m": 0.17120618162987505,
+          "motor_speed_at_peak_rad_s": -5.249517077556255,
+          "motor_peak_speed_rad_s": 31.32045238907325,
+          "joint_rms_nm": 7.435611633867875,
+          "motor_rms_nm": 3.913479807298882,
+          "full_run_joint_rms_nm": 7.46261664165924,
+          "full_run_motor_rms_nm": 3.927692969294337,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 6.550999999999089,
+              "longest_time_s": 0.04150000000000003,
+              "peak_abs_motor_speed_rad_s": 26.307863328166036,
+              "rms_motor_speed_rad_s": 9.986159147903711
+            },
+            "11": {
+              "total_time_s": 0.058500000000000045,
+              "longest_time_s": 0.009500000000000005,
+              "peak_abs_motor_speed_rad_s": 17.167142655227977,
+              "rms_motor_speed_rad_s": 11.917806796603111
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 17.167142655227977,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 952,
+              "steps": 150300,
+              "duration_s": 75.1500000001768
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.48918497591236026,
+          "peak_utilisation": 0.32532404488572275,
+          "fraction_above_continuous": 0.06550999999979733,
+          "estimated_rms_current_a": 3.557708915726256,
+          "estimated_final_temperature_c": 21.25532768050013,
+          "estimated_steady_temperature_c": 25.720463448888765,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "RL_haa_joint",
+          "joint_peak_nm": 24.800988249806288,
+          "motor_peak_nm": 24.800988249806288,
+          "motor_peak_signed_nm": -24.800988249806288,
+          "motor_peak_time_s": 1.185999999999925,
+          "motor_peak_world_position_m": [
+            0.6932085516395843,
+            0.08857803697491753,
+            0.14862887819920093
+          ],
+          "motor_peak_travel_m": 0.7369590122002387,
+          "motor_speed_at_peak_rad_s": 1.1243037655591297,
+          "motor_peak_speed_rad_s": 6.813578082196633,
+          "joint_rms_nm": 3.580524192130779,
+          "motor_rms_nm": 3.580524192130779,
+          "full_run_joint_rms_nm": 3.6280590064985967,
+          "full_run_motor_rms_nm": 3.6280590064985967,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 8.552499999998961,
+              "longest_time_s": 0.1340000000000001,
+              "peak_abs_motor_speed_rad_s": 6.011401897709672,
+              "rms_motor_speed_rad_s": 0.7726407940160547
+            },
+            "11": {
+              "total_time_s": 1.1109999999999332,
+              "longest_time_s": 0.05350000000000004,
+              "peak_abs_motor_speed_rad_s": 5.274158283003148,
+              "rms_motor_speed_rad_s": 0.692123610565459
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 5.274158283003148,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1830,
+              "steps": 120319,
+              "duration_s": 60.159500000105226
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.44756552401634736,
+          "peak_utilisation": 0.6889163402723969,
+          "fraction_above_continuous": 0.08552499999973692,
+          "estimated_rms_current_a": 3.2550219928461623,
+          "estimated_final_temperature_c": 21.06780914444824,
+          "estimated_steady_temperature_c": 24.78848625619962,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "RL_hfe_joint",
+          "joint_peak_nm": 28.01820279448858,
+          "motor_peak_nm": 28.01820279448858,
+          "motor_peak_signed_nm": -28.01820279448858,
+          "motor_peak_time_s": 0.47850000000000037,
+          "motor_peak_world_position_m": [
+            0.32270258866931206,
+            0.059424267452767326,
+            0.3420623894018348
+          ],
+          "motor_peak_travel_m": 0.33002638010627566,
+          "motor_speed_at_peak_rad_s": -4.506175317319807,
+          "motor_peak_speed_rad_s": 14.19780818690331,
+          "joint_rms_nm": 6.805393373643049,
+          "motor_rms_nm": 6.805393373643049,
+          "full_run_joint_rms_nm": 6.837939991418645,
+          "full_run_motor_rms_nm": 6.837939991418645,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 40.60150000001184,
+              "longest_time_s": 0.19800000000000015,
+              "peak_abs_motor_speed_rad_s": 12.47881808297416,
+              "rms_motor_speed_rad_s": 3.2433313874023417
+            },
+            "11": {
+              "total_time_s": 0.23250000000000018,
+              "longest_time_s": 0.1430000000000001,
+              "peak_abs_motor_speed_rad_s": 11.811693401988705,
+              "rms_motor_speed_rad_s": 3.1167086306045864
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 11.811693401988705,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1146,
+              "steps": 97269,
+              "duration_s": 48.634500000050195
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.8506741717053812,
+          "peak_utilisation": 0.7782834109580161,
+          "fraction_above_continuous": 0.40601499999891877,
+          "estimated_rms_current_a": 6.186721248766408,
+          "estimated_final_temperature_c": 23.801865638140146,
+          "estimated_steady_temperature_c": 37.298621178101385,
+          "safety_torque_clipped_cycles": 23340,
+          "safety_torque_clip_events": 1012,
+          "safety_torque_clipped_duration_s": 58.35
+        },
+        {
+          "name": "RL_kfe_joint",
+          "joint_peak_nm": 32.0458684297891,
+          "motor_peak_nm": 16.866246541994265,
+          "motor_peak_signed_nm": 16.866246541994265,
+          "motor_peak_time_s": 12.666000000003988,
+          "motor_peak_world_position_m": [
+            0.4803003094645031,
+            0.14461475427395482,
+            0.154632332430351
+          ],
+          "motor_peak_travel_m": 1.9291729204351584,
+          "motor_speed_at_peak_rad_s": -0.14533168410262778,
+          "motor_peak_speed_rad_s": 30.164448423180406,
+          "joint_rms_nm": 11.111025538994118,
+          "motor_rms_nm": 5.847908178417957,
+          "full_run_joint_rms_nm": 11.073761926054026,
+          "full_run_motor_rms_nm": 5.828295750554751,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 11.96300000000313,
+              "longest_time_s": 0.05150000000000004,
+              "peak_abs_motor_speed_rad_s": 17.371976934467742,
+              "rms_motor_speed_rad_s": 6.42188316659587
+            },
+            "11": {
+              "total_time_s": 0.6059999999999887,
+              "longest_time_s": 0.011500000000000007,
+              "peak_abs_motor_speed_rad_s": 13.118387870580305,
+              "rms_motor_speed_rad_s": 4.758610340034651
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 13.118387870580305,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1001,
+              "steps": 105736,
+              "duration_s": 52.86800000007041
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.7309885223022446,
+          "peak_utilisation": 0.4685068483887296,
+          "fraction_above_continuous": 0.11962999999967784,
+          "estimated_rms_current_a": 5.316280162198143,
+          "estimated_final_temperature_c": 22.765609538015507,
+          "estimated_steady_temperature_c": 32.7733881711295,
+          "safety_torque_clipped_cycles": 4661,
+          "safety_torque_clip_events": 381,
+          "safety_torque_clipped_duration_s": 11.6525
+        },
+        {
+          "name": "RR_haa_joint",
+          "joint_peak_nm": 17.840336316095897,
+          "motor_peak_nm": 17.840336316095897,
+          "motor_peak_signed_nm": 17.840336316095897,
+          "motor_peak_time_s": 1.5184999999998883,
+          "motor_peak_world_position_m": [
+            0.6894658634159482,
+            0.11210903645956828,
+            0.15256510898458278
+          ],
+          "motor_peak_travel_m": 0.7843242092396037,
+          "motor_speed_at_peak_rad_s": -0.304712806761443,
+          "motor_peak_speed_rad_s": 4.389744860055046,
+          "joint_rms_nm": 3.610058346912502,
+          "motor_rms_nm": 3.610058346912502,
+          "full_run_joint_rms_nm": 3.61295117897517,
+          "full_run_motor_rms_nm": 3.61295117897517,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 7.827999999998381,
+              "longest_time_s": 0.06700000000000005,
+              "peak_abs_motor_speed_rad_s": 3.1717593842606613,
+              "rms_motor_speed_rad_s": 0.97828684172657
+            },
+            "11": {
+              "total_time_s": 1.256999999999917,
+              "longest_time_s": 0.057000000000000044,
+              "peak_abs_motor_speed_rad_s": 2.224154247202866,
+              "rms_motor_speed_rad_s": 0.7199992425017765
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 2.224154247202866,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1880,
+              "steps": 109837,
+              "duration_s": 54.9185000000802
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.45125729336406273,
+          "peak_utilisation": 0.4955648976693305,
+          "fraction_above_continuous": 0.07827999999975253,
+          "estimated_rms_current_a": 3.2818712244659105,
+          "estimated_final_temperature_c": 21.06243310853032,
+          "estimated_steady_temperature_c": 24.867808253821075,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "RR_hfe_joint",
+          "joint_peak_nm": 28.426976465032283,
+          "motor_peak_nm": 28.426976465032283,
+          "motor_peak_signed_nm": 28.426976465032283,
+          "motor_peak_time_s": 0.35350000000000026,
+          "motor_peak_world_position_m": [
+            0.21231004801060188,
+            0.05301512482267544,
+            0.38230944260135324
+          ],
+          "motor_peak_travel_m": 0.21911605234007867,
+          "motor_speed_at_peak_rad_s": 2.218637370285763,
+          "motor_peak_speed_rad_s": 19.207384339354206,
+          "joint_rms_nm": 6.7885684219074625,
+          "motor_rms_nm": 6.7885684219074625,
+          "full_run_joint_rms_nm": 6.814260881055726,
+          "full_run_motor_rms_nm": 6.814260881055726,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 40.437000000011054,
+              "longest_time_s": 0.1475000000000001,
+              "peak_abs_motor_speed_rad_s": 18.257394055354094,
+              "rms_motor_speed_rad_s": 3.3896484999273286
+            },
+            "11": {
+              "total_time_s": 0.19400000000000014,
+              "longest_time_s": 0.05200000000000004,
+              "peak_abs_motor_speed_rad_s": 17.529247223977777,
+              "rms_motor_speed_rad_s": 7.84493717243133
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 17.529247223977777,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1374,
+              "steps": 97387,
+              "duration_s": 48.69350000005048
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.8485710527384328,
+          "peak_utilisation": 0.7896382351397856,
+          "fraction_above_continuous": 0.4043699999989158,
+          "estimated_rms_current_a": 6.171425838097693,
+          "estimated_final_temperature_c": 23.77665326202513,
+          "estimated_steady_temperature_c": 37.21319226271944,
+          "safety_torque_clipped_cycles": 23096,
+          "safety_torque_clip_events": 968,
+          "safety_torque_clipped_duration_s": 57.74
+        },
+        {
+          "name": "RR_kfe_joint",
+          "joint_peak_nm": 32.111522665485474,
+          "motor_peak_nm": 16.900801402887094,
+          "motor_peak_signed_nm": 16.900801402887094,
+          "motor_peak_time_s": 1.665999999999872,
+          "motor_peak_world_position_m": [
+            0.6950480656553678,
+            0.09007191063828054,
+            0.15286488702738044
+          ],
+          "motor_peak_travel_m": 0.8080593359463508,
+          "motor_speed_at_peak_rad_s": 0.01667719495513751,
+          "motor_peak_speed_rad_s": 34.112147875009065,
+          "joint_rms_nm": 11.101463286302685,
+          "motor_rms_nm": 5.842875413843519,
+          "full_run_joint_rms_nm": 11.122219946509098,
+          "full_run_motor_rms_nm": 5.853799971846894,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 12.164000000003375,
+              "longest_time_s": 0.22700000000000017,
+              "peak_abs_motor_speed_rad_s": 26.260670161341153,
+              "rms_motor_speed_rad_s": 6.361498441814484
+            },
+            "11": {
+              "total_time_s": 0.6614999999999825,
+              "longest_time_s": 0.17050000000000012,
+              "peak_abs_motor_speed_rad_s": 17.554809098220947,
+              "rms_motor_speed_rad_s": 4.745705344731057
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 17.554809098220947,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 970,
+              "steps": 105063,
+              "duration_s": 52.5315000000688
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.7303594267304399,
+          "peak_utilisation": 0.4694667056357526,
+          "fraction_above_continuous": 0.12163999999967436,
+          "estimated_rms_current_a": 5.311704921675926,
+          "estimated_final_temperature_c": 22.78764075909811,
+          "estimated_steady_temperature_c": 32.75141183662148,
+          "safety_torque_clipped_cycles": 5024,
+          "safety_torque_clip_events": 389,
+          "safety_torque_clipped_duration_s": 12.56
+        }
+      ],
+      "operating_point_pass": false,
+      "margin_failure_reasons": [
+        "stability criteria failed",
+        "velocity tracking criteria failed",
+        "safety limiting exceeded 1.0% of control cycles"
+      ]
+    },
+    {
+      "gait": "trot",
+      "commanded_vx_m_s": 1.0,
+      "commanded_vy_m_s": 0.0,
+      "commanded_wz_rad_s": 0.0,
+      "duration_s": 100.00000000029546,
+      "requested_duration_s": 100.0,
+      "warmup_s": 5.0,
+      "actual_vx_m_s": 0.9838495191442836,
+      "actual_body_vx_m_s": 0.9838495191442836,
+      "actual_vy_m_s": 0.00193662389444472,
+      "world_average_vx_m_s": 0.9836643501720833,
+      "actual_body_vy_m_s": 0.00193662389444472,
+      "actual_wz_rad_s": 5.081096402212453e-05,
+      "travel_m": 98.36643501749896,
+      "lateral_drift_m": 1.0633080135880661,
+      "max_tilt_deg": 8.780174430395006,
+      "min_height_m": 0.321615108377705,
+      "final_height_m": 0.332007092889276,
+      "safety_enabled": true,
+      "safety_latched": false,
+      "safety_clamp_events": 12258,
+      "safety_clamped_cycle_fraction": 0.30645,
+      "fault_flags": 6,
+      "stable": true,
+      "completed": true,
+      "failure_reason": null,
+      "stability_failure_reasons": [],
+      "tracks_velocity": true,
+      "within_continuous_rating": true,
+      "effort_source": "MuJoCo qfrc_actuator at joint DOFs",
+      "physics_samples": 200000,
+      "physics_timestep_s": 0.0005,
+      "torque_velocity_pairing": "Applied force with velocity at start of each implicitfast physics step",
+      "foot_strike_events_control_rate": {
+        "FL": 962,
+        "FR": 920,
+        "RL": 227,
+        "RR": 225
+      },
+      "joints": [
+        {
+          "name": "FL_haa_joint",
+          "joint_peak_nm": 9.655138438933855,
+          "motor_peak_nm": 9.655138438933855,
+          "motor_peak_signed_nm": -9.655138438933855,
+          "motor_peak_time_s": 0.09800000000000007,
+          "motor_peak_world_position_m": [
+            0.022510024855531056,
+            0.005637187520689392,
+            0.33069246918590073
+          ],
+          "motor_peak_travel_m": 0.02323197247116501,
+          "motor_speed_at_peak_rad_s": 0.397880817258989,
+          "motor_peak_speed_rad_s": 2.69679655479532,
+          "joint_rms_nm": 3.207168560232963,
+          "motor_rms_nm": 3.207168560232963,
+          "full_run_joint_rms_nm": 3.219651713304315,
+          "full_run_motor_rms_nm": 3.219651713304315,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.09050000000000007,
+              "longest_time_s": 0.09050000000000007,
+              "peak_abs_motor_speed_rad_s": 0.4708919641944137,
+              "rms_motor_speed_rad_s": 0.3803524438097952
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1653,
+              "steps": 91316,
+              "duration_s": 45.65800000003598
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.40089607002912037,
+          "peak_utilisation": 0.26819828997038486,
+          "fraction_above_continuous": 0.0009049999999973268,
+          "estimated_rms_current_a": 2.915607782029966,
+          "estimated_final_temperature_c": 20.842912493875748,
+          "estimated_steady_temperature_c": 23.841922431425502,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "FL_hfe_joint",
+          "joint_peak_nm": 20.92773331257903,
+          "motor_peak_nm": 20.92773331257903,
+          "motor_peak_signed_nm": 20.92773331257903,
+          "motor_peak_time_s": 0.9084999999999553,
+          "motor_peak_world_position_m": [
+            0.7638808178283544,
+            0.06755183912388703,
+            0.3393462830132131
+          ],
+          "motor_peak_travel_m": 0.7784736998847449,
+          "motor_speed_at_peak_rad_s": -0.20350321181945352,
+          "motor_peak_speed_rad_s": 13.047189775137284,
+          "joint_rms_nm": 5.308139610953439,
+          "motor_rms_nm": 5.308139610953439,
+          "full_run_joint_rms_nm": 5.345764731167657,
+          "full_run_motor_rms_nm": 5.345764731167657,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 14.971000000006805,
+              "longest_time_s": 0.1425000000000001,
+              "peak_abs_motor_speed_rad_s": 7.532213238674792,
+              "rms_motor_speed_rad_s": 2.928361102827873
+            },
+            "11": {
+              "total_time_s": 5.721999999999548,
+              "longest_time_s": 0.10550000000000008,
+              "peak_abs_motor_speed_rad_s": 4.803328528334965,
+              "rms_motor_speed_rad_s": 2.3669279635512157
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 4.803328528334965,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1299,
+              "steps": 102731,
+              "duration_s": 51.365500000063236
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.6635174513691798,
+          "peak_utilisation": 0.5813259253494175,
+          "fraction_above_continuous": 0.14970999999962573,
+          "estimated_rms_current_a": 4.825581464503125,
+          "estimated_final_temperature_c": 22.322081892413628,
+          "estimated_steady_temperature_c": 30.52421457286784,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "FL_kfe_joint",
+          "joint_peak_nm": 24.867551802278886,
+          "motor_peak_nm": 13.08818515909415,
+          "motor_peak_signed_nm": -13.08818515909415,
+          "motor_peak_time_s": 0.2610000000000002,
+          "motor_peak_world_position_m": [
+            0.14182442296293024,
+            0.05094052272582078,
+            0.38121393720243324
+          ],
+          "motor_peak_travel_m": 0.15093034006792114,
+          "motor_speed_at_peak_rad_s": 0.03304152613947653,
+          "motor_peak_speed_rad_s": 28.159234188926476,
+          "joint_rms_nm": 8.686614836312222,
+          "motor_rms_nm": 4.571902545427485,
+          "full_run_joint_rms_nm": 8.734836327454241,
+          "full_run_motor_rms_nm": 4.597282277607496,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.35050000000000026,
+              "longest_time_s": 0.21200000000000016,
+              "peak_abs_motor_speed_rad_s": 19.605788995794946,
+              "rms_motor_speed_rad_s": 7.232068029853242
+            },
+            "11": {
+              "total_time_s": 0.028500000000000022,
+              "longest_time_s": 0.014000000000000009,
+              "peak_abs_motor_speed_rad_s": 7.207429128092769,
+              "rms_motor_speed_rad_s": 2.9801546602025435
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 7.207429128092769,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 854,
+              "steps": 98634,
+              "duration_s": 49.317000000053454
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.5714878181784356,
+          "peak_utilisation": 0.3635606988637264,
+          "fraction_above_continuous": 0.0035049999999896466,
+          "estimated_rms_current_a": 4.156275041297714,
+          "estimated_final_temperature_c": 21.71825522812727,
+          "estimated_steady_temperature_c": 27.807265511838324,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "FR_haa_joint",
+          "joint_peak_nm": 8.328507366425637,
+          "motor_peak_nm": 8.328507366425637,
+          "motor_peak_signed_nm": -8.328507366425637,
+          "motor_peak_time_s": 0.9129999999999548,
+          "motor_peak_world_position_m": [
+            0.7678894893217301,
+            0.0673431457169785,
+            0.34041231978598124
+          ],
+          "motor_peak_travel_m": 0.7824878188119397,
+          "motor_speed_at_peak_rad_s": 1.752242353148568,
+          "motor_peak_speed_rad_s": 2.542181498658129,
+          "joint_rms_nm": 3.3180050330224997,
+          "motor_rms_nm": 3.3180050330224997,
+          "full_run_joint_rms_nm": 3.315169715028285,
+          "full_run_motor_rms_nm": 3.315169715028285,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.009000000000000005,
+              "longest_time_s": 0.007000000000000003,
+              "peak_abs_motor_speed_rad_s": 2.076249705503697,
+              "rms_motor_speed_rad_s": 1.701062690745107
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1920,
+              "steps": 93600,
+              "duration_s": 46.800000000041436
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.41475062912781246,
+          "peak_utilisation": 0.23134742684515658,
+          "fraction_above_continuous": 8.999999999973413e-05,
+          "estimated_rms_current_a": 3.016368211838636,
+          "estimated_final_temperature_c": 20.895077476601095,
+          "estimated_steady_temperature_c": 24.112056765745088,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "FR_hfe_joint",
+          "joint_peak_nm": 22.626333337455595,
+          "motor_peak_nm": 22.626333337455595,
+          "motor_peak_signed_nm": -22.626333337455595,
+          "motor_peak_time_s": 0.43600000000000033,
+          "motor_peak_world_position_m": [
+            0.3139563076931388,
+            0.08793621275523487,
+            0.33775808470536406
+          ],
+          "motor_peak_travel_m": 0.3273420299379302,
+          "motor_speed_at_peak_rad_s": 1.7748644391655561,
+          "motor_peak_speed_rad_s": 10.257983049219218,
+          "joint_rms_nm": 5.347799130073447,
+          "motor_rms_nm": 5.347799130073447,
+          "full_run_joint_rms_nm": 5.356343933397346,
+          "full_run_motor_rms_nm": 5.356343933397346,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 14.962500000006795,
+              "longest_time_s": 0.06900000000000005,
+              "peak_abs_motor_speed_rad_s": 5.990280561433203,
+              "rms_motor_speed_rad_s": 2.966788890134799
+            },
+            "11": {
+              "total_time_s": 5.7089999999995555,
+              "longest_time_s": 0.06450000000000004,
+              "peak_abs_motor_speed_rad_s": 4.793883579580022,
+              "rms_motor_speed_rad_s": 2.4265826433358906
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 4.793883579580022,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1270,
+              "steps": 102841,
+              "duration_s": 51.4205000000635
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.6684748912591809,
+          "peak_utilisation": 0.6285092593737666,
+          "fraction_above_continuous": 0.14962499999962586,
+          "estimated_rms_current_a": 4.861635572794043,
+          "estimated_final_temperature_c": 22.335244636055695,
+          "estimated_steady_temperature_c": 30.68206442505859,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "FR_kfe_joint",
+          "joint_peak_nm": 17.454466950956466,
+          "motor_peak_nm": 9.186561553134982,
+          "motor_peak_signed_nm": 9.186561553134982,
+          "motor_peak_time_s": 0.4035000000000003,
+          "motor_peak_world_position_m": [
+            0.2795206211899677,
+            0.0839778279561365,
+            0.3440727739770026
+          ],
+          "motor_peak_travel_m": 0.29267707787862335,
+          "motor_speed_at_peak_rad_s": -4.920399200610529,
+          "motor_peak_speed_rad_s": 18.140646722283222,
+          "joint_rms_nm": 8.715344989489356,
+          "motor_rms_nm": 4.587023678678609,
+          "full_run_joint_rms_nm": 8.710839887449199,
+          "full_run_motor_rms_nm": 4.5846525723416836,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.03900000000000003,
+              "longest_time_s": 0.03900000000000003,
+              "peak_abs_motor_speed_rad_s": 8.362616944105083,
+              "rms_motor_speed_rad_s": 4.448435194223232
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 874,
+              "steps": 99103,
+              "duration_s": 49.551500000054574
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.5733779598348261,
+          "peak_utilisation": 0.2551822653648606,
+          "fraction_above_continuous": 0.000389999999998848,
+          "estimated_rms_current_a": 4.170021526071462,
+          "estimated_final_temperature_c": 21.711640718794865,
+          "estimated_steady_temperature_c": 27.858994492634118,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "RL_haa_joint",
+          "joint_peak_nm": 13.625562154148502,
+          "motor_peak_nm": 13.625562154148502,
+          "motor_peak_signed_nm": 13.625562154148502,
+          "motor_peak_time_s": 0.45350000000000035,
+          "motor_peak_world_position_m": [
+            0.3312084448960876,
+            0.08812059312979789,
+            0.3404071002885742
+          ],
+          "motor_peak_travel_m": 0.34460276481894336,
+          "motor_speed_at_peak_rad_s": -1.1128703436479432,
+          "motor_peak_speed_rad_s": 4.486221375584511,
+          "joint_rms_nm": 2.404319248945397,
+          "motor_rms_nm": 2.404319248945397,
+          "full_run_joint_rms_nm": 2.41900697265102,
+          "full_run_motor_rms_nm": 2.41900697265102,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.4280000000000003,
+              "longest_time_s": 0.029000000000000022,
+              "peak_abs_motor_speed_rad_s": 2.153489388678494,
+              "rms_motor_speed_rad_s": 0.34477612451123724
+            },
+            "11": {
+              "total_time_s": 0.022000000000000016,
+              "longest_time_s": 0.022000000000000016,
+              "peak_abs_motor_speed_rad_s": 1.4432461704169126,
+              "rms_motor_speed_rad_s": 1.1281671232552934
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 1.4432461704169126,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 888,
+              "steps": 102227,
+              "duration_s": 51.11350000006203
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.3005399061181746,
+          "peak_utilisation": 0.3784878376152362,
+          "fraction_above_continuous": 0.004279999999987357,
+          "estimated_rms_current_a": 2.1857447717685425,
+          "estimated_final_temperature_c": 20.47578878218342,
+          "estimated_steady_temperature_c": 22.159182179695346,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "RL_hfe_joint",
+          "joint_peak_nm": 28.63819836137914,
+          "motor_peak_nm": 28.63819836137914,
+          "motor_peak_signed_nm": 28.63819836137914,
+          "motor_peak_time_s": 0.6809999999999804,
+          "motor_peak_world_position_m": [
+            0.557754770998212,
+            0.08671705426588493,
+            0.32541051732736814
+          ],
+          "motor_peak_travel_m": 0.5712528406312621,
+          "motor_speed_at_peak_rad_s": -0.3015928109980863,
+          "motor_peak_speed_rad_s": 9.604029950971734,
+          "joint_rms_nm": 5.095088970742447,
+          "motor_rms_nm": 5.095088970742447,
+          "full_run_joint_rms_nm": 5.134448522718594,
+          "full_run_motor_rms_nm": 5.134448522718594,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 17.692000000004118,
+              "longest_time_s": 0.08200000000000006,
+              "peak_abs_motor_speed_rad_s": 5.870066582558778,
+              "rms_motor_speed_rad_s": 3.718112523233879
+            },
+            "11": {
+              "total_time_s": 3.622500000000377,
+              "longest_time_s": 0.05600000000000004,
+              "peak_abs_motor_speed_rad_s": 5.870066582558778,
+              "rms_motor_speed_rad_s": 2.047756149902383
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 5.870066582558778,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1737,
+              "steps": 112994,
+              "duration_s": 56.49700000008774
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.6368861213428059,
+          "peak_utilisation": 0.7955055100383094,
+          "fraction_above_continuous": 0.17691999999951846,
+          "estimated_rms_current_a": 4.631899064311315,
+          "estimated_final_temperature_c": 22.142590711784937,
+          "estimated_steady_temperature_c": 29.696356277322458,
+          "safety_torque_clipped_cycles": 6431,
+          "safety_torque_clip_events": 216,
+          "safety_torque_clipped_duration_s": 16.0775
+        },
+        {
+          "name": "RL_kfe_joint",
+          "joint_peak_nm": 19.050913117186685,
+          "motor_peak_nm": 10.026796377466678,
+          "motor_peak_signed_nm": 10.026796377466678,
+          "motor_peak_time_s": 0.4110000000000003,
+          "motor_peak_world_position_m": [
+            0.287189045687549,
+            0.08498901108823012,
+            0.3420501629358631
+          ],
+          "motor_peak_travel_m": 0.3004119189085687,
+          "motor_speed_at_peak_rad_s": 2.3879187580668866,
+          "motor_peak_speed_rad_s": 22.00638770283426,
+          "joint_rms_nm": 10.184272588964987,
+          "motor_rms_nm": 5.360143467876309,
+          "full_run_joint_rms_nm": 10.183604535925733,
+          "full_run_motor_rms_nm": 5.3597918610135435,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 12.69250000000402,
+              "longest_time_s": 0.10100000000000008,
+              "peak_abs_motor_speed_rad_s": 10.310292559426651,
+              "rms_motor_speed_rad_s": 2.1833965040516174
+            },
+            "11": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 0.0,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1103,
+              "steps": 101973,
+              "duration_s": 50.986500000061426
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.6700179334845386,
+          "peak_utilisation": 0.2785221215962966,
+          "fraction_above_continuous": 0.1269249999996652,
+          "estimated_rms_current_a": 4.872857698069372,
+          "estimated_final_temperature_c": 22.339154054626057,
+          "estimated_steady_temperature_c": 30.73143621271926,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "RR_haa_joint",
+          "joint_peak_nm": 11.222020951255022,
+          "motor_peak_nm": 11.222020951255022,
+          "motor_peak_signed_nm": 11.222020951255022,
+          "motor_peak_time_s": 0.001,
+          "motor_peak_world_position_m": [
+            8.573874197953812e-07,
+            -8.991847503885352e-08,
+            0.32198567964671276
+          ],
+          "motor_peak_travel_m": 8.620896239815752e-07,
+          "motor_speed_at_peak_rad_s": 8.526512829121202e-17,
+          "motor_peak_speed_rad_s": 3.3356662594468154,
+          "joint_rms_nm": 2.2318519356237307,
+          "motor_rms_nm": 2.2318519356237307,
+          "full_run_joint_rms_nm": 2.2473077880551378,
+          "full_run_motor_rms_nm": 2.2473077880551378,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 0.11900000000000009,
+              "longest_time_s": 0.004,
+              "peak_abs_motor_speed_rad_s": 1.2242941840251444,
+              "rms_motor_speed_rad_s": 0.27319582586256863
+            },
+            "11": {
+              "total_time_s": 0.0005,
+              "longest_time_s": 0.0005,
+              "peak_abs_motor_speed_rad_s": 8.526512829121202e-17,
+              "rms_motor_speed_rad_s": 8.526512829121202e-17
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 8.526512829121202e-17,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 928,
+              "steps": 102281,
+              "duration_s": 51.14050000006216
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.27898149195296634,
+          "peak_utilisation": 0.31172280420152837,
+          "fraction_above_continuous": 0.0011899999999964849,
+          "estimated_rms_current_a": 2.0289563051124824,
+          "estimated_final_temperature_c": 20.41041876200372,
+          "estimated_steady_temperature_c": 21.86052615381677,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        },
+        {
+          "name": "RR_hfe_joint",
+          "joint_peak_nm": 27.207162596426983,
+          "motor_peak_nm": 27.207162596426983,
+          "motor_peak_signed_nm": 27.207162596426983,
+          "motor_peak_time_s": 0.45350000000000035,
+          "motor_peak_world_position_m": [
+            0.3312084448960876,
+            0.08812059312979789,
+            0.3404071002885742
+          ],
+          "motor_peak_travel_m": 0.34460276481894336,
+          "motor_speed_at_peak_rad_s": -0.1523612391536046,
+          "motor_peak_speed_rad_s": 13.531768080809272,
+          "joint_rms_nm": 5.070077571921449,
+          "motor_rms_nm": 5.070077571921449,
+          "full_run_joint_rms_nm": 5.130906419020605,
+          "full_run_motor_rms_nm": 5.130906419020605,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 16.52800000000683,
+              "longest_time_s": 0.1345000000000001,
+              "peak_abs_motor_speed_rad_s": 7.29886857522301,
+              "rms_motor_speed_rad_s": 3.761119996234674
+            },
+            "11": {
+              "total_time_s": 4.47350000000024,
+              "longest_time_s": 0.07700000000000005,
+              "peak_abs_motor_speed_rad_s": 6.23917341071673,
+              "rms_motor_speed_rad_s": 2.339627158599159
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 6.23917341071673,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1486,
+              "steps": 107851,
+              "duration_s": 53.92550000007546
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.6337596964901812,
+          "peak_utilisation": 0.7557545165674162,
+          "fraction_above_continuous": 0.16527999999957999,
+          "estimated_rms_current_a": 4.609161429019499,
+          "estimated_final_temperature_c": 22.13665150412873,
+          "estimated_steady_temperature_c": 29.601392605146067,
+          "safety_torque_clipped_cycles": 5827,
+          "safety_torque_clip_events": 217,
+          "safety_torque_clipped_duration_s": 14.5675
+        },
+        {
+          "name": "RR_kfe_joint",
+          "joint_peak_nm": 29.35787299866767,
+          "motor_peak_nm": 15.451512104561932,
+          "motor_peak_signed_nm": 15.451512104561932,
+          "motor_peak_time_s": 0.01550000000000001,
+          "motor_peak_world_position_m": [
+            0.00037350586670518207,
+            4.5601463074437085e-05,
+            0.32178052072459334
+          ],
+          "motor_peak_travel_m": 0.00037827161904956753,
+          "motor_speed_at_peak_rad_s": 0.26364726862200344,
+          "motor_peak_speed_rad_s": 29.75245683025783,
+          "joint_rms_nm": 9.889540419256951,
+          "motor_rms_nm": 5.2050212732931325,
+          "full_run_joint_rms_nm": 9.956820613404114,
+          "full_run_motor_rms_nm": 5.240431901791639,
+          "duration_s": 100.00000000029546,
+          "rms_duration_s": 95.00000000027153,
+          "threshold_metrics": {
+            "8": {
+              "total_time_s": 4.126000000000433,
+              "longest_time_s": 0.22500000000000017,
+              "peak_abs_motor_speed_rad_s": 21.813561663634346,
+              "rms_motor_speed_rad_s": 3.1698368920772495
+            },
+            "11": {
+              "total_time_s": 0.24000000000000019,
+              "longest_time_s": 0.20700000000000016,
+              "peak_abs_motor_speed_rad_s": 17.854736185127045,
+              "rms_motor_speed_rad_s": 6.5454524117322155
+            },
+            "36": {
+              "total_time_s": 0.0,
+              "longest_time_s": 0.0,
+              "peak_abs_motor_speed_rad_s": 0.0,
+              "rms_motor_speed_rad_s": 0.0
+            }
+          },
+          "peak_abs_motor_speed_when_above_11": 17.854736185127045,
+          "clipping": {
+            "peak": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            },
+            "speed": {
+              "events": 1096,
+              "steps": 101353,
+              "duration_s": 50.676500000059946
+            },
+            "physics": {
+              "events": 0,
+              "steps": 0,
+              "duration_s": 0.0
+            }
+          },
+          "continuous_utilisation": 0.6506276591616416,
+          "peak_utilisation": 0.42920866957116477,
+          "fraction_above_continuous": 0.041259999999882425,
+          "estimated_rms_current_a": 4.731837521175574,
+          "estimated_final_temperature_c": 22.231974634255184,
+          "estimated_steady_temperature_c": 30.11928990539952,
+          "safety_torque_clipped_cycles": 0,
+          "safety_torque_clip_events": 0,
+          "safety_torque_clipped_duration_s": 0.0
+        }
+      ],
+      "operating_point_pass": false,
+      "margin_failure_reasons": [
+        "safety limiting exceeded 1.0% of control cycles"
+      ]
+    }
+  ]
+}

@@ -7,6 +7,7 @@ Every attempted run writes JSON, including partial measurements and failures.
 """
 import argparse
 from collections import OrderedDict
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -19,7 +20,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import OccupancyGrid
 from octomap_msgs.msg import Octomap
 from robodog_msgs.msg import RobotState
-from robodog_msgs.srv import SetGait
+from robodog_msgs.srv import SaveMap, SetGait
 from rtabmap_msgs.msg import MapData
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 from std_srvs.srv import Empty
@@ -211,13 +212,59 @@ def call(node, client, request, timeout=3.):
     return future.result()
 
 
+def validate_room_scan(manifest_path):
+    manifest_path = Path(manifest_path)
+    require(manifest_path.is_absolute() and manifest_path.name == 'manifest.json',
+            f'Invalid manifest path: {manifest_path}')
+    require(manifest_path.is_file(), f'Map manifest does not exist: {manifest_path}')
+    manifest = json.loads(manifest_path.read_text())
+    require(manifest.get('complete') is True and manifest.get('format') == 'robodog-room-scan-v1',
+            'Map manifest is incomplete or has an unknown format')
+    expected = {'cloud_map.pcd', 'octomap.ot', 'rtabmap.db.back'}
+    require(set(manifest.get('files', {})) == expected, 'Map manifest has missing/unexpected artifacts')
+    verified = {}
+    for name in sorted(expected):
+        require(Path(name).name == name, f'Unsafe artifact name in manifest: {name}')
+        path = manifest_path.parent / name
+        require(path.is_file() and path.stat().st_size > 0, f'Missing/empty map artifact: {path}')
+        digest_builder = hashlib.sha256()
+        with path.open('rb') as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b''):
+                digest_builder.update(block)
+        digest = digest_builder.hexdigest()
+        record = manifest['files'][name]
+        require(record.get('bytes') == path.stat().st_size and record.get('sha256') == digest,
+                f'Map artifact checksum mismatch: {name}')
+        verified[name] = record
+    with (manifest_path.parent / 'cloud_map.pcd').open('rb') as stream:
+        pcd_header = stream.read(11)
+    with (manifest_path.parent / 'octomap.ot').open('rb') as stream:
+        octomap_header = stream.read(22)
+    with (manifest_path.parent / 'rtabmap.db.back').open('rb') as stream:
+        database_header = stream.read(16)
+    require(pcd_header.startswith(b'# .PCD v0.7'),
+            'Room cloud is not a PCD file')
+    require(octomap_header.startswith(b'# Octomap OcTree file'),
+            'Occupancy export is not a full OctoMap file')
+    require(database_header == b'SQLite format 3\x00',
+            'RTAB-Map backup is not a SQLite database')
+    return dict(manifest_path=str(manifest_path), session_name=manifest.get('session_name'),
+                point_cloud=manifest.get('point_cloud'), files=verified)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--distance', type=float, default=.5)
     parser.add_argument('--output', type=Path, default=Path('/tmp/robodog_mapping_smoke.json'))
     parser.add_argument('--backup', action='store_true')
+    parser.add_argument('--save-name', default=None,
+                        help='save and validate a complete room scan under this unique name')
+    parser.add_argument('--save-output-dir', type=Path, default=None,
+                        help='absolute room-scan export root (also enables saving)')
     args = parser.parse_args()
     require(math.isfinite(args.distance) and 0 <= args.distance <= .6, 'Distance must be between 0 and 0.6m')
+    require(args.save_output_dir is None or args.save_output_dir.is_absolute(),
+            '--save-output-dir must be absolute')
     report = dict(passed=False, requested_distance_m=args.distance, errors=[])
     rclpy.init()
     node = rclpy.create_node('robodog_mapping_smoke')
@@ -250,6 +297,14 @@ def main():
             backup = node.create_client(Empty, '/robodog/mapping/rtabmap/backup')
             call(node, backup, Empty.Request())
             report['backup_service_acknowledged'] = True
+        if args.save_name is not None or args.save_output_dir is not None:
+            save = node.create_client(SaveMap, '/robodog/mapping/save_map')
+            request = SaveMap.Request()
+            request.name = args.save_name or ''
+            request.output_directory = str(args.save_output_dir) if args.save_output_dir else ''
+            response = call(node, save, request, timeout=90.)
+            require(response.success, f'Room-scan export rejected: {response.message}')
+            report['room_scan_export'] = validate_room_scan(response.manifest_path)
     except (Exception, KeyboardInterrupt) as error:
         report['errors'].append(f'{type(error).__name__}: {error}')
     finally:

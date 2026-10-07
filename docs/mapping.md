@@ -38,6 +38,8 @@ Control supplies `odom → base_link`; RTAB-Map supplies only `map → odom`. Th
 
 Map outputs are generated on demand when subscribed. RViz or the integration smoke test supplies those subscriptions. The map cache is retained when viewers disconnect.
 
+The room-scan exporter keeps a subscription to `/robodog/mapping/cloud_map`, so RTAB-Map maintains its graph-corrected assembled point cloud even when RViz is closed. This is the dense, colored room scan. Do not confuse it with `octomap_occupied_space`, which contains occupied OctoMap voxel centers for occupancy visualization.
+
 ## Preserve and export maps
 
 The default database is `$ROS_HOME/robodog/maps/<world>.db`, or `~/.ros/robodog/maps/<world>.db` when `ROS_HOME` is unset. Restarting reuses it; nothing deletes it automatically. To start a separate mapping session, choose a new path:
@@ -60,6 +62,34 @@ ros2 run octomap_server octomap_saver_node --ros-args -p full:=true -p octomap_p
 
 The service includes the `rtabmap` node name; the corresponding topic does not. Export a full `ColorOcTree`, because the saver does not support binary conversion of that tree type. The database retains the SLAM graph and observations; the `.ot` file is an occupancy snapshot.
 
+### Save one complete room scan
+
+The Remote Control page's **Save room scan** button calls `/robodog/mapping/save_map`. It saves a self-contained, immutable session under `~/.ros/robodog/exports` by default. You can set another absolute root at launch:
+
+```bash
+ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house \
+  mapping_export_directory:=/absolute/path/to/room-scans
+```
+
+The same operation is available from the terminal:
+
+```bash
+ros2 run robodog_perception save_map --name kitchen-west
+ros2 run robodog_perception save_map \
+  --output-dir /absolute/path/to/room-scans --name living-room
+```
+
+Leave `--name` out to use a UTC timestamp such as `scan-20261007-142530`. A name can contain letters, numbers, `.`, `_` and `-`, must begin with a letter or number, and is limited to 64 characters. Existing session directories are never overwritten.
+
+| File | Contents |
+|---|---|
+| `cloud_map.pcd` | Binary PCD snapshot of RTAB-Map's assembled, graph-corrected `/cloud_map` |
+| `octomap.ot` | Full colored OctoMap obtained through RTAB-Map's `octomap_full` service |
+| `rtabmap.db.back` | Consistent backup of the SLAM graph, poses and sensor observations |
+| `manifest.json` | Completion marker, source frames/topics, point count, sizes and SHA-256 checksums |
+
+The manifest is written last. A directory without `manifest.json` is not a complete export. Saving does not stop mapping, clear the active database or delete earlier scans. Move the robot through the room and wait for visible map updates before saving; the request fails clearly if no assembled cloud has arrived or if its last update is more than five seconds old.
+
 ## Hardware and navigation boundary
 
 This integration currently supports MuJoCo simulation. The default `mapping:=auto` disables mapping on unsupported sensor pipelines; an explicit `mapping:=rtabmap` rejects them with an error. Kinematic mode has no moving base odometry or world spawn placement. The existing real NUWA backend does not yet deliver depth, and real base odometry is not integrated. Hardware needs calibrated registered depth and an independent odometry source, or a separately validated RGB-D odometry node with exclusive ownership of `odom → base_link`.
@@ -81,10 +111,26 @@ Both short mapping runs produced new maps during motion, acknowledged database b
 
 The house database reloaded successfully: the known 2D cells remained at 523 before any new walking, and stored observations increased from 18 before restart to 24 afterward. Full colored OctoMap exports succeeded for both worlds: 7,964 tree nodes for the house and 27,567 for the flat world. Tree nodes and occupied point-cloud points count different things.
 
+The new atomic room-scan path was validated separately in the house on
+2026-10-07. A 0.500231 m live walk grew known 2D cells from 479 to 579,
+occupied voxel-cloud points from 917 to 1,285, and graph nodes from 2 to 5.
+Registered camera checks and the `map → odom → base_link` TF chain passed; the
+run recorded no clamp events and acknowledged zero velocity plus stand. The
+saved assembled PCD has its own point count because it is a graph-corrected
+colored map rather than the occupied-voxel visualization.
+
+| Saved artifact | Size | Validation |
+|---|---:|---|
+| Assembled `cloud_map.pcd` | 1,056 points; 17,076 bytes | SHA-256 `945588c5…` |
+| Full colored `octomap.ot` | 71,706 bytes | SHA-256 `51d99962…` |
+| `rtabmap.db.back` | 22,462,464 bytes | SHA-256 `c70e7ae1…` |
+
 To repeat the bounded integration check against an already running simulation, use the same ROS domain and sourced workspace as its launch:
 
 ```bash
-python3 tools/mapping_smoke.py --distance 0.5 --backup --output /tmp/mapping-check.json
+python3 tools/mapping_smoke.py --distance 0.5 \
+  --save-name room-check --save-output-dir /tmp/robodog-map-exports \
+  --output /tmp/mapping-check.json
 ```
 
 This script commands motion; use it with the MuJoCo mapping stack. It verifies the camera contract, nonempty map outputs, updates during walking, expected TF publishers and edges, and stop/stand acknowledgement. Source review establishes TF edge ownership because Humble's Python message metadata does not expose publisher GIDs for live per-edge attribution. These short straight walks validate mapping integration and persistence, not visual loop closure, hardware localization accuracy or whole-world coverage.

@@ -21,6 +21,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   srv/SetGait.srv
   srv/EmergencyStop.srv
   srv/EnableJoints.srv
+  srv/SaveMap.srv
   DEPENDENCIES std_msgs geometry_msgs
 )
 

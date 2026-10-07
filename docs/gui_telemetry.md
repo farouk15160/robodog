@@ -5,6 +5,11 @@ the live readings to inspect motion and faults, and the rolling statistics to
 compare repeated steps. The robot information panel describes the configured
 model; it is not a measurement of an assembled robot.
 
+The separate [Remote Control page](remote_control.md) keeps the camera, measured
+motion, hottest/most-loaded joint, controller and mapping feedback beside touch
+and keyboard joysticks. It does not replace the Dashboard's per-joint table or
+rolling 20-second statistics.
+
 ![Live joint diagnostics](images/joint_diagnostics.png)
 
 ## Torque and speed conventions

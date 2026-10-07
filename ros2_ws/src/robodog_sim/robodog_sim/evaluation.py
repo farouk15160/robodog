@@ -8,6 +8,26 @@ from __future__ import annotations
 import numpy as np
 
 
+def operating_point_assessment(*, completed, stable, tracks_velocity,
+                               within_continuous_rating,
+                               safety_clamped_cycle_fraction,
+                               max_clamped_cycle_fraction=.01):
+    """Judge whether a run has usable margin, separately from basic stability."""
+    reasons = []
+    if not completed:
+        reasons.append("run did not complete")
+    if not stable:
+        reasons.append("stability criteria failed")
+    if not tracks_velocity:
+        reasons.append("velocity tracking criteria failed")
+    if not within_continuous_rating:
+        reasons.append("motor RMS exceeded the continuous stall reference")
+    if safety_clamped_cycle_fraction > max_clamped_cycle_fraction:
+        reasons.append(
+            f"safety limiting exceeded {100 * max_clamped_cycle_fraction:.1f}% of control cycles")
+    return not reasons, reasons
+
+
 def joint_metrics(*, names, torque, velocity, temperature, ratio, efficiency,
                   continuous, peak, kt, resistance, ambient, thermal_resistance):
     """Summarise signed time samples without mixing joint and motor ratings."""
@@ -78,7 +98,7 @@ def run_case(params, actuator, gaits, controls, model_path, *, gait="stand",
     keyframe receives a constant body-velocity command at time zero. This is a
     simulation measurement, not a thermal or hardware qualification.
     """
-    from robodog_control.balance import roll_pitch_from_quat
+    from robodog_control.balance import roll_pitch_from_quat, yaw_from_quat
     from robodog_control.gait import BodyFeedback, GaitGenerator, GaitParams
     from robodog_control.kinematics import LegGeometry
     from robodog_control.safety import SafetyLimits, SafetyMonitor
@@ -102,9 +122,19 @@ def run_case(params, actuator, gaits, controls, model_path, *, gait="stand",
         backend.enable()
         ratio, efficiency = transmission_arrays(actuator, JOINT_NAMES)
         continuous = actuator["operational_limits"]["continuous_torque_nm"]
-        physics = PhysicsMetrics(JOINT_NAMES, ratio, efficiency,
-                                 thresholds=tuple(sorted({8., 11., float(continuous)})), warmup_s=warmup)
-        backend.set_physics_observer(physics.update)
+        peak = actuator["operational_limits"]["peak_torque_nm"]
+        physics = PhysicsMetrics(
+            JOINT_NAMES, ratio, efficiency,
+            thresholds=tuple(sorted({8., 11., float(continuous), float(peak)})),
+            warmup_s=warmup,
+        )
+        def observe_physics(torque, velocity, step_dt, **clipping):
+            physics.update(
+                torque, velocity, step_dt,
+                world_position=backend.base_state().position,
+                **clipping,
+            )
+        backend.set_physics_observer(observe_physics)
         pose = params["named_poses"]["stand"]
         gen = GaitGenerator(LegGeometry.from_params(params),
                             np.array([pose[k] for k in ("haa", "hfe", "kfe")]),
@@ -126,7 +156,8 @@ def run_case(params, actuator, gaits, controls, model_path, *, gait="stand",
             roll, pitch = roll_pitch_from_quat(base.orientation)
             feedback = BodyFeedback(
                 height=float(base.position[2]), vz=float(base.linear_velocity[2]),
-                roll=roll, pitch=pitch, omega=tuple(base.angular_velocity),
+                roll=roll, pitch=pitch, yaw=yaw_from_quat(base.orientation),
+                omega=tuple(base.angular_velocity),
                 v_xy=tuple(body_planar_velocity(base.orientation, base.linear_velocity)))
             request = gait_command(gen.update(dt, feedback), controls["gains"])
             command, report = safety.apply(state, request)
@@ -166,6 +197,17 @@ def run_case(params, actuator, gaits, controls, model_path, *, gait="stand",
         stable = failure is None and max_tilt < 15 and min_height > .25 and not safety.latched
         complete = failure is None and cycles == int(seconds * rate)
         rms_available = physics.rms_duration_s > 0
+        clamped_fraction = clamp_ticks / max(cycles + int(failure is not None), 1)
+        tracks_velocity = bool(
+            complete and np.max(np.abs(average_velocity[:2] - [vx, vy])) < .07
+            and abs(average_velocity[2] - wz) < .15)
+        within_continuous = bool(
+            complete and rms_available and metrics
+            and max(j["continuous_utilisation"] for j in metrics) < 1)
+        operating_point_pass, margin_failure_reasons = operating_point_assessment(
+            completed=complete, stable=stable, tracks_velocity=tracks_velocity,
+            within_continuous_rating=within_continuous,
+            safety_clamped_cycle_fraction=clamped_fraction)
         return dict(
             gait=gait, commanded_vx_m_s=vx, commanded_vy_m_s=vy, commanded_wz_rad_s=wz,
             duration_s=duration, requested_duration_s=seconds, warmup_s=warmup,
@@ -175,15 +217,15 @@ def run_case(params, actuator, gaits, controls, model_path, *, gait="stand",
             travel_m=float(last_position[0] - initial[0]), lateral_drift_m=drift,
             max_tilt_deg=max_tilt, min_height_m=min_height, final_height_m=float(last_position[2]),
             safety_enabled=True, safety_latched=safety.latched, safety_clamp_events=safety.clamp_events,
-            safety_clamped_cycle_fraction=clamp_ticks / max(cycles + int(failure is not None), 1), fault_flags=faults,
+            safety_clamped_cycle_fraction=clamped_fraction, fault_flags=faults,
             stable=bool(stable), completed=complete, failure_reason=failure,
             stability_failure_reasons=(["excessive tilt"] if max_tilt >= 15 else []) +
                 (["body height below limit"] if min_height <= .25 else []) +
                 (["safety latched"] if safety.latched else []) + ([failure] if failure else []),
-            tracks_velocity=bool(complete and np.max(np.abs(average_velocity[:2] - [vx, vy])) < .07
-                                 and abs(average_velocity[2] - wz) < .15),
-            within_continuous_rating=bool(complete and rms_available and metrics and
-                                          max(j["continuous_utilisation"] for j in metrics) < 1),
+            tracks_velocity=tracks_velocity,
+            within_continuous_rating=within_continuous,
+            operating_point_pass=operating_point_pass,
+            margin_failure_reasons=margin_failure_reasons,
             effort_source="MuJoCo qfrc_actuator at joint DOFs", physics_samples=physics.samples,
             physics_timestep_s=float(backend.m.opt.timestep),
             torque_velocity_pairing="Applied force with velocity at start of each implicitfast physics step",

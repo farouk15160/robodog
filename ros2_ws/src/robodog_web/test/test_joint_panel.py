@@ -30,3 +30,12 @@ def test_diagnostics_panels_distinguish_live_commands_from_sampled_statistics():
          str(package / "www" / "js" / "panels.js")],
         check=True, capture_output=True, text=True,
     )
+
+
+def test_remote_control_panel_has_deadman_controls_and_live_feedback():
+    package = Path(__file__).resolve().parents[1]
+    subprocess.run(
+        ["node", str(package / "test" / "remote_control_panel.cjs"),
+         str(package / "www" / "js" / "panels.js")],
+        check=True, capture_output=True, text=True,
+    )

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from robodog_msgs.msg import JointTelemetry, RobotState
+from sensor_msgs.msg import PointCloud2
 from robodog_web.telemetry import RollingTelemetry
 from robodog_web.web_server import WebBridgeNode, _robot_info
 
@@ -11,7 +12,10 @@ from robodog_web.web_server import WebBridgeNode, _robot_info
 def bridge():
     info = _robot_info()
     return SimpleNamespace(_rolling=RollingTelemetry(info["joint_actuators"]),
-                           state_seq=0, camera_meta={}, _track_events=lambda *_: None)
+                           state_seq=0, camera_meta={}, _track_events=lambda *_: None,
+                           _mapping={"active": False, "status": "waiting for SLAM",
+                                     "points": 0, "frame": "", "last_saved_manifest": ""},
+                           _mapping_received=0.0)
 
 
 def message(t=1.0, backend="mujoco"):
@@ -64,6 +68,23 @@ def test_nonfinite_values_are_json_null():
     assert node.state["base"]["height"] is None
     assert node.state["diagnostics"]["dropped_samples"] == 1
     json.dumps(node.state, allow_nan=False)
+
+
+def test_cloud_map_feedback_reports_metadata_without_copying_point_payload():
+    node = bridge()
+    cloud = PointCloud2(width=321, height=2, point_step=16, row_step=5136)
+    cloud.header.frame_id = "map"
+    cloud.data = bytes(321 * 2 * 16)
+
+    WebBridgeNode._on_cloud_map(node, cloud)
+    WebBridgeNode._on_state(node, message())
+
+    assert node.state["mapping"]["active"] is True
+    assert node.state["mapping"]["status"] == "live"
+    assert node.state["mapping"]["points"] == 642
+    assert node.state["mapping"]["frame"] == "map"
+    assert node.state["mapping"]["age_s"] >= 0.0
+    assert "data" not in node.state["mapping"]
 
 
 def test_info_contains_sourced_rating_and_model_assumptions():

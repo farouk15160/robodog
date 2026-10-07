@@ -17,6 +17,9 @@
     qos_camera_info: 2
     wait_for_transform: 0.5
     map_cleanup: false
+    # Keep graph-corrected map products current even when RViz is closed. The
+    # export node subscribes to cloud_map so a room scan is always available.
+    map_always_update: true
     # RTAB-Map core parameters are strings, unlike native ROS parameters above.
     Rtabmap/DetectionRate: "2"
     Grid/3D: "true"

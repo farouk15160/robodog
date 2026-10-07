@@ -8,6 +8,7 @@ contact, and the bug that kept this robot from walking for most of the
 project's life was a continuity bug.
 """
 import os
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -155,3 +156,44 @@ def test_the_gait_reaches_every_leg(gen):
     tgt = _targets(gen, "trot", 0.30, 0.30)
     for i, leg in enumerate(LEGS):
         assert float(np.ptp(tgt[:, i, 2])) > 0.03, f"{leg} never lifted"
+
+
+def test_zero_yaw_command_holds_the_heading_latched_on_entry(gen):
+    gen.set_params(GaitParams(gait="trot", wz=0.0))
+    first = BodyFeedback(height=0.32, yaw=np.pi - 0.02)
+    assert gen.heading_rate_command(first) == pytest.approx(0.0)
+
+    # Crossing the +/-pi boundary is a small error, not a full turn.
+    drifted = BodyFeedback(height=0.32, yaw=-np.pi + 0.03)
+    correction = gen.heading_rate_command(drifted)
+    assert correction < 0.0
+    assert correction == pytest.approx(-0.10, abs=1e-6)
+
+
+def test_commanded_yaw_is_not_modified_by_heading_hold(gen):
+    gen.set_params(GaitParams(gait="trot", wz=0.6))
+    for yaw in (-2.0, 0.0, 2.0):
+        assert gen.heading_rate_command(BodyFeedback(yaw=yaw)) == pytest.approx(0.6)
+
+
+def test_heading_hold_re_latches_without_snap_after_a_commanded_turn(gen):
+    gen.set_params(GaitParams(gait="trot", wz=0.7))
+    assert gen.heading_rate_command(BodyFeedback(yaw=0.8)) == pytest.approx(0.7)
+    assert gen.heading_rate_command(BodyFeedback(yaw=1.1)) == pytest.approx(0.7)
+
+    gen.set_params(GaitParams(gait="trot", wz=0.0))
+    assert gen.heading_rate_command(BodyFeedback(yaw=1.1)) == pytest.approx(0.0)
+    assert gen.heading_rate_command(BodyFeedback(yaw=1.15)) < 0.0
+
+
+def test_update_passes_heading_correction_to_the_yaw_rate_controller(gen):
+    gen.set_params(GaitParams(gait="trot", step_frequency_hz=2.2,
+                              duty_factor=0.5, wz=0.0))
+    gen.update(DT, BodyFeedback(height=0.32, yaw=0.4))  # latch
+    wrapped = gen.stabiliser.wrench
+    gen.stabiliser.wrench = Mock(wraps=wrapped)
+
+    gen.update(DT, BodyFeedback(height=0.32, yaw=0.5))
+
+    yaw_rate_des = gen.stabiliser.wrench.call_args.args[-1]
+    assert yaw_rate_des == pytest.approx(-0.2)

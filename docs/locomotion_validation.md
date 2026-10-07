@@ -10,6 +10,33 @@ The normal ROS viewer launch also passed a direct `/cmd_vel` smoke test: a 0.2 m
 
 The later headless GUI/mapping test processes shut down cleanly. That result does not resolve the interactive viewer shutdown issue.
 
+## 100-second 1 m/s check
+
+The extended check uses the same obstacle-free sizing plane, 400 Hz controller
+and 2 kHz applied-physics-torque sampling. Both cases run for 100 simulated
+seconds. RMS excludes the first five seconds; peaks and overload duration
+include startup. The knee tables report both joint-side torque and motor-output
+torque: with the 2:1 belt and assumed 95% efficiency,
+`motor torque = joint torque / 1.9` and motor speed is twice knee speed.
+
+| Gait | Command / actual m/s | Worst motor RMS / peak N·m | Largest spike | Safety-clamped cycles | Stable / tracks |
+|---|---:|---:|---|---:|---|
+| walk | 1.00 / −0.011 | 7.67 / 31.63 | FR hip pitch, 0.3335 s, 0.203 m travel | 99.8% | No / no |
+| trot, heading hold | 1.00 / 0.984 | 5.36 / 28.64 | RL hip pitch, 0.6810 s, 0.571 m travel | 30.6% | Yes / yes |
+
+The walk result in the [baseline report](rs06_1ms_100s_baseline.md) is a failed
+operating point: excessive tilt and a 0.144 m minimum body height mean its
+post-failure RMS does not describe successful walking. The tuned trot completes
+and tracks speed. Heading hold reduces lateral drift from 24.405 m to 1.063 m,
+while the run still spends 30.6% of cycles under safety limiting. Its main peak
+events are concentrated at startup: rear-left hip pitch reaches 28.64 N·m at
+0.681 s, rear-right hip pitch 27.21 N·m at 0.4535 s, and front-right hip pitch
+22.63 N·m at 0.436 s. The [full tuned per-joint report](rs06_1ms_100s.md)
+records RMS, peak time and world position, time above 8/11/36 N·m, maximum
+speed during overload, clamping and estimated temperature for all twelve
+joints; its JSON, CSV and MuJoCo XML companions preserve the machine-readable
+evidence.
+
 ## Speed sweep
 
 Every case starts from the standing keyframe with a velocity step, on an obstacle-free plane. Each run lasts 20 simulated seconds; RMS excludes the first second, while peaks/overload durations include it. Physics runs at 2 kHz, control at 400 Hz, command delay 1 ms. Robot safety remains active. A successful speed must stay upright, track its command, and be assessed together with clipping—not RMS alone.

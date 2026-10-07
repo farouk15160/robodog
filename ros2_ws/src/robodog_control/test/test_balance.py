@@ -9,7 +9,8 @@ do not pretend otherwise (see docs section "Measured locomotion performance").
 import numpy as np
 import pytest
 
-from robodog_control.balance import BalanceGains, BodyStabiliser, roll_pitch_from_quat
+from robodog_control.balance import (BalanceGains, BodyStabiliser, angle_wrap,
+                                     roll_pitch_from_quat, yaw_from_quat)
 
 MASS = 10.0
 G = MASS * 9.81
@@ -148,7 +149,26 @@ def test_quaternion_recovers_the_applied_angle(axis, idx):
     assert roll_pitch_from_quat(q)[idx] == pytest.approx(a, abs=1e-9)
 
 
+def test_quaternion_recovers_yaw():
+    yaw = -0.7
+    q = np.array([0.0, 0.0, np.sin(yaw / 2.0), np.cos(yaw / 2.0)])
+    assert yaw_from_quat(q) == pytest.approx(yaw, abs=1e-9)
+
+
 def test_gains_are_configurable():
     s = BodyStabiliser(MASS, BalanceGains(kp_height=1500.0))
     f, _ = s.wrench(0.30, 0.32, 0.0, 0.0, 0.0, np.zeros(3), np.zeros(2), np.zeros(2))
     assert f[2] == pytest.approx(G + 1500.0 * 0.02)
+
+
+@pytest.mark.parametrize(
+    "angle, expected",
+    [
+        (0.0, 0.0),
+        (2.0 * np.pi + 0.2, 0.2),
+        (-2.0 * np.pi - 0.2, -0.2),
+        (np.pi + 0.1, -np.pi + 0.1),
+    ],
+)
+def test_angle_wrap_returns_shortest_signed_error(angle, expected):
+    assert angle_wrap(angle) == pytest.approx(expected)
