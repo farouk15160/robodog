@@ -69,8 +69,8 @@ Network Service Discovery and requests the corresponding network permissions.
    assumption, hottest joint, and rolling torque RMS/peak.
 4. Wait for the cockpit's control status to show **READY**. Touch and drag the
    **MOVE** joystick for forward/lateral velocity or the **TURN** joystick for
-   yaw. Each stick acts as a dead-man control; both remain side by side in
-   portrait and spring back to centre when released.
+   yaw. Each stick acts as a dead-man control; both can be held together, remain
+   side by side in portrait, and spring back to centre when released.
 5. Use **Stand**, **Walk**, **Greeting** and **EMERGENCY STOP** directly from
    the cockpit. The E-stop is latched by the robot.
 6. Open **Web Remote** for the full browser controller and map export. Its

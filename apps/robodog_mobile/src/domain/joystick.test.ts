@@ -56,13 +56,17 @@ test('tracks two independent sticks without mutating the previous input state', 
   const empty = createHandheldInput();
   const moving = updateHandheldStick(empty, 'move', { x: 0.2, y: -0.8 });
   const moveHeld = setHandheldStickActive(moving, 'move', true);
-  const bothHeld = setHandheldStickActive(moveHeld, 'turn', true);
+  const turning = updateHandheldStick(moveHeld, 'turn', { x: -0.5, y: 0 });
+  const bothHeld = setHandheldStickActive(turning, 'turn', true);
 
   assert.deepEqual(empty, {
     move: { x: 0, y: 0 }, turn: { x: 0, y: 0 }, activeSticks: [],
   });
   assert.deepEqual(bothHeld.activeSticks, ['move', 'turn']);
   assert.equal(isHandheldInputActive(bothHeld), true);
+  assert.deepEqual(commandForHandheldInput(bothHeld, true, { linear: 1, angular: 2 }), {
+    vx: 0.8, vy: 0.2, wz: 1,
+  });
   assert.notEqual(moving, empty);
   assert.equal(Object.isFrozen(bothHeld), true);
   assert.equal(Object.isFrozen(bothHeld.activeSticks), true);

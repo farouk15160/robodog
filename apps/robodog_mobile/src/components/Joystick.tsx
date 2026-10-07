@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector } from 'react-native-gesture-handler';
+import type { PanGesture } from 'react-native-gesture-handler';
 
-import { clampJoystick, joystickGeometry, joystickTranslation } from '../domain/joystick';
+import { joystickGeometry, joystickTranslation } from '../domain/joystick';
 import type { JoystickVector } from '../domain/joystick';
 import { colors } from '../theme';
 
@@ -10,48 +10,21 @@ interface Props {
   readonly label: string;
   readonly disabled?: boolean;
   readonly size?: number;
-  readonly resetKey?: number;
-  readonly onChange?: (value: JoystickVector) => void;
-  readonly onActiveChange?: (active: boolean) => void;
+  readonly value: JoystickVector;
+  readonly pressed: boolean;
+  readonly gesture: PanGesture;
 }
 
 export function Joystick({
   label,
   disabled = false,
   size = 142,
-  resetKey = 0,
-  onChange,
-  onActiveChange,
+  value,
+  pressed,
+  gesture,
 }: Props) {
-  const [value, setValue] = useState<JoystickVector>({ x: 0, y: 0 });
-  const [pressed, setPressed] = useState(false);
   const geometry = joystickGeometry(size);
   const translated = joystickTranslation(value, geometry.diameter);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  const onActiveChangeRef = useRef(onActiveChange);
-  onActiveChangeRef.current = onActiveChange;
-  const emit = (next: JoystickVector) => {
-    setValue(next);
-    onChangeRef.current?.(next);
-  };
-  useEffect(() => {
-    setPressed(false);
-    setValue({ x: 0, y: 0 });
-  }, [resetKey]);
-  const gesture = useMemo(() => Gesture.Pan()
-    .enabled(!disabled)
-    .minDistance(0)
-    .shouldCancelWhenOutside(false)
-    .runOnJS(true)
-    .onBegin(() => { setPressed(true); onActiveChangeRef.current?.(true); })
-    .onUpdate((event) => emit(clampJoystick({
-      x: event.translationX / geometry.travel,
-      y: event.translationY / geometry.travel,
-    })))
-    .onFinalize(() => {
-      setPressed(false); emit({ x: 0, y: 0 }); onActiveChangeRef.current?.(false);
-    }), [disabled, geometry.travel]);
   return <View
     style={styles.wrapper}
     accessibilityLabel={`${label} joystick${disabled ? ', unavailable' : ''}`}

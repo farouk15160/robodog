@@ -76,8 +76,9 @@ unstable; see [locomotion validation](locomotion_validation.md).
 
 In the React Native cockpit, **MOVE** provides forward/lateral velocity and
 **TURN** provides yaw. Once the cockpit shows **READY**, touching either stick
-enables motion. Releasing one stick recentres that axis; releasing both sticks
-commands zero velocity.
+enables motion, and both sticks can be held for combined translation and yaw.
+Releasing one stick recentres that axis; releasing both sticks commands zero
+velocity.
 
 The speed slider starts at **0.5 m/s**. It remains bounded by the server's
 backend limit: simulation allows up to 2.0 m/s, while hardware remains limited
