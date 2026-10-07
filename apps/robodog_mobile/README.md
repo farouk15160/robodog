@@ -3,7 +3,10 @@
 Expo/React Native operator app for discovering a RoboDog on the local network,
 viewing telemetry and camera output, and driving it from a responsive handheld
 cockpit. Portrait keeps the camera and telemetry above two side-by-side
-joysticks fixed in the lower control area. Landscape switches to a split view.
+joysticks fixed in the lower control area. Phone landscape switches to a fixed
+gamepad: MOVE and TURN flank the live camera, with telemetry, dead-man status
+and compact action buttons kept in the left/right thumb zones without vertical
+scrolling.
 
 ## Run a development build
 
@@ -35,9 +38,9 @@ accepts a hostname or IP such as `robodog.local:8080`.
   command socket or weaken the server hostname allowlist.
 - Wait for **READY**, then touch and drag either joystick. Each joystick acts as
   a dead-man control, and both can be held together for combined move and turn.
-  Releasing one recentres that axis, while releasing both, backgrounding or
-  leaving the screen sends zero. WebSocket disconnect and drive-lease expiry
-  also stop motion.
+  Releasing one recentres that axis, while releasing both, rotating the device,
+  backgrounding or leaving the screen sends zero. WebSocket disconnect and
+  drive-lease expiry also stop motion.
 - The server's one-operator drive lease and the controller's independent
   velocity timeout remain active. **Web Remote** opens the complete visible
   `/remote` interface in a navigation-pinned WebView.

@@ -4,7 +4,9 @@
 tablets. It discovers a robot on the local network, validates its public
 descriptor and telemetry, and provides a responsive handheld controller. In
 portrait, camera and telemetry stay above a bottom control area containing two
-side-by-side joysticks. Landscape uses a split camera/control cockpit.
+side-by-side joysticks. Phone landscape places MOVE and TURN around the live
+camera and keeps dead-man status plus compact action buttons in the left/right
+thumb zones without scrolling.
 
 ## Robot setup
 
@@ -88,8 +90,8 @@ An ordinary browser visiting `/remote` does not activate it.
 The existing one-operator 0.30 s drive lease and the controller's independent
 0.35 s body-velocity timeout remain authoritative. The app refreshes a held
 command at 10 Hz while either stick is touched and sends zero when both sticks
-are released, when the app is backgrounded, on screen exit and on bridge
-teardown. It releases locally on link loss; the server publishes zero on
+are released, when orientation changes, when the app is backgrounded, on screen
+exit and on bridge teardown. It releases locally on link loss; the server publishes zero on
 disconnect or lease expiry. Releasing one joystick recentres its axis.
 
 ## Security boundary

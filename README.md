@@ -152,8 +152,9 @@ The repository also contains an Expo/React Native client in
 `_robodog._tcp.local` with a stable device UUID, and the app also accepts a
 manual IP address when multicast discovery is unavailable. In portrait, the
 camera and telemetry stay above a bottom handheld-control area with two
-side-by-side joysticks; landscape uses a split cockpit. Motion, Stand, Walk and
-Greeting become active when the app shows **READY**; emergency stop remains
+side-by-side joysticks. Phone landscape uses a gamepad layout with the live
+camera between MOVE and TURN and all safety/actions fixed on screen. Motion,
+Stand, Walk and Greeting become active when the app shows **READY**; emergency stop remains
 available whenever the control link is connected. A hidden, navigation-pinned WebView loads
 `/remote?native_bridge=1` and relays strictly validated commands through the
 robot page's same-origin WebSocket. This preserves the exact Origin/Host checks,

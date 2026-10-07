@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture } from 'react-native-gesture-handler';
 import { WebView } from 'react-native-webview';
 
@@ -50,6 +50,7 @@ type ViewMode = 'cockpit' | 'web';
 
 const DEFAULT_LIMITS: ControlLimits = Object.freeze({ linear: 0.5, angular: 1.2 });
 const ZERO_STICK: JoystickVector = Object.freeze({ x: 0, y: 0 });
+const LANDSCAPE_HIT_SLOP = Object.freeze({ top: 4, bottom: 4 });
 
 const numberField = (source: JsonObject, key: string, fallback: number): number => {
   const value = source[key];
@@ -79,7 +80,11 @@ export default function ControlScreen() {
   const params = useLocalSearchParams<{ origin?: string }>();
   const router = useRouter();
   const { width, height } = useWindowDimensions();
-  const layout = useMemo(() => resolveControllerLayout(width, height), [width, height]);
+  const insets = useSafeAreaInsets();
+  const layout = useMemo(() => resolveControllerLayout(
+    width - insets.left - insets.right,
+    height - insets.top - insets.bottom,
+  ), [height, insets.bottom, insets.left, insets.right, insets.top, width]);
   const bridgeRef = useRef<WebView>(null);
   const commandSequence = useRef(0);
   const bridgeReadyRef = useRef(false);
@@ -239,6 +244,10 @@ export default function ControlScreen() {
     });
     return () => subscription.remove();
   }, [releaseMotion]);
+
+  useEffect(() => {
+    releaseMotion();
+  }, [layout.orientation, releaseMotion]);
 
   useEffect(() => () => {
     inputRef.current = releaseHandheldInput(inputRef.current);
@@ -425,8 +434,90 @@ export default function ControlScreen() {
     </View>
   </View>;
 
+  const gamepad = layout.landscapeGamepad;
+  const landscapeGamepad = gamepad ? <View style={[styles.gamepadStage, { gap: gamepad.gap }]}>
+    <View style={[styles.gamepadSidePane, { width: gamepad.sidePaneWidth }]}>
+      <View style={[styles.gamepadSideActions, { height: gamepad.actionButtonHeight }]}>
+        <Pressable hitSlop={LANDSCAPE_HIT_SLOP} disabled={!controlAvailable}
+          onPress={() => sendGait('stand')}
+          style={[styles.action, styles.gamepadSideButton, !controlAvailable && styles.controlDisabled]}>
+          <Text numberOfLines={1} style={styles.gamepadActionText}>Stand</Text>
+        </Pressable>
+        <Pressable hitSlop={LANDSCAPE_HIT_SLOP} disabled={!controlAvailable}
+          onPress={() => sendGait('trot')}
+          style={[styles.action, styles.actionPrimary, styles.gamepadSideButton,
+            !controlAvailable && styles.controlDisabled]}>
+          <Text numberOfLines={1} style={[styles.gamepadActionText, styles.actionPrimaryText]}>Walk</Text>
+        </Pressable>
+      </View>
+      <View style={styles.gamepadStickDock}>
+        <Joystick label="MOVE" size={layout.joystickDiameter} disabled={!controlAvailable}
+          value={moveVisual} pressed={movePressed} gesture={joystickGestures.move} />
+      </View>
+      <View style={[
+        styles.deadman,
+        styles.gamepadDeadman,
+        deadmanHeld && styles.deadmanHeld,
+        !controlAvailable && styles.controlDisabled,
+      ]}>
+        <Text numberOfLines={1} style={[
+          styles.deadmanText,
+          styles.gamepadDeadmanText,
+          deadmanHeld && styles.deadmanTextHeld,
+        ]}>
+          {deadmanHeld ? 'STOP ON RELEASE' : 'DEADMAN READY'}
+        </Text>
+      </View>
+    </View>
+
+    <View style={[styles.gamepadCenter, { width: gamepad.centerPaneWidth }]}>
+      <View style={[styles.camera, styles.gamepadCamera, { height: layout.cameraHeight }]}>
+        <WebView
+          source={{ html: cameraHtml, baseUrl: robot.origin }}
+          scrollEnabled={false}
+          style={styles.cameraWeb}
+          onShouldStartLoadWithRequest={(request) =>
+            request.url === 'about:blank' || isAllowedRobotNavigation(robot.origin, request.url)}
+        />
+        <View style={styles.cameraBadge}><Text style={styles.cameraBadgeText}>LIVE CAMERA</Text></View>
+        <View style={styles.gamepadCameraStatus}>
+          <View style={[styles.statusDot, state?.safety.estop && styles.statusDanger]} />
+          <Text numberOfLines={1} style={styles.gamepadCameraStatusText}>
+            {state?.safety.estop ? 'E-STOP ENGAGED' : error || bridgeStatus}
+          </Text>
+        </View>
+      </View>
+      {metrics}
+    </View>
+
+    <View style={[styles.gamepadSidePane, { width: gamepad.sidePaneWidth }]}>
+      <View style={[styles.gamepadSideActions, { height: gamepad.actionButtonHeight }]}>
+        <Pressable hitSlop={LANDSCAPE_HIT_SLOP} disabled={!controlAvailable} onPress={sendGreeting}
+          style={[styles.action, styles.gamepadSideButton, !controlAvailable && styles.controlDisabled]}>
+          <Text numberOfLines={1} style={styles.gamepadActionText}>Greet</Text>
+        </Pressable>
+        <Pressable hitSlop={LANDSCAPE_HIT_SLOP} disabled={!bridgeConnected} onPress={sendEstop}
+          style={[styles.estop, styles.gamepadSideButton, !bridgeConnected && styles.controlDisabled]}>
+          <Text numberOfLines={1} style={styles.estopText}>E-STOP</Text>
+        </Pressable>
+      </View>
+      <View style={styles.gamepadStickDock}>
+        <Joystick label="TURN" size={layout.joystickDiameter} disabled={!controlAvailable}
+          value={turnVisual} pressed={turnPressed} gesture={joystickGestures.turn} />
+      </View>
+      <Pressable hitSlop={LANDSCAPE_HIT_SLOP}
+        onPress={() => { releaseMotion(); setView('web'); }}
+        style={[styles.webControl, styles.gamepadWebButton, { height: gamepad.actionButtonHeight }]}>
+        <Text numberOfLines={1} style={styles.gamepadWebText}>Web</Text>
+      </Pressable>
+    </View>
+  </View> : null;
   return <SafeAreaView style={styles.safe}>
-    <View style={[styles.topline, { paddingHorizontal: layout.pagePadding }]}>
+    <View style={[
+      styles.topline,
+      gamepad && styles.gamepadTopline,
+      { paddingHorizontal: layout.pagePadding },
+    ]}>
       <Pressable
         accessibilityLabel="Back to robot selection"
         style={styles.backButton}
@@ -438,17 +529,27 @@ export default function ControlScreen() {
         <Text numberOfLines={1} style={styles.robotName}>{robot.name}</Text>
         <Text numberOfLines={1} style={styles.origin}>{robot.origin}</Text>
       </View>
-      <View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View>
+      {gamepad
+        ? <View style={[styles.readyPill, controlAvailable && styles.readyPillOn]}>
+            <Text style={[styles.readyText, controlAvailable && styles.readyTextOn]}>
+              {controlAvailable ? 'READY' : 'WAIT'}
+            </Text>
+          </View>
+        : <View style={styles.liveBadge}>
+            <View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text>
+          </View>}
     </View>
 
     <View style={[
       styles.cockpit,
       { paddingHorizontal: layout.pagePadding },
-      layout.splitColumns && styles.cockpitSplit,
+      layout.splitColumns && !gamepad && styles.cockpitSplit,
+      gamepad && styles.gamepadCockpit,
     ]}>
-      {visual}
-      {layout.splitColumns
-        ? <ScrollView
+      {gamepad ? landscapeGamepad : <>
+        {visual}
+        {layout.splitColumns
+          ? <ScrollView
             style={styles.controlsScroll}
             contentContainerStyle={styles.controlsScrollContent}
             showsVerticalScrollIndicator={false}
@@ -456,7 +557,8 @@ export default function ControlScreen() {
           >
             {controls}
           </ScrollView>
-        : controls}
+          : controls}
+      </>}
     </View>
 
     <WebView
@@ -489,6 +591,7 @@ const styles = StyleSheet.create({
   loadingBackText: { color: colors.accent, fontWeight: '800' },
   topline: { minHeight: 50, paddingVertical: 7, flexDirection: 'row', gap: 12,
     justifyContent: 'space-between', alignItems: 'center' },
+  gamepadTopline: { minHeight: 42, paddingVertical: 2 },
   identity: { flex: 1, minWidth: 0 },
   backButton: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.elevated,
     alignItems: 'center', justifyContent: 'center' },
@@ -501,16 +604,28 @@ const styles = StyleSheet.create({
   liveText: { color: colors.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   cockpit: { flex: 1, paddingBottom: 8, gap: 8 },
   cockpitSplit: { flexDirection: 'row', alignItems: 'stretch' },
+  gamepadCockpit: { gap: 4, paddingBottom: 4 },
+  gamepadStage: { flex: 1, minHeight: 0, flexDirection: 'row', alignItems: 'stretch' },
+  gamepadSidePane: { flexShrink: 0, gap: 5, alignItems: 'stretch', justifyContent: 'space-between' },
+  gamepadSideActions: { flexShrink: 0, flexDirection: 'row', gap: 4 },
+  gamepadSideButton: { minHeight: 0, height: '100%', borderRadius: 8 },
+  gamepadStickDock: { flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center' },
+  gamepadCenter: { flexShrink: 0, minWidth: 0, gap: 4, justifyContent: 'center' },
   controlsScroll: { flex: 1, minHeight: 0 },
   controlsScrollContent: { flexGrow: 1 },
   visualPane: { flex: 1, minHeight: 0, gap: 6 },
   visualPaneSplit: { flex: 1.15 },
   camera: { flexShrink: 0, backgroundColor: colors.black, borderRadius: 14,
     overflow: 'hidden', borderColor: colors.line, borderWidth: 1 },
+  gamepadCamera: { borderRadius: 12 },
   cameraWeb: { flex: 1, backgroundColor: colors.black },
   cameraBadge: { position: 'absolute', left: 8, top: 8, backgroundColor: '#07110FCC',
     borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4 },
   cameraBadgeText: { color: colors.cyan, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  gamepadCameraStatus: { position: 'absolute', left: 7, right: 7, bottom: 6,
+    minHeight: 20, paddingHorizontal: 7, borderRadius: 6, backgroundColor: '#07110FCC',
+    flexDirection: 'row', alignItems: 'center', gap: 6 },
+  gamepadCameraStatusText: { flex: 1, color: colors.text, fontSize: 9, fontWeight: '700' },
   metricRail: { gap: 6, paddingVertical: 1 },
   metric: { backgroundColor: colors.elevated, borderRadius: 10, paddingHorizontal: 9,
     paddingVertical: 7, minWidth: 82, maxWidth: 128 },
@@ -534,6 +649,8 @@ const styles = StyleSheet.create({
   joysticks: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
   deadman: { minHeight: 46, backgroundColor: colors.elevated, borderColor: colors.warning,
     borderWidth: 1, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  gamepadDeadman: { minHeight: 26, height: 26, borderRadius: 8 },
+  gamepadDeadmanText: { fontSize: 9 },
   deadmanHeld: { backgroundColor: colors.accent, borderColor: colors.accent },
   deadmanText: { color: colors.warning, fontWeight: '900', fontSize: 11, letterSpacing: 0.5 },
   deadmanTextHeld: { color: colors.black },
@@ -541,6 +658,9 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 6 },
   action: { minHeight: 44, flex: 1, backgroundColor: colors.elevated, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center' },
+  gamepadActionText: { color: colors.text, fontWeight: '800', fontSize: 10 },
+  gamepadWebButton: { minHeight: 0, width: '100%', borderRadius: 8 },
+  gamepadWebText: { color: colors.black, fontWeight: '900', fontSize: 9 },
   actionPrimary: { backgroundColor: colors.accent },
   actionText: { color: colors.text, fontWeight: '800', fontSize: 12 },
   actionPrimaryText: { color: colors.black },

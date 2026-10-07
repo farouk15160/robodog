@@ -31,13 +31,15 @@ The React Native client uses this service and retains manual address entry; see
 the [mobile app runbook](mobile_app.md).
 
 The app's portrait controller keeps the camera and telemetry above two
-side-by-side joysticks in a bottom control area; landscape uses a split cockpit.
+side-by-side joysticks in a bottom control area. Phone landscape uses a fixed
+gamepad with MOVE and TURN around the live camera, with compact action buttons
+kept beside the thumbs and no vertical control scroll.
 Its active controls use a hidden WebView at `/remote?native_bridge=1`. The
 robot-served page, rather than React Native, opens `/ws`, preserving the exact
 Origin/Host checks and hostname allowlist. Bridge input uses a strict command
 schema and retains the drive lease and dead-man timeouts described below. The
-app sends zero on dead-man release and background/screen exit; disconnect or
-lease expiry also produces zero. This does not create a standalone native
+app sends zero on dead-man release, orientation change and background/screen
+exit; disconnect or lease expiry also produces zero. This does not create a standalone native
 command socket. Expo Go works with manual address entry, while automatic DNS-SD
 discovery requires the native development build.
 
