@@ -4,7 +4,7 @@
   <name>robodog_description</name>
   <version>0.1.0</version>
   <description>
-    URDF/Xacro model, meshes, RViz configuration and the ROBSTRIDE02 actuator
+    URDF/Xacro model, meshes, RViz configuration and the ROBSTRIDE06 actuator
     specification for the 12-DOF robodog quadruped. Generated from the Onshape
     CAD export by tools/cad_to_model.py.
   </description>

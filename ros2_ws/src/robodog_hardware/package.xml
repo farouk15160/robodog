@@ -6,8 +6,8 @@
   <description>
     Hardware abstraction for the robodog quadruped. Defines the JointBackend
     boundary and provides three implementations: an ideal kinematic backend, a
-    MuJoCo backend, and the ROBSTRIDE02 CAN backend. Also contains the pure
-    RS02 CAN frame codec and the winding thermal model.
+    MuJoCo backend, and the ROBSTRIDE06 CAN backend. Also contains the
+    versioned ROBSTRIDE protocol codecs and the winding thermal model.
   </description>
   <maintainer email="farouk15160@gmail.com">farouk</maintainer>
   <license>Apache-2.0</license>

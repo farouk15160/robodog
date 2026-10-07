@@ -1,4 +1,4 @@
-# A single-joint command. This is deliberately the ROBSTRIDE02 native
+# A single-joint command. This follows the ROBSTRIDE motion-control
 # motion-control frame: the motor closes
 #     tau = kp * (position - q) + kd * (velocity - qd) + effort
 # in firmware at its own rate. Sending anything narrower (position only) would

@@ -1,5 +1,5 @@
 # Enable/disable actuator output without changing the control mode. On the real
-# robot this maps onto the RS02 enable (comm type 3) / stop (comm type 4) frames.
+# robot this maps onto the ROBSTRIDE enable (comm type 3) / stop (comm type 4) frames.
 bool     enable
 string[] joints         # empty = all 12
 ---

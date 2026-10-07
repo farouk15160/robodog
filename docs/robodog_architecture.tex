@@ -161,36 +161,26 @@ necessary because a 100\,s RMS value can hide startup or touchdown spikes.
 \textbf{Claim area} & \textbf{Source files and artifacts} \\
 \midrule
 Generated rigid-body model &
-\code{tools/cad\_to\_model.py};
-\code{ros2\_ws/src/robodog\_description/config/robot\_parameters.yaml};
-\code{ros2\_ws/src/robodog\_description/urdf/robodog.urdf.xacro} \\
+\code{cad\_to\_model.py}; \code{robot\_parameters.yaml};
+\code{robodog.urdf.xacro} \\
 RS06 ratings and knee belt &
-\code{docs/rs06\_datasheet\_audit.md};
-\code{ros2\_ws/src/robodog\_description/config/robstride06.yaml};
-\code{ros2\_ws/src/robodog\_hardware/robodog\_hardware/transmission.py} \\
+\code{rs06\_datasheet\_audit.md}; \code{robstride06.yaml};
+\code{transmission.py} \\
 Control loop and ROS contracts &
-\code{ros2\_ws/src/robodog\_control/robodog\_control/control\_node.py};
-\code{ros2\_ws/src/robodog\_msgs/msg/*.msg};
-\code{ros2\_ws/src/robodog\_msgs/srv/*.srv} \\
+\code{control\_node.py}; \code{robodog\_msgs/msg};
+\code{robodog\_msgs/srv} \\
 Kinematics and force mapping &
-\code{ros2\_ws/src/robodog\_control/robodog\_control/kinematics.py};
-\code{ros2\_ws/src/robodog\_control/test/test\_kinematics.py} \\
+\code{kinematics.py}; \code{test\_kinematics.py} \\
 Gait and balance controller &
-\code{ros2\_ws/src/robodog\_control/robodog\_control/gait.py};
-\code{ros2\_ws/src/robodog\_control/robodog\_control/balance.py};
-\code{ros2\_ws/src/robodog\_control/config/gaits.yaml} \\
+\code{gait.py}; \code{balance.py}; \code{gaits.yaml} \\
 28\,kg torque report &
-\code{docs/rs06\_28kg\_1ms\_100s.md};
-\code{docs/rs06\_28kg\_1ms\_100s.json};
-\code{docs/rs06\_28kg\_1ms\_100s.csv};
-\code{tools/torque\_report.py} \\
+\code{rs06\_28kg\_1ms\_100s.\{md,json,csv,xml\}};
+\code{torque\_report.py} \\
 RGB-D mapping and saved scans &
-\code{docs/mapping.md};
-\code{ros2\_ws/src/robodog\_perception/launch/mapping.launch.py};
-\code{ros2\_ws/src/robodog\_perception/robodog\_perception/map\_export.py};
-\code{ros2\_ws/src/robodog\_msgs/srv/SaveMap.srv} \\
+\code{mapping.md}; \code{mapping.launch.py}; \code{map\_export.py};
+\code{SaveMap.srv} \\
 Primary-source research note &
-\code{docs/research/robodog\_scientific\_foundations.md} \\
+\code{research/robodog\_scientific\_foundations.md} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -577,6 +567,9 @@ torque explicitly.
 
 A single normalised cycle phase advances at the step frequency. Each leg has a
 fixed offset and is in stance for \code{duty\_factor} of its period.
+Diagonal pairing produces a trot, lateral pairing a pace, and fore/hind pairing
+a bound, consistent with the classical quadruped gait taxonomy
+~\cite{raibert}.
 
 \begin{center}\small
 \begin{tabular}{@{}llrrl@{}}
@@ -1213,31 +1206,31 @@ odometry integration remain prerequisites for enabling mapping there.}{1.0}
 \textbf{Topic} & \textbf{Type} & \textbf{Rate/QoS} & \textbf{Owner and purpose} \\
 \midrule
 \endhead
-\topicname{/joint\_states} & JointState & 100\,Hz & control; standard TF/RViz state \\
-\topicname{/robodog/robot\_state} & RobotState & 50\,Hz & control; coherent joints, feet, base, safety and simulation snapshot \\
-\topicname{/robodog/safety\_status} & SafetyStatus & 50\,Hz & control; faults, clamp count and loop timing \\
-\topicname{/robodog/imu} & Imu & 50\,Hz & control; simulated attitude/rates, hardware integration pending \\
-\topicname{/robodog/backend\_info} & String & startup & control; selected backend/provenance \\
-\topicname{/robodog/joint\_command} & JointCommandArray & event & clients/web; direct bounded command \\
-\topicname{/robodog/gait\_command} & GaitCommand & event & clients/web; gait and velocity request \\
-\topicname{/cmd\_vel} & Twist & held & remote/mobile velocity with lease and timeout \\
-\topicname{/robodog/world\_markers} & MarkerArray & transient local & simulation; RViz world from shared geometry \\
-\topicname{/robodog/camera/color/image\_raw} & Image (rgb8) & 15\,Hz, best effort & camera; registered color \\
-\topicname{/robodog/camera/color/camera\_info} & CameraInfo & 15\,Hz, best effort & camera; color intrinsics \\
-\topicname{/robodog/camera/depth/image\_rect\_raw} & Image (16UC1) & 15\,Hz, best effort & camera; registered depth in millimetres \\
-\topicname{/robodog/camera/depth/camera\_info} & CameraInfo & 15\,Hz, best effort & camera; depth intrinsics \\
-\topicname{/robodog/camera/depth/points} & PointCloud2 & 10\,Hz, best effort & camera; range-filtered cloud \\
-\topicname{/robodog/mapping/map} & OccupancyGrid & 2\,Hz & RTAB-Map; graph-corrected 2D projection \\
-\topicname{/robodog/mapping/cloud\_map} & PointCloud2 & on update & RTAB-Map; assembled colored cloud and export input \\
-\topicname{/robodog/mapping/octomap\_occupied\_space} & PointCloud2 & on update & RTAB-Map; occupied voxel centers for RViz \\
-\topicname{/robodog/mapping/rtabmap/octomap\_full} & Octomap & on request/update & RTAB-Map; full colored octree export source \\
+\topicpath{/joint_states} & JointState & 100\,Hz & control; standard TF/RViz state \\
+\topicpath{/robodog/robot_state} & RobotState & 50\,Hz & control; coherent joints, feet, base, safety and simulation snapshot \\
+\topicpath{/robodog/safety_status} & SafetyStatus & 50\,Hz & control; faults, clamp count and loop timing \\
+\topicpath{/robodog/imu} & Imu & 50\,Hz & control; simulated attitude/rates, hardware integration pending \\
+\topicpath{/robodog/backend_info} & String & startup & control; selected backend/provenance \\
+\topicpath{/robodog/joint_command} & JointCommandArray & event & clients/web; direct bounded command \\
+\topicpath{/robodog/gait_command} & GaitCommand & event & clients/web; gait and velocity request \\
+\topicpath{/cmd_vel} & Twist & held & remote/mobile velocity with lease and timeout \\
+\topicpath{/robodog/world_markers} & MarkerArray & transient local & simulation; RViz world from shared geometry \\
+\topicpath{/robodog/camera/color/image_raw} & Image (rgb8) & 15\,Hz, best effort & camera; registered color \\
+\topicpath{/robodog/camera/color/camera_info} & CameraInfo & 15\,Hz, best effort & camera; color intrinsics \\
+\topicpath{/robodog/camera/depth/image_rect_raw} & Image (16UC1) & 15\,Hz, best effort & camera; registered depth in millimetres \\
+\topicpath{/robodog/camera/depth/camera_info} & CameraInfo & 15\,Hz, best effort & camera; depth intrinsics \\
+\topicpath{/robodog/camera/depth/points} & PointCloud2 & 10\,Hz, best effort & camera; range-filtered cloud \\
+\topicpath{/robodog/mapping/map} & OccupancyGrid & 2\,Hz & RTAB-Map; graph-corrected 2D projection \\
+\topicpath{/robodog/mapping/cloud_map} & PointCloud2 & on update & RTAB-Map; assembled colored cloud and export input \\
+\topicpath{/robodog/mapping/octomap_occupied_space} & PointCloud2 & on update & RTAB-Map; occupied voxel centers for RViz \\
+\topicpath{/robodog/mapping/rtabmap/octomap_full} & Octomap & on request/update & RTAB-Map; full colored octree export source \\
 \bottomrule
 \end{longtable}}
 
 The control node serves \code{set\_named\_pose}, \code{set\_gait},
 \code{set\_control\_mode}, \code{enable\_joints}, \code{emergency\_stop} and
 \code{greeting}. The map-export node serves
-\topicname{/robodog/mapping/save\_map} and calls RTAB-Map's namespaced
+\topicpath{/robodog/mapping/save_map} and calls RTAB-Map's namespaced
 \code{backup} service. No ROS actions are defined. Sensor streams use matching
 best-effort QoS to favor recent samples; the world markers use reliable,
 transient-local depth one so late RViz subscribers receive the current world.
@@ -1263,7 +1256,7 @@ multibody equation
 \]
 where $M$ is the mass matrix, $c$ collects bias terms, $\tau$ includes applied
 actuator generalized force and $J_c^{\mathsf T}f_c$ represents constraint and
-contact forces~\cite{mujoco-paper,mujoco-computation}. RoboDog records the
+contact forces~\cite{mujoco-computation}. RoboDog records the
 actuator contribution \code{qfrc\_actuator}; it does not label total contact or
 constraint reaction as motor torque.
 
@@ -1509,11 +1502,11 @@ occupancy snapshot. Exact service remapping and installation commands are in
 \href{mapping.md}{the mapping runbook}.
 
 The room-scan service wraps these pieces into one immutable export directory:
-\code{cloud\_map.pcd} from \topicname{/robodog/mapping/cloud\_map},
+\code{cloud\_map.pcd} from \topicpath{/robodog/mapping/cloud_map},
 \code{octomap.ot} from
-\topicname{/robodog/mapping/rtabmap/octomap\_full},
+\topicpath{/robodog/mapping/rtabmap/octomap_full},
 \code{rtabmap.db.back} from
-\topicname{/robodog/mapping/rtabmap/backup}, and a manifest with byte counts
+\topicpath{/robodog/mapping/rtabmap/backup}, and a manifest with byte counts
 and SHA-256 checksums. It refuses stale clouds, relative output roots and
 existing session names. The export is therefore a scan artifact that can be
 copied, inspected or archived without mutating the live SLAM database.
@@ -1871,6 +1864,28 @@ falls from 0.984 to 0.923\,m/s, RMS rises from 5.360 to 6.749\,N$\cdot$m, peak
 rises from 28.638 to 34.897\,N$\cdot$m and safety-limited cycles rise from
 30.6\,\% to 88.0\,\%.
 
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrrl@{}}
+\toprule
+\textbf{Gait} & $v_x^*$ & $v_x$ & \textbf{Tilt} & \textbf{Height} &
+\textbf{Worst RMS} & \textbf{Peak} & \textbf{Verdict} \\
+ & \multicolumn{2}{c}{m/s} & deg & m & \multicolumn{2}{c}{motor N$\cdot$m} & \\
+\midrule
+Walk & 1.000 & -0.011 & 33.17 & 0.149 & 7.681 & 32.159 & unstable; fail \\
+Trot & 1.000 & 0.923 & 8.66 & 0.322 & 6.749 & 34.897 & upright; margin fail \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The motor-side load distribution explains why joint torque cannot be compared
+directly across the robot. In the trot, worst hip-roll, hip-pitch and knee RMS
+values are 5.43, 5.85 and 6.75\,N$\cdot$m. Their largest peaks are 14.99,
+34.90 and 18.17\,N$\cdot$m, respectively. Knee joint torque is divided by
+$2\times0.95$ before these motor values are reported. The 34.897\,N$\cdot$m
+largest spike is rear-left hip pitch at 0.681\,s; the worst RMS is rear-left
+knee. RMS and peak therefore describe different failure mechanisms and need
+not identify the same joint.
+
 \paragraph{Historical 19.719271 kg speed sweep.}
 
 Each case ran for 20 seconds with the configured gains, motor envelope and
@@ -1957,6 +1972,79 @@ different scenario from the successful sustained-gait benchmarks above;
 those benchmarks do not establish comfortable margins for every transition.
 \href{gui_telemetry_validation.json}{The GUI validation record} retains both
 the passing interface checks and the failed transition assertion.
+
+% =====================================================================
+\section{Discussion, limitations and conclusions}
+
+\subsection{Interpretation of the 28 kg experiment}
+
+The walk result is a controller failure: the body exceeds the tilt and height
+limits, reverses net travel and spends essentially the entire run under safety
+intervention. Its RMS values include the unstable and fallen interval and must
+not be interpreted as the load of a successful 1.0\,m/s walk.
+
+The trot result is more informative. It remains upright and covers 92.227\,m,
+but its 0.922506\,m/s mean speed misses the tracking threshold and the safety
+monitor changes commands during 87.965\,\% of cycles. Added mass reduces speed
+by 0.061\,m/s relative to the 19.719271\,kg case, increases the worst motor RMS
+by 1.389\,N$\cdot$m, increases the peak by 6.259\,N$\cdot$m and raises limiter
+activity by 57.3 percentage points. The largest peak occurs at 0.681\,s on the
+rear-left hip pitch joint, during the acceleration transient. A speed ramp and
+transition-specific gain scheduling are therefore higher-value next tests than
+another identical steady command.
+
+The 2:1 knee transmission reduces inferred knee motor torque by $r\eta=1.9$
+and doubles motor speed, which is favorable for the reported knee RMS. The
+same transmission reflects actuator inertia by $r^2=4$ and introduces belt,
+pulley, shaft, tension and compliance questions that the rigid, 95\,\%-efficient
+simulation does not answer. Upright simulated motion therefore cannot qualify
+the mechanical transmission.
+
+\subsection{Threats to validity}
+
+\begin{itemize}
+\item No physical motor, battery, CAN bus, IMU, camera, belt or structure has
+      been exercised. Direction, zero offsets, cooling and supply behavior are
+      unverified.
+\item The 8.280729\,kg ballast is centered and adds mass without a measured
+      payload location or inertia tensor. A real payload changes pitch/roll
+      inertia and front/rear foot loading.
+\item Belt efficiency, compliance, backlash, gearbox friction, motor current
+      loop dynamics, battery sag and regeneration are absent or assumed.
+\item The first-order copper-loss model has uncalibrated thermal resistance and
+      capacitance. Reported temperatures are illustrative estimates, not a
+      winding-temperature validation.
+\item The current 28\,kg evidence comprises deterministic flat-ground single
+      runs. It provides no repeatability statistics, terrain envelope or
+      confidence interval.
+\item MuJoCo contact, friction and damping are model choices. Physics success
+      does not remove sim-to-real contact or latency error.
+\item Mapping uses simulator ground-truth \code{odom}$\to$\code{base\_link}.
+      The checks validate ROS integration, map growth, reload and export; they
+      do not measure visual-odometry drift, loop-closure precision or room-scale
+      trajectory error.
+\item Physical NUWA depth delivery and calibration remain unknown, autonomous
+      navigation and obstacle avoidance are not implemented, and the current
+      camera path is 15\,Hz ROS/10\,Hz MJPEG rather than 60\,fps.
+\item The Go2 study applies the RoboDog controller to the official model. It is
+      a plant comparison, not a comparison with Unitree's factory controller.
+\end{itemize}
+
+\subsection{Conclusion and prioritized work}
+
+The supported conclusion is that RoboDog has a traceable model, a coherent ROS
+2 boundary, an inspectable locomotion controller, physics-rate joint-load
+metrics and a persistent simulated mapping pipeline. The unsupported
+conclusion is that the 28\,kg robot can reliably walk or trot at 1.0\,m/s with
+comfortable ROBSTRIDE06 margin. The present acceptance result is a failure.
+
+The next work should measure the real mass distribution, belt efficiency and
+actuator thermal response; replace the step start with a bounded speed ramp and
+retune transitions; integrate and validate IMU/contact base estimation; run
+repeated seeds and terrain cases; calibrate registered camera depth; and only
+then perform staged single-joint, suspended-leg, stand and low-speed hardware
+commissioning. Each stage must retain motor-output RMS, peak, overload duration,
+speed at peak, limiter intervention and fault provenance.
 
 % =====================================================================
 \section{Hardware migration and commissioning}
@@ -2166,6 +2254,13 @@ M. H. Raibert, ``Dynamically Stable Legged Locomotion: Second Report to
 DARPA,'' CMU Robotics Institute, 1983.
 \url{https://publications.ri.cmu.edu/dynamically-stable-legged-locomotion-second-report-to-darpa-october-11981-december-311982}
 
+\bibitem{raibert-gaits}
+M. H. Raibert, B. Brown, M. Chepponis, H. Koechling, J. K. Hodgins,
+D. Dustman, W. K. Brennan, D. S. Barrett, C. M. Thompson, J. D. Hebert,
+W. Lee and L. Borvansky, ``Dynamically Stable Legged Locomotion,''
+\emph{IEEE Journal of Robotics and Automation}, vol. 2, no. 2, 1986,
+pp. 70--82. \url{https://publications.ri.cmu.edu/publications/dynamically-stable-legged-locomotion/}
+
 \bibitem{khatib}
 O. Khatib, ``The Operational Space Formulation in Robot Manipulator Control,''
 1985.
@@ -2207,14 +2302,21 @@ Google DeepMind, ``MuJoCo computation documentation: actuation model and
 generalized forces.''
 \url{https://mujoco.readthedocs.io/en/stable/computation/}
 
+\bibitem{mujoco-paper}
+E. Todorov, T. Erez and Y. Tassa, ``MuJoCo: A Physics Engine for Model-Based
+Control,'' in \emph{Proc. IEEE/RSJ IROS}, 2012, pp. 5026--5033,
+doi:10.1109/IROS.2012.6386109.
+\url{https://homes.cs.washington.edu/~todorov/papers/TodorovIROS12.pdf}
+
 \bibitem{pointcloud2}
 ROS 2 common interfaces, ``sensor\_msgs/msg/PointCloud2 message definition.''
 \url{https://github.com/ros2/common_interfaces/blob/rolling/sensor_msgs/msg/PointCloud2.msg}
 
 \bibitem{rtabmap-paper}
-M. Labbe and F. Michaud, ``RTAB-Map as an Open-Source Lidar and Visual SLAM
-Library for Large-Scale and Long-Term Online Operation.''
-\url{https://arxiv.org/abs/2403.06341}
+M. Labb\'e and F. Michaud, ``RTAB-Map as an Open-Source Lidar and Visual SLAM
+Library for Large-Scale and Long-Term Online Operation,'' \emph{Journal of
+Field Robotics}, vol. 36, no. 2, pp. 416--446, 2019,
+doi:10.1002/rob.21831.
 
 \bibitem{rtabmap-ros}
 IntRoLab, ``rtabmap\_ros: ROS 2 wrapper for RTAB-Map.''
@@ -2227,7 +2329,8 @@ IntRoLab, ``rtabmap\_slam CoreWrapper source.''
 \bibitem{octomap}
 A. Hornung, K. M. Wurm, M. Bennewitz, C. Stachniss and W. Burgard,
 ``OctoMap: An Efficient Probabilistic 3D Mapping Framework Based on Octrees,''
-\emph{Autonomous Robots}, 2013. Project page:
+\emph{Autonomous Robots}, vol. 34, no. 3, pp. 189--206, 2013,
+doi:10.1007/s10514-012-9321-0. Project page:
 \url{https://octomap.github.io/}
 
 \bibitem{octomap-saver}
@@ -2235,13 +2338,14 @@ OctoMap project, ``ROS 2 octomap\_saver source.''
 \url{https://github.com/OctoMap/octomap_mapping/blob/ros2/octomap_server/src/octomap_saver.cpp}
 
 \bibitem{cheetah3-design}
-J. Di Carlo, B. Katz, G. Bledt and S. Kim, ``MIT Cheetah 3: Design and Control
-of a Robust, Dynamic Quadruped Robot,'' MIT records.
+G. Bledt, M. J. Powell, B. Katz, J. Di Carlo, P. M. Wensing and S. Kim,
+``MIT Cheetah 3: Design and Control of a Robust, Dynamic Quadruped Robot,''
+in \emph{Proc. IEEE/RSJ IROS}, 2018, doi:10.1109/IROS.2018.8593885.
 \url{https://dspace.mit.edu/entities/publication/b77b4b14-6d3d-43c0-899e-e85ddbba2a8f}
 
 \bibitem{mpc-wbic}
-J. Kim, J. Kim, S. Kim and S. Kim, ``Highly Dynamic Quadruped Locomotion via
-Whole-Body Impulse Control and Model Predictive Control,'' 2019.
+D. Kim, J. Di Carlo, B. Katz, G. Bledt and S. Kim, ``Highly Dynamic Quadruped
+Locomotion via Whole-Body Impulse Control and Model Predictive Control,'' 2019.
 \url{https://arxiv.org/abs/1909.06586}
 
 \bibitem{unitree-mujoco}
