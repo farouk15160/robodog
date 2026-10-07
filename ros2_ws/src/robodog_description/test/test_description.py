@@ -81,11 +81,22 @@ def test_total_mass_matches_design_target(urdf, params):
     assert total == pytest.approx(params["meta"]["target_mass_kg"], abs=0.01), total
 
 
-def test_new_cad_and_rs06_payload_are_present(urdf, params):
-    """The supplied 7.549 kg structure plus the user's complete load list."""
+def test_new_cad_rs06_and_28kg_test_ballast_are_present(urdf, params):
+    """The 28 kg test model adds declared ballast to the physical build."""
     total = sum(float(link.find("inertial/mass").get("value"))
                 for link in urdf.findall("link") if link.find("inertial") is not None)
-    assert total == pytest.approx(19.72, abs=0.01)
+    ballast = next(item for item in params["payload"]["items"]
+                   if item["name"] == "test_ballast_28kg")
+
+    assert params["meta"]["target_mass_kg"] == pytest.approx(28.0)
+    assert params["mass_budget"]["total_kg"] == pytest.approx(28.0, abs=1e-6)
+    assert params["mass_budget"]["base_configuration_kg"] == pytest.approx(19.719271)
+    assert params["mass_budget"]["test_ballast_kg"] == pytest.approx(8.280729)
+    assert params["mass_budget"]["electronics_payload_kg"] == pytest.approx(4.452)
+    assert total == pytest.approx(28.0, abs=0.01)
+    assert ballast["mass_kg"] == pytest.approx(8.280729, abs=1e-6)
+    assert ballast["xyz"] == pytest.approx([0.0, 0.0, 0.0])
+    assert total - ballast["mass_kg"] == pytest.approx(19.719271, abs=0.01)
     assert params["meta"]["cad_source"] == "cad/urdf/urdf/urdf.urdf"
     assert "ROBSTRIDE06" in params["meta"]["actuator"]
     motors = [mesh for mesh in urdf.iter("mesh")

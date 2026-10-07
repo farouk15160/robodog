@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Software architecture for a 12-DOF quadruped robot</b><br>
-  12 × RobStride RS06 · ≈19.72 kg · ROS 2 · MuJoCo
+  12 × RobStride RS06 · 28.00 kg loaded test configuration · ROS 2 · MuJoCo
 </p>
 
 <p align="center">
@@ -134,7 +134,7 @@ maximum commanded velocity, gait confirmation, whether joint jogging is allowed
 at all — are configuration too, not constants buried in JavaScript.
 
 It speaks a purpose-built protocol rather than rosbridge: less bandwidth, and a
-much smaller surface from a web page that can move a 19.72 kg machine.
+much smaller surface from a web page that can move a 28 kg loaded machine.
 
 The **Remote Control** page adds two touch joysticks, `WASD`/arrow keyboard
 control, live camera and motion/safety feedback, a simulation-only Greeting,
@@ -294,10 +294,12 @@ a designed challenge into a wall or an open field.
 ## Current configuration and validation
 
 The active model uses the new export in `cad/urdf/`, twelve **RobStride RS06**
-actuators and a **19.72 kg working mass**. The twelve 621 g actuators contribute
+actuators and a **28.000 kg loaded test mass**. The underlying robot
+configuration is 19.719271 kg; an 8.280729 kg centered, removable simulation
+ballast provides the current test load. The twelve 621 g actuators contribute
 7.452 kg. The CAD export contributes approximately 7.549 kg before its tiny
-placeholder motor and equipment masses are removed and real inertias are added. Battery,
-electronics, wiring and mounting masses remain planning estimates.
+placeholder motor and equipment masses are removed and real inertias are added.
+Battery, electronics, wiring and mounting masses remain planning estimates.
 
 | Mass component | Modeled mass |
 |---|---:|
@@ -307,7 +309,9 @@ electronics, wiring and mounting masses remain planning estimates.
 | Belt/pulley upgrade allowance | 0.120 kg |
 | Installed electronics, batteries and remaining payload | 4.452 kg |
 | Camera | 0.150 kg |
-| **Total** | **19.719271 kg** |
+| **Base robot subtotal** | **19.719271 kg** |
+| Centered removable test ballast | 8.280729 kg |
+| **Loaded simulation total** | **28.000000 kg** |
 
 The current geometry has 192.0 mm thighs and 195.621 mm shanks. The full-chain
 reach is approximately 387.6 mm; reach reserve is a geometric quantity, not a
@@ -348,29 +352,34 @@ The battery model assumes the two 6S packs are **in series: 12S, 44.4 V nominal,
 input range, but a different speed and power envelope from this simulation.
 Confirm the delivered revision and power wiring before hardware use.
 
-See the [current speed sweep and Go2 comparison](docs/locomotion_validation.md)
-for the measured operating limits and calculation method. The
-[per-joint report](docs/rs06_speed_study.md), [JSON](docs/rs06_speed_study.json)
-and [CSV](docs/rs06_speed_study.csv) include all twelve joints, peaks, RMS,
-time above 8/11 N·m, speed during overload, and clipping. These results supersede
-the earlier `rs06_feasibility` measurements: applied torque is now sampled at
-every 0.5 ms physics step, and the command delay is correctly 1 ms.
+See the [current locomotion validation](docs/locomotion_validation.md) for the
+loaded-model operating limits and calculation method. The historical
+[19.719 kg speed sweep](docs/rs06_speed_study.md),
+[JSON](docs/rs06_speed_study.json) and [CSV](docs/rs06_speed_study.csv) remain
+base-configuration comparison evidence. They include all twelve joints, peaks,
+RMS, time above 8/11 N·m, speed during overload, and clipping.
 
-The [100-second 1 m/s report](docs/rs06_1ms_100s.md) repeats the applied-torque
-measurement for tuned walk and trot after a five-second RMS warmup and compares
-the tuned heading hold with the preserved [baseline](docs/rs06_1ms_100s_baseline.md).
-Walk still falls into an unstable, heavily limited state and averages
-−0.011 m/s. Tuned trot tracks at 0.984 m/s, with worst motor-side RMS/peak of
-5.36/28.64 N·m. It still has safety limiting on 30.6% of controller cycles, but
-heading hold reduces lateral drift from 24.405 m to 1.063 m. The largest tuned
-trot spike is the rear-left hip-pitch at 0.681 s and 0.571 m travel. This
-supports a simulation feasibility finding, not hardware approval or autonomous
-navigation performance.
+The [28 kg, 100-second 1 m/s report](docs/rs06_28kg_1ms_100s.md),
+[JSON](docs/rs06_28kg_1ms_100s.json), [CSV](docs/rs06_28kg_1ms_100s.csv) and
+[evaluated MuJoCo model](docs/rs06_28kg_1ms_100s.xml) repeat the applied-torque
+measurement for walk and trot after a five-second RMS warmup.
+Walk falls and averages −0.01096 m/s, with 7.681/32.159 N·m worst motor RMS/peak
+and safety limiting on 99.82% of cycles. Trot stays upright but reaches only
+0.922506 m/s, with 6.749/34.897 N·m worst motor RMS/peak and limiting on 87.965%
+of cycles. Its largest spike is rear-left hip pitch at 0.681 s and 0.4776 m
+travel. Neither case passes the tracking and motor-margin criteria. No
+peak-torque or physics-actuator clipping occurs; extensive safety and modeled
+speed-envelope limiting remain. Walk reports position, velocity and torque
+fault bits; trot reports velocity and torque bits. The reported temperatures
+are uncalibrated estimates. The
+[19.719 kg report](docs/rs06_1ms_100s.md) remains a historical comparison: its
+trot reached 0.984 m/s with 5.360/28.638 N·m RMS/peak and 30.6% safety-limited
+cycles.
 
-Each speed-sweep run below lasts 20 simulated seconds on an obstacle-free
-plane; RMS excludes the first second while peaks include startup. The tuned
-walk uses 1.5 Hz, 0.78 duty factor and 30 mm lift at 320 mm stance; trot uses
-2.2 Hz and 40 mm lift at 330 mm stance.
+The historical 19.719 kg speed-sweep runs below each last 20 simulated seconds
+on an obstacle-free plane; RMS excludes the first second while peaks include
+startup. The tuned walk uses 1.5 Hz, 0.78 duty factor and 30 mm lift at 320 mm
+stance; trot uses 2.2 Hz and 40 mm lift at 330 mm stance.
 
 | Gait | Command / actual speed | Worst motor RMS / peak | Safety-clamped cycles | Result |
 |---|---:|---:|---:|---|
@@ -398,6 +407,12 @@ model differences, and the [official SDK/viewer shutdown failure](docs/go2_runne
 After sourcing ROS and the built workspace, reproduce with:
 
 ```bash
+MUJOCO_GL=egl python3 tools/torque_report.py \
+  --gaits walk trot --velocity 1.0 --seconds 100 --warmup 5 \
+  --study-label 28kg_1ms_100s \
+  --baseline-report docs/rs06_1ms_100s.json \
+  --output docs/rs06_28kg_1ms_100s.json
+# Historical 19.719 kg speed sweep:
 MUJOCO_GL=egl python3 tools/torque_report.py --study --seconds 20 --output docs/rs06_speed_study.json
 ```
 
@@ -466,7 +481,7 @@ cd docs && make                      # facts, diagrams, and the PDF
 
 | Quantity | Active configuration |
 |---|---|
-| Working mass | Approximately 19.72 kg; payload placement and several masses estimated |
+| Working mass | 28.000 kg loaded simulation: 19.719271 kg base configuration plus 8.280729 kg centered removable ballast |
 | Motors | 12 × RS06, 621 g each; 8 N·m continuous stall, 11 N·m rotating rated, 36 N·m peak |
 | External transmission | HAA/HFE 1:1; knees 2:1, 95% efficiency assumed |
 | Battery assumption | Two 6S packs in series; 44.4 V nominal, 50.4 V full |

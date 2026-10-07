@@ -1,4 +1,5 @@
-# RS06 / 19.719 kg / 192 + 195.621 mm links / 2:1 knee belt.
+# RS06 / 28.000 kg loaded test model / 192 + 195.621 mm links / 2:1 knee belt.
+# Base configuration is 19.719271 kg; centered removable ballast is 8.280729 kg.
 # Flat-ground simulation tuning, NOT a terrain or hardware qualification.
 # The 40 mm lift reduces swing acceleration and motor load on the shorter legs.
 # Walk at1.5Hz improves speed tracking and body tilt relative to the old1.2Hz.

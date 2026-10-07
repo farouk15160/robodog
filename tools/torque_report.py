@@ -22,11 +22,17 @@ from ament_index_python.packages import get_package_share_directory
 from robodog_sim.evaluation import run_case
 from robodog_sim.generate_models import make_model
 from robodog_sim.world_spec import World
+from robodog_hardware.types import Fault
 
 
 def load(package, filename):
     path = Path(get_package_share_directory(package)) / "config" / filename
     return yaml.safe_load(path.read_text())
+
+
+def fault_names(mask):
+    """Decode the shared safety bitmask for human-readable reports."""
+    return [flag.name for flag in Fault if flag is not Fault.NONE and mask & int(flag)]
 
 
 def markdown(report):
@@ -113,11 +119,14 @@ def markdown(report):
                 lines.append(f"| {label} | {before:.3f} | {after:.3f} | {after-before:+.3f} |")
             lines.append("")
     for case in report['cases']:
+        faults = fault_names(case['fault_flags'])
+        fault_summary = ', '.join(faults) if faults else 'none'
         lines += [f"## {case['gait']} {case['commanded_vx_m_s']:.2f} m/s, yaw {case.get('commanded_wz_rad_s', 0):.2f} rad/s", "",
                   f"Duration {case['duration_s']:.1f}s, RMS warmup {case['warmup_s']:.1f}s; "
                   f"travel {case['travel_m']:.3f}m, lateral drift {case['lateral_drift_m']:.3f}m; "
                   f"safety latch {case['safety_latched']}, clamp events {case['safety_clamp_events']}, "
-                  f"clamped cycles {case['safety_clamped_cycle_fraction']:.1%}, fault mask {case['fault_flags']}.", "",
+                  f"clamped cycles {case['safety_clamped_cycle_fraction']:.1%}, fault mask {case['fault_flags']} "
+                  f"({fault_summary}).", "",
                   "| Joint | Joint peak / RMS N·m | Motor peak / RMS N·m | Motor peak rad/s | Continuous % | Estimated final / steady °C |",
                   "|---|---:|---:|---:|---:|---:|"]
         for j in case['joints']:

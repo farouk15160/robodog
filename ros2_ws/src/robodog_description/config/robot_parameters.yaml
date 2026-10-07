@@ -3,7 +3,7 @@
 
 meta: {description: Canonical 12-DOF quadruped model derived from the Onshape CAD export., generated_by: 'tools/cad_to_model.py
     -- DO NOT EDIT BY HAND, regenerate instead', cad_source: cad/urdf/urdf/urdf.urdf, cad_sha256_16: b95d92fd9159f4f7,
-  actuator: ROBSTRIDE06 (see robstride06.yaml), target_mass_kg: 19.72}
+  actuator: ROBSTRIDE06 (see robstride06.yaml), target_mass_kg: 28.0}
 actuator_config: robstride06.yaml
 conventions:
   frame: 'REP-103: x forward, y left, z up; base_link at the body geometric centre'
@@ -80,7 +80,10 @@ payload:
   - name: battery_tray_straps
     mass_kg: 0.1
     xyz: [0.0, 0.0, -0.035]
-  total_kg: 1.138
+  - name: test_ballast_28kg
+    mass_kg: 8.280729
+    xyz: [0.0, 0.0, 0.0]
+  total_kg: 9.418729
   installed_cad_devices:
   - {name: battery_6s_10000mah_1, mass_kg: 1.25}
   - {name: battery_6s_10000mah_2, mass_kg: 1.25}
@@ -100,20 +103,23 @@ camera_mount:
 mass_budget:
   cad_structure_and_actuators_kg: 15.117271
   electronics_payload_kg: 4.452
+  base_configuration_kg: 19.719271
+  test_ballast_kg: 8.280729
   cad_export_kg: 7.549431
   replaced_placeholder_kg: 0.00416
   actuators_kg: 7.452
   belt_upgrade_kg: 0.12
   assumptions: ['Known motor/device placeholder masses replaced, not added twice.', RS06 inertias use a uniform
       88mm x 49mm envelope; mounting requires CAD fit validation., Unmodelled equipment/fasteners use estimated
-      point-mass locations., '2:1 belt geometry remains the supplied old belt visual; extra 120g is included.']
+      point-mass locations., '2:1 belt geometry remains the supplied old belt visual; extra 120g is included.',
+    The 8.280729kg removable test ballast is approximated as a point mass at base_link origin.]
   camera_kg: 0.15
-  total_kg: 19.719271
+  total_kg: 28.0
 links:
   base:
-    mass_kg: 9.955898
-    com_xyz: [-0.00558, 0.001349, -0.004841]
-    inertia: {ixx: 0.043451, ixy: 0.000934, ixz: -0.000384, iyy: 0.178524, iyz: -0.000473, izz: 0.201573}
+    mass_kg: 18.236627
+    com_xyz: [-0.003046, 0.000737, -0.002643]
+    inertia: {ixx: 0.043565, ixy: 0.000968, ixz: -0.000506, iyy: 0.17877, iyz: -0.000444, izz: 0.201722}
     visuals:
     - mesh: acs758_200a_sensor.stl
       xyz: [0.0, 0.0, 0.0]

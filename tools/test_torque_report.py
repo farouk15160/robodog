@@ -1,7 +1,7 @@
 """Report rendering keeps the evidence needed to locate torque spikes."""
 from argparse import Namespace
 
-from torque_report import flat_row, markdown, requested_cases
+from torque_report import fault_names, flat_row, markdown, requested_cases
 
 
 def _case():
@@ -87,6 +87,17 @@ def test_markdown_marks_a_stable_but_limited_case_as_margin_failure():
                          "cases": [case]})
     assert "Motor-margin verdict: FAIL" in rendered
     assert "True / True / False" in rendered
+
+
+def test_fault_mask_is_named_in_human_report():
+    case = _case()
+    case["fault_flags"] = 6
+
+    rendered = markdown({"mass_kg": 28.0, "supply_voltage_v": 44.4,
+                         "cases": [case]})
+
+    assert fault_names(6) == ["VELOCITY_LIMIT", "TORQUE_LIMIT"]
+    assert "fault mask 6 (VELOCITY_LIMIT, TORQUE_LIMIT)" in rendered
 
 
 def test_walk_and_trot_can_share_one_100_second_report():

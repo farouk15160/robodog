@@ -38,7 +38,9 @@ CAD_URDF = os.path.join(ROOT, "cad/urdf/urdf/urdf.urdf")
 OUT_YAML = os.path.join(ROOT, "ros2_ws/src/robodog_description/config/robot_parameters.yaml")
 ACTUATOR_CONFIG = "robstride06.yaml"
 
-TARGET_MASS_KG = 19.72           # working estimate, not a mass normalization
+TARGET_MASS_KG = 28.0            # requested loaded test configuration
+BASE_WORKING_MASS_KG = 19.719271  # configuration before removable test ballast
+TEST_BALLAST_MASS_KG = TARGET_MASS_KG - BASE_WORKING_MASS_KG
 MOTOR_MASS_KG = 0.621
 MOTOR_RADIUS_M = 0.044          # RS06 maximum flange envelope [ESTIMATE inertia]
 MOTOR_DEPTH_M = 0.049           # RS06 manufacturer outline overall axial depth
@@ -358,6 +360,11 @@ PAYLOAD = [
     ("wiring_connectors", 0.300, (0.0, 0.0, 0.0)),
     ("additional_fasteners_shafts", 0.250, (0.0, 0.0, 0.0)),
     ("battery_tray_straps", 0.100, (0.0, 0.0, -0.035)),
+    # Removable test ballast raises the 19.719271 kg working model to exactly
+    # 28 kg.  It is centred at base_link so the benchmark does not invent an
+    # unprovided payload offset; a physical ballast installation must replace
+    # this point-mass approximation with its measured pose and inertia.
+    ("test_ballast_28kg", TEST_BALLAST_MASS_KG, (0.0, 0.0, 0.0)),
 ]
 CAMERA_MASS_KG = 0.150          # user's planning estimate
 BELT_UPGRADE_PER_LEG_KG = 0.030  # net addition to the existing CAD belts
@@ -499,6 +506,12 @@ def main():
         total += m
 
     payload_m = sum(p[1] for p in PAYLOAD)
+    loaded_mass = total + payload_m + CAMERA_MASS_KG
+    if not math.isclose(loaded_mass, TARGET_MASS_KG, abs_tol=5e-7):
+        raise ValueError(
+            f"loaded mass {loaded_mass:.6f} kg does not match {TARGET_MASS_KG:.6f} kg target; "
+            "remeasure the ballast after changing the base model"
+        )
     print("\n" + "=" * 74)
     print("MASS BUDGET")
     print("=" * 74)
@@ -506,7 +519,7 @@ def main():
     print(f"  electronics payload (base_link)          {payload_m:8.4f} kg")
     print(f"  camera link (Yahboom NUWA HP60C)         {CAMERA_MASS_KG:8.4f} kg")
     print(f"  {'-'*54}")
-    print(f"  TOTAL                                    {total + payload_m + CAMERA_MASS_KG:8.4f} kg"
+    print(f"  TOTAL                                    {loaded_mass:8.4f} kg"
           f"   (target {TARGET_MASS_KG:.1f} kg)")
 
     emit(canon, bodies, q_cad, geo, L2, total, payload_m,
@@ -633,7 +646,7 @@ def emit(canon, bodies, q_cad, geo, L2, struct_mass, payload_m, cad_mass, placeh
                  for lg, c in LEGS.items()},
         "joint_limits": {k: dict(lower=v["lower"], upper=v["upper"]) for k, v in JOINT_LIMITS.items()},
         "named_poses": poses,
-        "payload": {"items": [{"name": n, "mass_kg": m, "xyz": list(p)} for n, m, p in PAYLOAD],
+        "payload": {"items": [{"name": n, "mass_kg": r6(m), "xyz": list(p)} for n, m, p in PAYLOAD],
                     "total_kg": r6(payload_m),
                     "installed_cad_devices": [{"name": name, "mass_kg": mass}
                                               for name, mass in DEVICE_MASSES.items() if mass > 0]},
@@ -652,7 +665,10 @@ def emit(canon, bodies, q_cad, geo, L2, struct_mass, payload_m, cad_mass, placeh
         },
         "mass_budget": {
             "cad_structure_and_actuators_kg": r6(struct_mass - sum(DEVICE_MASSES.values())),
-            "electronics_payload_kg": r6(payload_m + sum(DEVICE_MASSES.values())),
+            "electronics_payload_kg": r6(
+                payload_m + sum(DEVICE_MASSES.values()) - TEST_BALLAST_MASS_KG),
+            "base_configuration_kg": BASE_WORKING_MASS_KG,
+            "test_ballast_kg": r6(TEST_BALLAST_MASS_KG),
             "cad_export_kg": r6(cad_mass),
             "replaced_placeholder_kg": r6(placeholder_mass),
             "actuators_kg": 12 * MOTOR_MASS_KG,
@@ -662,6 +678,7 @@ def emit(canon, bodies, q_cad, geo, L2, struct_mass, payload_m, cad_mass, placeh
                 "RS06 inertias use a uniform 88mm x 49mm envelope; mounting requires CAD fit validation.",
                 "Unmodelled equipment/fasteners use estimated point-mass locations.",
                 "2:1 belt geometry remains the supplied old belt visual; extra 120g is included.",
+                "The 8.280729kg removable test ballast is approximated as a point mass at base_link origin.",
             ],
             "camera_kg": CAMERA_MASS_KG,
             "total_kg": r6(struct_mass + payload_m + CAMERA_MASS_KG),

@@ -49,7 +49,7 @@ def system_architecture() -> Diagram:
     d.box("BND", 20, 520, 1140, 40, "HARDWARE / SOFTWARE BOUNDARY",
           "JointBackend  +  CameraBackend", kind="boundary", z=0, rounded=False)
 
-    d.box("L3", 20, 590, 1140, 150, "PHYSICAL ROBOT", "19.72 kg, 12 DOF", kind="layer", z=0)
+    d.box("L3", 20, 590, 1140, 150, "PHYSICAL ROBOT", "28.00 kg loaded, 12 DOF", kind="layer", z=0)
     d.box("can0", 60, 630, 200, 85, "CAN bus 0", "1 Mbit/s, front legs\n6 x RS06, 72% load",
           kind="hardware")
     d.box("can1", 285, 630, 200, 85, "CAN bus 1", "1 Mbit/s, rear legs\n6 x RS06, 72% load",
@@ -360,7 +360,7 @@ def domain_model() -> Diagram:
     d = Diagram("domain_model", "Domain model", w=1160, h=770,
                 caption="Value types crossing the hardware boundary and the entities "
                         "that own them.")
-    d.box("robot", 440, 30, 280, 80, "Robot", "12 joints, 4 legs\n19.72 kg, base_link")
+    d.box("robot", 440, 30, 280, 80, "Robot", "12 joints, 4 legs\n28.00 kg loaded, base_link")
     d.box("leg", 440, 170, 280, 100, "Leg  (FL FR RL RR)",
           "sx: front/rear   sy: left/right\nLegGeometry: L1 L2 offsets")
     d.box("joint", 100, 170, 260, 100, "Joint",

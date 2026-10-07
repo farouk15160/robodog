@@ -1,6 +1,11 @@
 # Locomotion and applied-torque validation
 
-The normal launch dependency and command-ordering paths were repaired. The experiment uses the current 19.719 kg model, 12 RS06 actuators and 2:1 external knee reduction with assumed 95% efficiency. GUI velocity range reaches 2 m/s in simulation; accepting a command does not establish that a gait can execute it.
+The normal launch dependency and command-ordering paths were repaired. The
+active loaded simulation is **28.000 kg**: an 8.280729 kg centered, removable
+test ballast is added to the 19.719271 kg base configuration. It uses 12 RS06
+actuators and 2:1 external knee reduction with assumed 95% efficiency. GUI
+velocity range reaches 2 m/s in simulation; accepting a command does not
+establish that a gait can execute it.
 
 The normal ROS viewer launch also passed a direct `/cmd_vel` smoke test: a 0.2 m/s command moved the robot 0.616 m in 3 simulated seconds, with finite applied-torque telemetry on all 12 joints and an acknowledged return to standing. The browser walking test advanced 0.806 m, verified all 12 torque/current/temperature rows and the simulation slider range. [Live test evidence](live_launch_validation.json) records both checks.
 
@@ -10,7 +15,7 @@ The normal ROS viewer launch also passed a direct `/cmd_vel` smoke test: a 0.2 m
 
 The later headless GUI/mapping test processes shut down cleanly. That result does not resolve the interactive viewer shutdown issue.
 
-## 100-second 1 m/s check
+## 28 kg, 100-second 1 m/s check
 
 The extended check uses the same obstacle-free sizing plane, 400 Hz controller
 and 2 kHz applied-physics-torque sampling. Both cases run for 100 simulated
@@ -19,25 +24,32 @@ include startup. The knee tables report both joint-side torque and motor-output
 torque: with the 2:1 belt and assumed 95% efficiency,
 `motor torque = joint torque / 1.9` and motor speed is twice knee speed.
 
-| Gait | Command / actual m/s | Worst motor RMS / peak N·m | Largest spike | Safety-clamped cycles | Stable / tracks |
-|---|---:|---:|---|---:|---|
-| walk | 1.00 / −0.011 | 7.67 / 31.63 | FR hip pitch, 0.3335 s, 0.203 m travel | 99.8% | No / no |
-| trot, heading hold | 1.00 / 0.984 | 5.36 / 28.64 | RL hip pitch, 0.6810 s, 0.571 m travel | 30.6% | Yes / yes |
+| Gait | Command / actual m/s | Tilt / min height | Worst motor RMS / peak N·m | Largest spike | Safety-clamped cycles | Stable / tracks / margin |
+|---|---:|---:|---:|---|---:|---|
+| walk | 1.00 / −0.01096 | 33.17° / 0.14857 m | 7.681 / 32.159 | FR hip pitch, 0.3335 s | 99.82% | No / no / no |
+| trot, heading hold | 1.00 / 0.922506 | 8.6559° / 0.32165 m | 6.749 / 34.897 | RL hip pitch, 0.6810 s, 0.4776 m travel, [0.467, 0.054, 0.323] m | 87.965% | Yes / no / no |
 
-The walk result in the [baseline report](rs06_1ms_100s_baseline.md) is a failed
-operating point: excessive tilt and a 0.144 m minimum body height mean its
-post-failure RMS does not describe successful walking. The tuned trot completes
-and tracks speed. Heading hold reduces lateral drift from 24.405 m to 1.063 m,
-while the run still spends 30.6% of cycles under safety limiting. Its main peak
-events are concentrated at startup: rear-left hip pitch reaches 28.64 N·m at
-0.681 s, rear-right hip pitch 27.21 N·m at 0.4535 s, and front-right hip pitch
-22.63 N·m at 0.436 s. The [full tuned per-joint report](rs06_1ms_100s.md)
-records RMS, peak time and world position, time above 8/11/36 N·m, maximum
-speed during overload, clamping and estimated temperature for all twelve
-joints; its JSON, CSV and MuJoCo XML companions preserve the machine-readable
+The loaded walk falls and is not a valid operating point; its post-failure RMS
+does not describe successful walking. The loaded trot remains upright but
+misses the 1 m/s tracking criterion and has no comfortable motor margin. Its
+worst spike is the rear-left hip-pitch motor at 0.681 s. The run reports
+position, velocity and torque fault bits for walk, and velocity and torque bits
+for trot. There is **no peak-torque clipping and no physics-actuator clipping**
+in either run. The high clamp percentages instead come from the safety monitor
+and the modeled speed/voltage torque envelope, so the absence of actuator
+clipping is not evidence of adequate margin. Thermal values are uncalibrated
+estimates.
+
+Compared with the historical 19.719271 kg heading-hold trot, actual speed falls
+from 0.984 to 0.923 m/s, worst motor RMS rises from 5.360 to 6.749 N·m, peak
+rises from 28.638 to 34.897 N·m, and safety-limited cycles rise from 30.6% to
+88.0%. The [full 28 kg per-joint report](rs06_28kg_1ms_100s.md),
+[JSON](rs06_28kg_1ms_100s.json), [CSV](rs06_28kg_1ms_100s.csv) and
+[evaluated MuJoCo model](rs06_28kg_1ms_100s.xml) preserve the measurements.
+The earlier [19.719 kg report](rs06_1ms_100s.md) remains historical comparison
 evidence.
 
-## Speed sweep
+## Historical 19.719 kg speed sweep
 
 Every case starts from the standing keyframe with a velocity step, on an obstacle-free plane. Each run lasts 20 simulated seconds; RMS excludes the first second, while peaks/overload durations include it. Physics runs at 2 kHz, control at 400 Hz, command delay 1 ms. Robot safety remains active. A successful speed must stay upright, track its command, and be assessed together with clipping—not RMS alone.
 
@@ -71,7 +83,7 @@ Failed/fallen runs include loads after instability and are not valid operating p
 
 Actual forward/lateral speed is measured in the body yaw frame. These runs expose yaw tracking error; they must not be represented as successful execution of the requested turn rate.
 
-## Official Go2 model comparison
+## Historical 19.719 kg official Go2 model comparison
 
 Both models use MuJoCo 3.13.0, the same plane/contact parameters, gravity, solver, timestep, 20-second duration, 1-second RMS warmup, 1 ms delay, 2 mm initial clearance and shared trot generator/gains. Masses differ: Robodog 19.719 kg versus Go2 model 15.206408 kg. Go2 retains its official inertias and actuator caps; Robodog retains its RS06 speed envelope and safety limiter. This is a shared-controller model comparison, **not Unitree factory-controller performance**. No external force drives either floating base.
 
@@ -92,9 +104,9 @@ Go2 model limits are 23.7 Nm for hip roll/pitch and 45.43 Nm for knees. They are
 
 ## How physical parameters and torque are calculated
 
-1. **Geometry/mass:** joint transforms, link masses, COMs and inertia tensors come from the supplied CAD URDF. Twelve motor placeholders are replaced by 0.621 kg RS06 motors; battery/electronics/belt additions give 19.719 kg. Known placeholders are replaced rather than counted twice.
+1. **Geometry/mass:** joint transforms, link masses, COMs and inertia tensors come from the supplied CAD URDF. Twelve motor placeholders are replaced by 0.621 kg RS06 motors; battery/electronics/belt additions give a 19.719271 kg base configuration. The current loaded test adds 8.280729 kg at the body center for an exact 28.000 kg total. Known placeholders are replaced rather than counted twice.
 2. **Inertia:** rotate each CAD inertia into its link frame and add it about the combined COM using `I = Σ(R I_part Rᵀ + m[(r·r)I₃ − rrᵀ])`. Motor housing inertia uses an estimated uniform 88×49 mm cylinder; payload additions use declared point-mass locations. RS06 output-equivalent armature is 0.012 kg·m²; the 2:1 knee reflects this to 0.048 kg·m². Those are distinct from housing/link rigid-body inertia.
-3. **Requested joint torque:** `τ_req = Kp(q_target−q) + Kd(q̇_target−q̇) + JᵀF`. The balance controller distributes support/acceleration forces across stance feet; nominal static support is `mg/4 ≈ 48.4 N` per foot. It then applies joint limits, the overload/temperature gate and the motor envelope.
+3. **Requested joint torque:** `τ_req = Kp(q_target−q) + Kd(q̇_target−q̇) + JᵀF`. The balance controller distributes support/acceleration forces across stance feet; nominal equal static support for the 28 kg loaded case is `mg/4 ≈ 68.7 N` per foot. It then applies joint limits, the overload/temperature gate and the motor envelope.
 4. **Reported torque:** read MuJoCo `qfrc_actuator` at each hinge DOF every 0.5 ms. This is applied actuator torque after clamping/gearing—not the PD request, and not the total impact/reaction torque on bearings or structures. For the knee, `τ_motor = τ_joint/(2×0.95)` and `ω_motor = 2ω_joint`; hips use ratio 1.
 5. **Peak/RMS/overload:** `peak=max(|τ_motor|)`; `RMS=√(Στ_motor²Δt/ΣΔt)`. For every joint, record cumulative and longest consecutive time above 8 and 11 Nm, speed at peak, speed during overload, and separate software/peak/speed-envelope/MuJoCo clipping. The threshold durations include startup and are sampled at the physics rate.
 
@@ -106,6 +118,11 @@ Temperatures remain uncalibrated model estimates. These results do not establish
 source /opt/ros/humble/setup.bash
 source ros2_ws/install/setup.bash
 python3 tools/torque_report.py --study --seconds 20 --output docs/rs06_speed_study.json
+python3 tools/torque_report.py \
+  --gaits walk trot --velocity 1.0 --seconds 100 --warmup 5 \
+  --study-label 28kg_1ms_100s \
+  --baseline-report docs/rs06_1ms_100s.json \
+  --output docs/rs06_28kg_1ms_100s.json
 python3 tools/go2_benchmark.py --repo /tmp/robodog-unitree-mujoco --seconds 20 --output docs/go2_benchmark.json
 python3 tools/compare_benchmarks.py
 ```

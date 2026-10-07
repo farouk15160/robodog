@@ -35,8 +35,10 @@ Section~\ref{sec:migration} records the original migration design.
 
 \paragraph{Current configuration.} The active source is
 \code{cad/urdf/urdf/urdf.urdf}, with twelve RS06 actuators and a working mass
-of approximately 19.72\,kg. Generated geometry, inertias and actuator macros
-below describe the active model. The external knee belt is 2:1 with an assumed
+of exactly 28.000\,kg in the loaded test model. This combines the
+19.719271\,kg base configuration with 8.280729\,kg of centered, removable
+simulation ballast. Generated geometry, inertias and actuator macros below
+describe the active model. The external knee belt is 2:1 with an assumed
 95\,\% efficiency: the 8\,N$\cdot$m continuous-stall reference becomes
 15.2\,N$\cdot$m at the knee. The 11\,N$\cdot$m rotating rating becomes
 20.9\,N$\cdot$m, and 36\,N$\cdot$m peak becomes 68.4\,N$\cdot$m.
@@ -87,15 +89,38 @@ page references, source hashes and differences between these documents.
 \paragraph{Current gait settings and report.} Walk uses 1.5\,Hz, duty
 factor 0.78, 30\,mm swing clearance and 320\,mm stance height. Trot uses 2.2\,Hz, 40\,mm clearance
 and 330\,mm stance. Stance impedance remains 90/2 and swing impedance 60/1.5
-in joint-space stiffness/damping units. Current measurements and their limits
-are in \href{rs06_speed_study.md}{docs/rs06\_speed\_study.md}; the associated
-JSON and CSV retain all twelve joint results. The accompanying
-\code{rs06\_speed\_study.xml} uses an obstacle-free plane for sustained travel.
+in joint-space stiffness/damping units. Current loaded-model measurements and
+their limits are in
+\href{rs06_28kg_1ms_100s.md}{docs/rs06\_28kg\_1ms\_100s.md}; its JSON, CSV and
+MuJoCo XML retain all twelve joint results and the evaluated model. The
+historical 19.719271\,kg sweep remains in
+\href{rs06_speed_study.md}{docs/rs06\_speed\_study.md}.
 The GUI proving ground's barrier at 9\,m makes it unsuitable for these longer
 speed runs. \href{locomotion_validation.md}{The locomotion validation report}
 compares speeds, turning and the official Go2 model.
 
 \subsection{Current RS06 simulation measurements}
+
+The current 28.000\,kg loaded-model cases ran for 100 simulated seconds at a
+1.00\,m/s command, with a five-second RMS warmup. The walk case falls: actual
+speed is $-0.01096$\,m/s, maximum tilt is 33.17 degrees, minimum body height is
+0.14857\,m, and worst motor RMS/peak is 7.681/32.159\,N$\cdot$m. The heading-hold
+trot stays upright but reaches only 0.922506\,m/s; maximum tilt is 8.6559
+degrees, minimum height is 0.32165\,m, and worst RMS/peak is
+6.749/34.897\,N$\cdot$m. Its largest spike is rear-left hip pitch at 0.681\,s,
+after 0.4776\,m travel, at world position [0.467, 0.054, 0.323]\,m.
+
+Safety changes commands during 99.82\,\% of walk cycles and 87.965\,\% of trot
+cycles. Walk reports position, velocity and torque fault bits; trot reports
+velocity and torque bits. Neither case passes the tracking and motor-margin
+criteria. No peak-torque or MuJoCo actuator clipping occurs, but extensive
+safety and modeled speed-envelope limiting remains. Temperatures are
+uncalibrated estimates. Against the historical 19.719271\,kg trot, actual speed
+falls from 0.984 to 0.923\,m/s, RMS rises from 5.360 to 6.749\,N$\cdot$m, peak
+rises from 28.638 to 34.897\,N$\cdot$m and safety-limited cycles rise from
+30.6\,\% to 88.0\,\%.
+
+\paragraph{Historical 19.719271 kg speed sweep.}
 
 Each case ran for 20 seconds with the configured gains, motor envelope and
 safety monitor active. Commands step from a standing keyframe with 2\,mm ground
@@ -105,8 +130,10 @@ is two physics steps (1\,ms). Applied actuator torque is read from MuJoCo
 it is neither the requested PD effort nor the total structural/contact load.
 RMS excludes the first second; peaks and overload durations include startup.
 For knees, inferred motor-output torque is joint torque divided by
-$2\times0.95$; hips are direct drive. These measurements supersede earlier
-RS06 results collected before the delay correction and physics-rate sampling.
+$2\times0.95$; hips are direct drive. These measurements superseded earlier
+RS06 results collected before the delay correction and physics-rate sampling;
+they now serve as base-configuration comparison data for the 28\,kg loaded
+model.
 
 \begin{center}\small
 \begin{tabular}{@{}lrrrrrl@{}}
@@ -195,7 +222,7 @@ extension currently supported only in MuJoCo.}{1.0}
 \toprule
 \textbf{Quantity} & \textbf{Target} & \textbf{Achieved} \\
 \midrule
-Total mass            & 19.72\,kg              & \RdMassTotal\,kg \\
+Total mass            & 28.00\,kg loaded       & \RdMassTotal\,kg \\
 Degrees of freedom    & 12 (HAA/HFE/KFE)    & 12 \\
 Nominal stance height & ---                 & \RdStandHeight\,mm (\RdStandExtension\,\% of leg reach) \\
 Static torque margin  & within continuous   & requires current per-motor report \\
@@ -209,10 +236,13 @@ Actuator              & ROBSTRIDE06         & \RdTorqueCont/\RdTorquePeak\,N$\cd
 
 The new CAD export totals approximately 7.549\,kg. Its small placeholder
 motor masses are removed before adding twelve 0.621\,kg RS06 actuators.
-The working model totals \RdMassTotal\,kg, including an estimated battery,
+The base configuration totals 19.719271\,kg, including an estimated battery,
 electronics and mounting allowance. Two 1.250\,kg battery packs contribute
-2.500\,kg; the twelve actuators contribute 7.452\,kg. The remaining component
-masses and their placement must be checked against the assembled machine.
+2.500\,kg; the twelve actuators contribute 7.452\,kg. The loaded simulation
+adds 8.280729\,kg of centered, removable test ballast for the
+\RdMassTotal\,kg total. This ballast is not a CAD-derived component. The
+remaining component masses and their placement must be checked against the
+assembled machine.
 
 Generated per-link examples are base \RdMassBase\,kg, front-left hip
 \RdMassHip\,g, thigh \RdMassThigh\,g and calf \RdMassCalf\,g. The base-link
@@ -1136,7 +1166,7 @@ would drop the robot.
 \subsection{Watchdog and emergency stop}
 
 \begin{decision}{A stale command holds position; it does not go limp}
-Losing torque mid-stance drops a roughly 19.72\,kg robot. The watchdog substitutes an
+Losing torque mid-stance drops a 28\,kg loaded robot. The watchdog substitutes an
 impedance command that holds the measured position at moderate gain. If a joint
 is measured outside its soft range, the hold target is the limit, so the
 watchdog recovers the envelope gently rather than freezing outside it.
@@ -1185,11 +1215,12 @@ bandwidth, and CAN jitter.
 
 The current tests compare generated URDF and MJCF masses, origins, axes and
 joint limits and verify unobstructed hip motion. At rest, total ground reaction
-should approach $m g$; for the working 19.719\,kg model that is approximately
-193.45\,N. Equal load sharing would be \RdStaticLoad\,N per foot, but the
+should approach $m g$; for the loaded 28.000\,kg model that is approximately
+274.68\,N. Equal load sharing would be about 68.67\,N per foot, but the
 actual front/rear split depends on the generated center of mass and stance.
 Current simulated displacement, tilt and per-motor loads are recorded in
-\href{rs06_speed_study.md}{docs/rs06\_speed\_study.md}, with JSON and CSV exports;
+\href{rs06_28kg_1ms_100s.md}{docs/rs06\_28kg\_1ms\_100s.md}, with JSON, CSV and
+MuJoCo XML exports;
 \href{locomotion_validation.md}{the locomotion validation report} summarizes
 failed speeds, turn-rate errors and the shared-controller Go2 comparison.
 The earlier 10\,kg validation numbers are not evidence for this configuration.

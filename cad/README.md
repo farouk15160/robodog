@@ -11,9 +11,12 @@ tensors into the same frame convention used by the URDF, IK and MuJoCo.
 
 The new approximately 7.549 kg CAD export includes tiny motor placeholders,
 not twelve correctly weighted RS06 actuators. Their existing mass and inertia
-must be removed before adding twelve 621 g RS06 units (7.452 kg). The working
-ROS model is approximately 19.72 kg after battery, electronics and mounting
-allowances. Payload placement and several component masses remain estimates.
+must be removed before adding twelve 621 g RS06 units (7.452 kg). The base ROS
+configuration is 19.719271 kg after battery, electronics and mounting
+allowances. The active loaded test model adds 8.280729 kg of centered,
+removable simulation ballast for an exact 28.000 kg total. The ballast is a
+test load, not a CAD-derived robot component. Payload placement and several
+component masses remain estimates.
 
 The knee actuator remains on the upper leg and drives the knee through a
 2:1 belt reduction: two actuator-output turns per knee turn. Pulley/belt mass

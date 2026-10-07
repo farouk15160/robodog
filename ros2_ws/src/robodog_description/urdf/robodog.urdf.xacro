@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <!--
   =========================================================================
-  robodog - 12-DOF quadruped, 12 x ROBSTRIDE06 QDD actuators, 19.72 kg working model
+  robodog - 12-DOF quadruped, 12 x ROBSTRIDE06 QDD actuators, 28.00 kg loaded test model
+  Base configuration: 19.719271 kg; centered removable ballast: 8.280729 kg.
   =========================================================================
   Derived from cad/robot/onshape_export by tools/cad_to_model.py. Every number
   used here comes from one of two generated/curated config files; this file
