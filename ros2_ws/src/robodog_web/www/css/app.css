@@ -46,6 +46,7 @@ body {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   display: flex; flex-direction: column; min-width: 0; overflow: hidden;
 }
+.panel[hidden] { display: none; }
 .panel h2 {
   margin: 0; padding: 9px 12px; font-size: 11px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
@@ -150,7 +151,25 @@ select, input[type=number] {
 .disabled-note { color: var(--warn); font-size: 11px; }
 
 /* ---------------- remote control ---------------- */
-.remote-layout { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(300px, 1fr); gap: 18px; }
+.remote-layout {
+  display: grid; grid-template-columns: minmax(340px, 1.1fr) minmax(300px, .9fr);
+  grid-template-areas:
+    "actions video"
+    "speed video"
+    "sticks video"
+    "help feedback"
+    "scan feedback"
+    "status feedback";
+  gap: 12px 18px; align-items: start;
+}
+.remote-actions { grid-area: actions; }
+.remote-speed { grid-area: speed; }
+.remote-video { grid-area: video; }
+.remote-sticks { grid-area: sticks; }
+.remote-help { grid-area: help; }
+.scan-save { grid-area: scan; }
+.scan-status { grid-area: status; }
+.remote-feedback { grid-area: feedback; }
 .joystick-grid { display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); gap: 18px; }
 .joystick-column { display: flex; flex-direction: column; align-items: center; gap: 7px; text-align: center; }
 .joystick-pad {
@@ -169,10 +188,10 @@ select, input[type=number] {
   pointer-events: none; transition: transform .04s linear;
 }
 .remote-actions .btn { min-height: 44px; flex: 1 1 130px; }
-.remote-help { line-height: 1.6; }
+.remote-help { line-height: 1.6; overflow-wrap: anywhere; }
 .remote-speed { margin: 2px 0 6px; }
 .remote-speed output { min-width: 132px; }
-.remote-video { min-height: 220px; }
+.remote-video { min-height: 220px; align-self: stretch; }
 .scan-save { display: grid; grid-template-columns: minmax(120px, 1fr) auto; gap: 8px; }
 .scan-save input { min-height: 44px; }
 .scan-save .btn { min-height: 44px; }
@@ -180,14 +199,62 @@ select, input[type=number] {
 .ok-text { color: var(--ok); }
 .alarm-text { color: var(--alarm); }
 @media (max-width: 850px) {
-  .remote-layout { grid-template-columns: 1fr; }
+  .remote-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas: "video" "actions" "speed" "sticks" "feedback" "scan" "status" "help";
+  }
+  .remote-video { min-height: 0; max-height: 38svh; }
   .topbar { gap: 10px; }
   .page-tabs { order: 4; width: 100%; }
   .page-tab { flex: 1; }
 }
-@media (max-width: 430px) {
-  .pbody { padding: 10px; }
-  .joystick-grid { gap: 8px; }
-  .joystick-pad { width: min(39vw, 165px); }
+@media (max-width: 520px) {
+  body { min-width: 0; overflow-x: hidden; }
+  .topbar {
+    position: static; gap: 8px; padding: 8px max(8px, env(safe-area-inset-right)) 8px
+      max(8px, env(safe-area-inset-left));
+  }
+  .brand { flex: 1; min-width: 0; }
+  .brand .sub, .topstats { display: none; }
+  .topactions { gap: 6px; }
+  .topactions .btn { min-height: 44px; padding-inline: 12px; }
+  .page-tabs { order: 5; }
+  .page-tab { min-height: 44px; }
+  .grid { gap: 6px; padding: 6px 6px calc(12px + env(safe-area-inset-bottom)); }
+  .panel h2 { padding: 8px 10px; }
+  .pbody { padding: 8px; }
+  .remote-layout { gap: 10px; }
+  .remote-video { max-height: 32svh; border-radius: 6px; }
+  .remote-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .remote-actions .btn { min-height: 50px; width: 100%; padding: 8px 5px; }
+  .remote-speed { grid-template-columns: auto 1fr; gap: 6px 10px; }
+  .remote-speed input { grid-column: 1 / -1; grid-row: 2; min-height: 32px; }
+  .remote-speed output { min-width: 0; }
+  .joystick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .joystick-column { gap: 5px; min-width: 0; }
+  .joystick-column .muted { font-size: 11px; }
+  .joystick-pad { width: clamp(116px, 39vw, 165px); max-width: 100%; }
+  .scan-save input { font-size: 16px; }
   .scan-save { grid-template-columns: 1fr; }
+  .scan-save .btn { min-height: 48px; }
+  .remote-feedback { font-size: 12px; gap: 4px 8px; }
+  .footer { flex-wrap: wrap; gap: 5px 12px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 520px) {
+  .topstats { display: none; }
+  .topbar { position: static; padding-block: 6px; }
+  .remote-layout {
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+    grid-template-areas:
+      "video actions"
+      "video speed"
+      "feedback sticks"
+      "feedback scan"
+      "feedback status"
+      "help help";
+  }
+  .remote-video { max-height: 58svh; }
+  .remote-speed { grid-template-columns: auto 1fr; }
+  .remote-speed input { grid-column: 1 / -1; grid-row: 2; }
+  .remote-speed output { min-width: 0; }
 }

@@ -321,6 +321,7 @@ class WebApp:
         self.app = web.Application()
         self.app.add_routes([
             web.get("/", self.index),
+            web.get("/remote", self.index),
             web.get("/api/config", self.api_config),
             web.get("/api/info", self.api_info),
             web.get("/api/state", self.api_state),
@@ -336,7 +337,8 @@ class WebApp:
 
     # ---------------- static + REST ----------------
     async def index(self, request):
-        return web.FileResponse(os.path.join(self.www, "index.html"))
+        return web.FileResponse(os.path.join(self.www, "index.html"),
+                                headers={"Cache-Control": "no-cache"})
 
     async def api_config(self, request):
         panels = sorted([p for p in self.cfg["panels"] if p.get("enabled", True)],

@@ -31,12 +31,21 @@ Control supplies `odom → base_link`; RTAB-Map supplies only `map → odom`. Th
 | Topic | Type / purpose |
 |---|---|
 | `/robodog/mapping/map` | `nav_msgs/OccupancyGrid`, 2D occupancy |
+| `/robodog/mapping/octomap_grid` | `nav_msgs/OccupancyGrid`, OctoMap 2D projection |
 | `/robodog/mapping/octomap_occupied_space` | `sensor_msgs/PointCloud2`, occupied 3D cells |
 | `/robodog/mapping/octomap_full` | `octomap_msgs/Octomap`, full colored occupancy tree |
 | `/robodog/mapping/octomap_binary` | `octomap_msgs/Octomap`, compact occupancy output |
 | `/robodog/mapping/mapData` | `rtabmap_msgs/MapData`, graph and observations |
 
 Map outputs are generated on demand when subscribed. RViz or the integration smoke test supplies those subscriptions. The map cache is retained when viewers disconnect.
+
+The shipped RViz profile labels these inputs explicitly. **SLAM 2D occupancy
+(`/mapping/map`)** uses `/robodog/mapping/map`; the optional **OctoMap 2D
+projection (`/mapping/octomap_grid`)** uses `/robodog/mapping/octomap_grid`;
+and **OctoMap occupied voxels** uses the PointCloud2 topic. Do not point an RViz
+Map display at `octomap_full`, `octomap_binary` or `octomap_occupied_space`:
+those are different message types. Relaunch bringup after rebuilding to reload
+the checked-in RViz profile.
 
 The room-scan exporter keeps a subscription to `/robodog/mapping/cloud_map`, so RTAB-Map maintains its graph-corrected assembled point cloud even when RViz is closed. This is the dense, colored room scan. Do not confuse it with `octomap_occupied_space`, which contains occupied OctoMap voxel centers for occupancy visualization.
 

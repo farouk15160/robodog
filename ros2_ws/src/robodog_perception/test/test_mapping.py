@@ -2,6 +2,7 @@
 from pathlib import Path
 import importlib.util
 import struct
+import yaml
 
 import pytest
 from sensor_msgs.msg import PointCloud2, PointField
@@ -27,6 +28,16 @@ def test_disabled_mapping_needs_no_camera_or_odometry():
 
 def test_auto_mapping_enables_supported_simulation():
     assert plan(mode="auto").enabled
+
+
+def test_rviz_profile_keeps_slam_and_octomap_topics_distinct():
+    config = yaml.safe_load((Path(__file__).parents[1] / "config/mapping.rviz").read_text())
+    displays = config["Visualization Manager"]["Displays"]
+    topics = {display["Name"]: display.get("Topic", {}).get("Value")
+              for display in displays}
+    assert topics["SLAM 2D occupancy (/mapping/map)"] == "/robodog/mapping/map"
+    assert topics["OctoMap 2D projection (/mapping/octomap_grid)"] == "/robodog/mapping/octomap_grid"
+    assert topics["OctoMap occupied voxels"] == "/robodog/mapping/octomap_occupied_space"
 
 
 @pytest.mark.parametrize("kwargs", [

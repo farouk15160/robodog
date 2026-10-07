@@ -35,6 +35,18 @@ def test_local_gui_origin_can_receive_telemetry():
     asyncio.run(check())
 
 
+def test_remote_control_has_a_direct_page_route():
+    async def check():
+        app = WebApp(SimpleNamespace(state=None),
+                     {"host": "127.0.0.1", "stream_rate_hz": 20},
+                     str(Path(__file__).resolve().parents[1] / "www"), {})
+        async with TestClient(TestServer(app.app)) as client:
+            response = await client.get("/remote")
+            assert response.status == 200
+            assert "Remote Control" in await response.text()
+    asyncio.run(check())
+
+
 def test_command_socket_rejects_non_object_json_without_closing():
     async def check():
         app = WebApp(SimpleNamespace(state=None),

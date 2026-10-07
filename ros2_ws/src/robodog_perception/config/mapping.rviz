@@ -313,12 +313,24 @@ Visualization Manager:
     Value: false
   - Class: rviz_default_plugins/Map
     Enabled: true
-    Name: SLAM occupancy grid
+    Name: SLAM 2D occupancy (/mapping/map)
     Alpha: 0.55
     Draw Behind: true
     Color Scheme: map
     Topic:
       Value: /robodog/mapping/map
+      Depth: 1
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+  - Class: rviz_default_plugins/Map
+    Enabled: false
+    Name: OctoMap 2D projection (/mapping/octomap_grid)
+    Alpha: 0.55
+    Draw Behind: true
+    Color Scheme: map
+    Topic:
+      Value: /robodog/mapping/octomap_grid
       Depth: 1
       Durability Policy: Transient Local
       History Policy: Keep Last

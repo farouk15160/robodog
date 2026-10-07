@@ -227,6 +227,7 @@ Panels.remote = {
       ["hottest motor", "--"], ["backend / world", "--"],
       ["mapping", "waiting for telemetry"],
     ]);
+    feedback.className += " remote-feedback";
     const video = el("div", "videoframe remote-video");
     const image = el("img");
     image.src = "/api/video";
@@ -286,7 +287,7 @@ Panels.remote = {
     };
     const translation = makeStick("Forward and lateral joystick", "translation");
     const turning = makeStick("Turn joystick", "turn");
-    const sticks = el("div", "joystick-grid");
+    const sticks = el("div", "joystick-grid remote-sticks");
     const stickColumn = (title, stick, hint) => {
       const column = el("div", "joystick-column");
       column.append(el("strong", null, title), stick.pad, el("div", "muted", hint));
@@ -397,10 +398,8 @@ Panels.remote = {
     const keyboard = el("div", "muted remote-help",
       "Laptop: W/S forward, A/D lateral, Q/E or ←/→ turn. Hold keys or a joystick to move; release, focus loss, hidden tab, or disconnect commands zero velocity.");
     const layout = el("div", "remote-layout");
-    const controls = el("div", "stack");
-    controls.append(actions, speed, sticks, keyboard, scan, saveStatus);
-    const live = el("div", "stack"); live.append(video, feedback);
-    layout.append(controls, live); body.append(layout);
+    layout.append(actions, speed, video, sticks, keyboard, scan, saveStatus, feedback);
+    body.append(layout);
 
     return {
       update(s) {

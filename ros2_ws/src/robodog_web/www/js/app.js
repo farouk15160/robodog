@@ -119,6 +119,7 @@
       }
     }
 
+    const pageFromLocation = () => location.pathname === "/remote" ? "remote" : "dashboard";
     const selectPage = (page) => {
       const previous = state.page;
       state.page = page;
@@ -136,9 +137,14 @@
       });
     };
     document.querySelectorAll(".page-tab").forEach(button => {
-      button.onclick = () => selectPage(button.dataset.page);
+      button.onclick = () => {
+        const page = button.dataset.page;
+        history.pushState(null, "", page === "remote" ? "/remote" : "/");
+        selectPage(page);
+      };
     });
-    selectPage("dashboard");
+    window.addEventListener("popstate", () => selectPage(pageFromLocation()));
+    selectPage(pageFromLocation());
 
     $("btn-estop-top").onclick = () => send({ action: "estop", reason: "web GUI toolbar" });
     $("btn-theme").onclick = () => {

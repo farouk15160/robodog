@@ -9,14 +9,16 @@ RMS diagnostics remain on the Dashboard.
 
 ## Start and connect
 
-For local use, launch normally and open <http://localhost:8080>:
+For local use, launch normally and open the direct page at
+<http://localhost:8080/remote>. The **Remote Control** tab and browser
+back/forward navigation use the same route:
 
 ```bash
 ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house
 ```
 
 The server binds to loopback by default. To use a phone on the same trusted
-LAN, bind it to all interfaces and open `http://<robot-ip>:8080` on the phone:
+LAN, bind it to all interfaces and open `http://<robot-ip>:8080/remote` on the phone:
 
 ```bash
 ros2 launch robodog_bringup robot.launch.py \

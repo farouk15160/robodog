@@ -137,6 +137,8 @@ much smaller surface from a web page that can move a 19.72 kg machine.
 The **Remote Control** page adds two touch joysticks, `WASD`/arrow keyboard
 control, live camera and motion/safety feedback, a simulation-only Greeting,
 and an atomic **Save room scan** action. Its speed slider starts at 0.5 m/s.
+Open it directly at `http://localhost:8080/remote`, or use the Remote Control
+tab.
 Motion is dead-man controlled: held inputs refresh at 10 Hz, and release,
 focus loss, disconnect or either server/controller timeout commands zero
 velocity. See the [remote-control runbook](docs/remote_control.md), including
