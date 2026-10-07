@@ -437,8 +437,8 @@ the identifier's data field because the payload is full.
 \begin{decision}{The command interface is the actuator's native impedance frame}
 \code{JointCommand} carries $(\text{position},\ \text{velocity},\ \text{effort},\
 k_p,\ k_d)$ --- exactly one CAN frame. A narrower interface, such as position
-only, would force the host to close a loop the motor already closes in firmware
-at tens of kHz. The host sets \emph{setpoints}; it is not the servo.
+only, would force the host to reproduce a loop that the motor firmware already
+closes locally. The host sets \emph{setpoints}; it is not the servo.
 \end{decision}
 
 \subsection{Bus budget}
@@ -462,14 +462,17 @@ needs one command and one feedback frame per cycle.
 \end{center}
 
 \begin{decision}{Two buses at \RdControlRate\,Hz, split front/rear}
-\RdControlRate\,Hz is not a compromise on control quality: because the RS06
-closes its position and velocity loop in firmware, the host rate is a
-\emph{setpoint update} rate. The same rate is used in simulation so that gains
-tuned in MuJoCo transfer without change.
+Because the RS06 closes its position and velocity loop in firmware, the
+\RdControlRate\,Hz host rate is a \emph{setpoint update} rate. Simulation uses
+the same setpoint cadence to reproduce the command timing. This alignment does
+not make simulated gains hardware-ready: motor-current dynamics, communication
+latency, friction, backlash, compliance and sensor filtering still require
+identification and retuning on the supported robot.
 
-The split is front/rear rather than left/right so that each bus carries a
-complete leg \emph{pair}: a single bus failure leaves the robot in a
-recognisable posture rather than a diagonal collapse.
+The front/rear split gives deterministic fault containment: each bus carries
+both complete legs at one end of the body. It does not guarantee a safe posture
+after a bus fault; the outcome depends on actuator fail state, contact geometry
+and the supervisory stop response and must be validated on a supported rig.
 \code{RobStride06Backend.check\_bus\_budget()} refuses any configuration above
 80\,\% at start-up.
 \end{decision}
@@ -620,9 +623,12 @@ Each leg $i$ reads the same clock through its own offset:
 \]
 where $D$ is the duty factor. That single line is what distinguishes a walk
 from a trot: the offsets decide which feet are down together, and $D$ decides
-for how long. A duty of 0.75 with the walk offsets always leaves three feet
-down, so the robot is statically stable; a duty of 0.5 with the trot offsets
-leaves two, on a diagonal, so it is not.
+for how long. A duty of 0.75 with the walk offsets normally leaves three feet
+down and therefore permits a support triangle. Static stability additionally
+requires the projected centre of mass to remain inside that triangle with a
+positive margin, feasible contact forces and adequate friction. A duty of 0.5
+with the trot offsets normally leaves two diagonal contacts and therefore does
+not provide a finite-area static support polygon.
 
 \subsubsection{Stance: the foot is a fixed point in the world}
 
@@ -653,7 +659,7 @@ Sweeping at the measured velocity instead is self-consistent at any speed,
 including the wrong one: measured at $g_{\text{sweep}} = 0$, a walk commanded
 to 0.15\,m/s free-ran to 0.272\,m/s and then fell over.
 
-\subsubsection{Swing: interpolate between two latched endpoints}
+\subsubsection{Swing: interpolate towards an updated landing point}
 
 Swing carries the foot from where it left the ground to where it should next
 land. Both endpoints are explicit positions:
@@ -672,15 +678,19 @@ land. Both endpoints are explicit positions:
   \sigma(u) = u - \frac{\sin 2\pi u}{2\pi}
 \]
 
-$\sigma'(u) = 1 - \cos 2\pi u$ vanishes at both ends, so the foot leaves and
-arrives with no horizontal velocity relative to the ground --- it is placed,
-not dragged. The vertical profile $\sin^2(\pi u)$ is likewise zero-slope at
-both ends, with a small \code{touchdown\_depth} subtracted late in swing so the
-foot seeks the floor rather than hovering over it, and decayed again over the
-first sixth of stance so that seeking does not itself become a step.
+$\sigma'(u) = 1 - \cos 2\pi u$ vanishes at both ends, so the interpolation
+profile itself contributes no endpoint slope. The landing point is nevertheless
+updated during swing; the implementation reports the analytic interpolation
+velocity while omitting the $\dot{\mathbf p}_1\sigma$ term. Consequently the
+actual command need not have zero ground-relative horizontal velocity at
+touchdown. The $\sin^2(\pi u)$ lift term is also zero-slope at both ends, but
+the added $-d_{\rm td}u^3$ touchdown-depth term has a nonzero terminal slope.
+The reported vertical desired velocity omits that derivative. These are explicit
+moving-endpoint approximations to be corrected before hardware gait validation.
 
-Interpolating between two latched endpoints is what makes the command
-continuous, and it is worth being explicit about why that is not a detail.
+Interpolating from the latched lift-off point with a smooth profile keeps the
+principal command contribution continuous, and it is worth being explicit
+about why that is not a detail.
 Section~\ref{sec:locomotion-status} records what happened when it was not.
 
 \subsubsection{Foot placement: where velocity is really decided}
@@ -769,12 +779,16 @@ forces are solved to reproduce it:
 \[
 \sum_i f_i = F, \qquad \sum_i r_i \times f_i = M
 \]
-Six equations in $3 n_{\mathrm{stance}}$ unknowns --- exactly determined for a
-trot, under-determined for a walk or a full stance --- solved by least squares,
+Six equations in $3 n_{\mathrm{stance}}$ unknowns are solved by least squares,
 then projected into what a contact can deliver: $f_z \ge 0$ and
-$\lVert f_{xy} \rVert \le \mu f_z$.
+$\lVert f_{xy} \rVert \le \mu f_z$. Two-contact trot gives a square $6\times6$
+system, but its grasp matrix is generally rank-deficient because point contacts
+cannot generate an arbitrary moment about their connecting line. A square
+system therefore does not guarantee an exact, unique or contact-feasible wrench;
+the achieved wrench must be checked after projection. Walk and full stance add
+force variables but retain rank and friction-cone feasibility limits.
 
-\begin{decision}{A stance leg is force controlled, not position controlled}
+\begin{decision}{Stance uses joint impedance with force feed-forward}
 This was measured the hard way. With \code{stance\_kp} at 120 the stance legs
 showed 0.17\,rad of tracking error and 20\,N$\cdot$m of pure disagreement with
 reality: the commanded foot position was advancing at the \emph{commanded} body
@@ -918,14 +932,17 @@ and 201\,\% of continuous, implying winding temperatures from 139 to
 260\,$^\circ$C. That table was correct about a robot with two welded hips and a
 discontinuous swing arc.
 
-The interpretation was correct then and remains the useful one: the actuators
-were never undersized. Standing costs 3.9\,N$\cdot$m RMS, and steady walking at
-0.5\,m/s needs about 49\,W of net mechanical work against 754\,W rated --- some
-7\,\% --- because almost all the torque a quadruped spends is holding itself up,
-which does no work at all. A travelling gait that costs three times the RMS of
-standing still is not doing three times the work; it is wasting the difference.
-With the waste removed, trot sits at 90\,\% of continuous and 69\,$^\circ$C,
-inside the 70\,$^\circ$C warning threshold.
+After repairing those simulation defects, this historical RS02 model no longer
+supported the earlier actuator-undersizing diagnosis. Standing costs
+3.9\,N$\cdot$m RMS, while the 0.5\,m/s run reports about 49\,W of mean signed
+mechanical power. These quantities answer different questions: signed
+mechanical power can be small despite large alternating positive and negative
+work, while RMS torque is a current and copper-loss proxy under a constant
+torque-constant assumption. Neither metric alone measures energetic efficiency
+or identifies ``waste.'' In the repaired model, trot reaches 90\,\% of the configured continuous
+reference and an estimated 69\,$^\circ$C, just below the project's
+70\,$^\circ$C warning policy. Those uncalibrated RS02 simulation values do not
+establish real-motor thermal margin or general actuator adequacy.
 
 Bound remains over limit, which is what it is for: it is the gait used to probe
 the peak-torque and $I^2t$ path in simulation, and it should not be commanded on
@@ -1268,10 +1285,11 @@ a controller that works in simulation and fails on the robot.
 
 \begin{enumerate}
 \item \textbf{The impedance law is evaluated at the physics rate}, not the
-      control rate. The real RS06 closes its loop in firmware at tens of kHz;
-      holding a \RdControlRate\,Hz zero-order hold on $k_p(q^*-q)$ would make the
-      simulated joints noticeably softer than the hardware and would tune gains
-      that are wrong on the robot. Only the \emph{setpoint} is held.
+      control rate. The RS06 closes its servo loop locally in firmware; holding
+      a \RdControlRate\,Hz zero-order hold on $k_p(q^*-q)$ in the physics model
+      would instead integrate the impedance law only at the host update rate.
+      Only the \emph{setpoint} is held. The local-loop bandwidth is not claimed
+      here because it was not specified in the audited manufacturer documents.
 \item \textbf{\code{armature} carries equivalent output inertia}:
       0.012\,kg$\cdot$m$^2$ for direct hips and 0.048\,kg$\cdot$m$^2$
       after the external knee reduction. Omitting it overstates acceleration.
@@ -1741,7 +1759,7 @@ Performance and electrical values follow the manufacturer's September 17, 2026
 RS-series specification; the July RS06 manual supplies protocol details.
 \href{rs06_datasheet_audit.md}{The RS06 datasheet audit} records source links,
 page references, source hashes and differences between these
-documents~\cite{robstride-audit}.
+documents~\cite{robstride-spec,robstride-manual,robstride-audit}.
 The research pass behind this revision is captured in
 \href{research/robodog_scientific_foundations.md}{docs/research/robodog\_scientific\_foundations.md}
 ~\cite{scientific-foundations};
@@ -1823,7 +1841,8 @@ odometry broadcaster or separate OctoMap mapper. \\
 3D occupancy & OctoMap project and ROS 2 saver source~\cite{octomap,octomap-saver} & \code{.ot} export is
 an occupancy snapshot from a \code{GetOctomap} service, not the SLAM database. \\
 Quadruped locomotion & Raibert-style foot placement and MIT Cheetah literature
-\cite{cheetah3-design,mpc-wbic} & Velocity regulation is treated as foot-placement and contact-force control
+\cite{cheetah3-design,mpc-wbic} & Velocity regulation uses foot placement and
+joint impedance targets with Jacobian-transpose contact-force feed-forward,
 rather than joint-position playback alone. \\
 Benchmarking & Official \code{unitree\_mujoco} repository~\cite{unitree-mujoco} & Go2 comparison uses
 the official MJCF under the same measurement method, not a manufacturer
@@ -1861,8 +1880,14 @@ Safety changes commands during 99.82\,\% of walk cycles and 87.965\,\% of trot
 cycles. Walk reports position, velocity and torque fault bits; trot reports
 velocity and torque bits. Neither case passes the tracking and motor-margin
 criteria. No peak-torque or MuJoCo actuator clipping occurs, but extensive
-safety and modeled speed-envelope limiting remains. Temperatures are
-uncalibrated estimates. Against the historical 19.719271\,kg trot, actual speed
+safety and modeled speed-envelope limiting remains. The simulator's speed
+limit is a generic linear motoring approximation,
+$\tau_{\rm available}=\tau_{\rm limit}(1-|\omega|/\omega_{\rm nl})$, with
+voltage-scaled no-load speed. It is not a fit to the manufacturer's tabulated
+RS06 torque--speed curve and can be conservative over parts of the measured
+range. Because limiting is frequent here, hardware capability requires a
+curve-calibrated model and physical measurements. Temperatures are uncalibrated
+estimates. Against the historical 19.719271\,kg trot, actual speed
 falls from 0.984 to 0.923\,m/s, RMS rises from 5.360 to 6.749\,N$\cdot$m, peak
 rises from 28.638 to 34.897\,N$\cdot$m and safety-limited cycles rise from
 30.6\,\% to 88.0\,\%.
@@ -2094,8 +2119,11 @@ available; simulation gains and limits do not certify hardware operation.
       Section~\ref{sec:safety} carry the uncertainty.
 \item \textbf{Bring up on a stand}, legs free: joint test sweeps, then named
       poses, then stance with the body supported.
-\item \textbf{On the ground}, walk gait first --- it is statically stable and
-      keeps three feet down.
+\item \textbf{On the ground}, begin with a tethered, low-speed walk only after
+      verifying estimator feedback, friction, force feasibility and positive
+      centre-of-mass support margin throughout the commanded cycle. Its nominal
+      three-contact phases form support triangles; that contact count alone does
+      not establish stability.
 \end{enumerate}
 
 \subsection{Known gaps}
@@ -2266,39 +2294,47 @@ pp. 70--82. \url{https://publications.ri.cmu.edu/publications/dynamically-stable
 
 \bibitem{khatib}
 O. Khatib, ``The Operational Space Formulation in Robot Manipulator Control,''
-1985.
+in \emph{Proc. 15th International Symposium on Industrial Robots}, Tokyo,
+pp. 165--172, 1985.
 \url{https://cs.stanford.edu/group/manips/publications/pdfs/Khatib_1985_ISIR.pdf}
 
 \bibitem{hogan}
 N. Hogan, ``Impedance Control: An Approach to Manipulation: Part I---Theory,''
-1985.
+\emph{Journal of Dynamic Systems, Measurement, and Control}, vol. 107, no. 1,
+pp. 1--7, 1985.
 \url{https://doi.org/10.1115/1.3140702}
 
 \bibitem{ros2-nodes}
 Open Robotics, ``ROS 2 nodes documentation source.''
-\url{https://github.com/ros2/ros2_documentation/blob/rolling/source/ROS-Framework/About-Nodes.rst}
+Humble branch, commit \code{50c120d}.
+\url{https://github.com/ros2/ros2_documentation/blob/50c120d4651e92c0aa8f372a1206b195de6238d1/source/Concepts/Basic/About-Nodes.rst}
 
 \bibitem{ros2-topics}
 Open Robotics, ``ROS 2 topics documentation source.''
-\url{https://github.com/ros2/ros2_documentation/blob/rolling/source/ROS-Framework/interfaces/About-Topics.rst}
+Humble branch, commit \code{50c120d}.
+\url{https://github.com/ros2/ros2_documentation/blob/50c120d4651e92c0aa8f372a1206b195de6238d1/source/Concepts/Basic/About-Topics.rst}
 
 \bibitem{ros2-qos}
 Open Robotics, ``ROS 2 Quality of Service documentation source.''
-\url{https://github.com/ros2/ros2_documentation/blob/rolling/source/ROS-Framework/interfaces/topics/About-Quality-of-Service-Settings.rst}
+Humble branch, commit \code{50c120d}.
+\url{https://github.com/ros2/ros2_documentation/blob/50c120d4651e92c0aa8f372a1206b195de6238d1/source/Concepts/Intermediate/About-Quality-of-Service-Settings.rst}
 
 \bibitem{robot-state-publisher}
 ROS project, ``robot\_state\_publisher README.''
-\url{https://github.com/ros/robot_state_publisher}
+Humble branch, commit \code{8b5af4f}.
+\url{https://github.com/ros/robot_state_publisher/tree/8b5af4f31e0f754c7c262eb487ccd3956cb788cc}
 
 \bibitem{rep103}
 T. Foote and M. Purvis, ``REP-103: Standard Units of Measure and Coordinate
 Conventions,'' ROS Enhancement Proposals.
-\url{https://github.com/ros-infrastructure/rep/blob/master/rep-0103.rst}
+Commit \code{11ca24a}.
+\url{https://github.com/ros-infrastructure/rep/blob/11ca24a41f31480dfb9562ba99f2a5b93d3ebda5/rep-0103.rst}
 
 \bibitem{rep105}
 W. Meeussen, ``REP-105: Coordinate Frames for Mobile Platforms,'' ROS
 Enhancement Proposals.
-\url{https://github.com/ros-infrastructure/rep/blob/master/rep-0105.rst}
+Commit \code{11ca24a}.
+\url{https://github.com/ros-infrastructure/rep/blob/11ca24a41f31480dfb9562ba99f2a5b93d3ebda5/rep-0105.rst}
 
 \bibitem{mujoco-computation}
 Google DeepMind, ``MuJoCo computation documentation: actuation model and
@@ -2309,11 +2345,12 @@ generalized forces.''
 E. Todorov, T. Erez and Y. Tassa, ``MuJoCo: A Physics Engine for Model-Based
 Control,'' in \emph{Proc. IEEE/RSJ IROS}, 2012, pp. 5026--5033,
 doi:10.1109/IROS.2012.6386109.
-\url{https://homes.cs.washington.edu/~todorov/papers/TodorovIROS12.pdf}
+\url{https://doi.org/10.1109/IROS.2012.6386109}
 
 \bibitem{pointcloud2}
 ROS 2 common interfaces, ``sensor\_msgs/msg/PointCloud2 message definition.''
-\url{https://github.com/ros2/common_interfaces/blob/rolling/sensor_msgs/msg/PointCloud2.msg}
+Humble branch, commit \code{0843449}.
+\url{https://github.com/ros2/common_interfaces/blob/08434490d3e4abd37ccc5462cdde69b88853b5b8/sensor_msgs/msg/PointCloud2.msg}
 
 \bibitem{rtabmap-paper}
 M. Labb\'e and F. Michaud, ``RTAB-Map as an Open-Source Lidar and Visual SLAM
@@ -2323,11 +2360,13 @@ doi:10.1002/rob.21831.
 
 \bibitem{rtabmap-ros}
 IntRoLab, ``rtabmap\_ros: ROS 2 wrapper for RTAB-Map.''
-\url{https://github.com/introlab/rtabmap_ros/blob/ros2/README.md}
+ROS 2 branch, commit \code{cb2117f}.
+\url{https://github.com/introlab/rtabmap_ros/blob/cb2117f1ed6674cf7cfc644d7bb4ffc0b567b364/README.md}
 
 \bibitem{rtabmap-corewrapper}
 IntRoLab, ``rtabmap\_slam CoreWrapper source.''
-\url{https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_slam/src/CoreWrapper.cpp}
+ROS 2 branch, commit \code{cb2117f}.
+\url{https://github.com/introlab/rtabmap_ros/blob/cb2117f1ed6674cf7cfc644d7bb4ffc0b567b364/rtabmap_slam/src/CoreWrapper.cpp}
 
 \bibitem{octomap}
 A. Hornung, K. M. Wurm, M. Bennewitz, C. Stachniss and W. Burgard,
@@ -2338,7 +2377,8 @@ doi:10.1007/s10514-012-9321-0. Project page:
 
 \bibitem{octomap-saver}
 OctoMap project, ``ROS 2 octomap\_saver source.''
-\url{https://github.com/OctoMap/octomap_mapping/blob/ros2/octomap_server/src/octomap_saver.cpp}
+ROS 2 branch, commit \code{f79da9a}.
+\url{https://github.com/OctoMap/octomap_mapping/blob/f79da9a9a1fcdf82e72dab4df288d6cc27c6e163/octomap_server/src/octomap_saver.cpp}
 
 \bibitem{cheetah3-design}
 G. Bledt, M. J. Powell, B. Katz, J. Di Carlo, P. M. Wensing and S. Kim,
@@ -2353,7 +2393,20 @@ Locomotion via Whole-Body Impulse Control and Model Predictive Control,'' 2019.
 
 \bibitem{unitree-mujoco}
 Unitree Robotics, ``unitree\_mujoco official repository.''
-\url{https://github.com/unitreerobotics/unitree_mujoco}
+Commit \code{1eb6642}, the revision used by the benchmark.
+\url{https://github.com/unitreerobotics/unitree_mujoco/tree/1eb6642e3f3fdfb7fb13a9794fd6a2dd93ea0e7d}
+
+\bibitem{robstride-spec}
+RobStride, ``RS Series Product Specification,'' revision 17 September 2026,
+RS06 pp. 30--33, repository commit \code{3f0cae4}; downloaded file SHA-256
+\code{76c85c3c11f15bf3adc1676d6a4b8c931ffd9c18cec41221f8ea5a8b54e22ea1}.
+\url{https://github.com/RobStride/Product_Information/blob/3f0cae4986e175337c7b03d891b899247b1f2933/%E7%81%B5%E8%B6%B3%E6%97%B6%E4%BB%A3RS%E7%B3%BB%E5%88%97%E4%BA%A7%E5%93%81%E8%A7%84%E6%A0%BC%E4%BB%8B%E7%BB%8D%282026.09.17%29.pdf}
+
+\bibitem{robstride-manual}
+RobStride, \emph{RS06 User Manual 260713}, July 2026, repository commit
+\code{3f0cae4}; downloaded file SHA-256
+\code{f2790b989d7aa3f1ecee321b0ca773db18f07a7b1da647b38cb714d361d32b2f}.
+\url{https://github.com/RobStride/Product_Information/blob/3f0cae4986e175337c7b03d891b899247b1f2933/Product%20Literature/RS06/RS06User%20Manual260713.pdf}
 
 \bibitem{robstride-audit}
 RoboDog project, ``RS06 manufacturer datasheet audit,''
