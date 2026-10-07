@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { usePanGesture } from 'react-native-gesture-handler';
+import { Gesture } from 'react-native-gesture-handler';
 import { WebView } from 'react-native-webview';
 
 import { Joystick } from '../components/Joystick';
@@ -134,67 +134,65 @@ export default function ControlScreen() {
     if (wasHeld || bridgeReadyRef.current) sendVelocity(false);
   }, [sendVelocity]);
 
-  const onTranslation = (value: JoystickVector) => {
-    inputRef.current = updateHandheldStick(inputRef.current, 'move', value);
-    if (isHandheldInputActive(inputRef.current)) sendVelocity(true);
-  };
-  const onRotation = (value: JoystickVector) => {
-    inputRef.current = updateHandheldStick(inputRef.current, 'turn', value);
-    if (isHandheldInputActive(inputRef.current)) sendVelocity(true);
-  };
-  const setStickActive = (stick: HandheldStick, active: boolean) => {
-    inputRef.current = setHandheldStickActive(inputRef.current, stick, active);
-    const driving = isHandheldInputActive(inputRef.current) && controlAvailableRef.current;
-    setDeadmanHeld(driving);
-    sendVelocity(driving);
-  };
   const joystickTravel = useMemo(
     () => joystickGeometry(layout.joystickDiameter).travel,
     [layout.joystickDiameter],
   );
-  const moveGesture = usePanGesture({
-    enabled: controlAvailable,
-    minDistance: 0,
-    shouldCancelWhenOutside: false,
-    runOnJS: true,
-    onBegin: () => { setMovePressed(true); setStickActive('move', true); },
-    onUpdate: (event) => {
-      const next = clampJoystick({
-        x: event.translationX / joystickTravel,
-        y: event.translationY / joystickTravel,
+  const joystickGestures = useMemo(() => {
+    const updateVector = (stick: HandheldStick, value: JoystickVector) => {
+      inputRef.current = updateHandheldStick(inputRef.current, stick, value);
+      if (isHandheldInputActive(inputRef.current)) sendVelocity(true);
+    };
+    const setActive = (stick: HandheldStick, active: boolean) => {
+      inputRef.current = setHandheldStickActive(inputRef.current, stick, active);
+      const driving = isHandheldInputActive(inputRef.current) && controlAvailableRef.current;
+      setDeadmanHeld(driving);
+      sendVelocity(driving);
+    };
+    const move = Gesture.Pan()
+      .enabled(controlAvailable)
+      .minDistance(0)
+      .shouldCancelWhenOutside(false)
+      .runOnJS(true)
+      .onBegin(() => { setMovePressed(true); setActive('move', true); })
+      .onUpdate((event) => {
+        const next = clampJoystick({
+          x: event.translationX / joystickTravel,
+          y: event.translationY / joystickTravel,
+        });
+        setMoveVisual(next);
+        updateVector('move', next);
+      })
+      .onFinalize(() => {
+        setMovePressed(false);
+        setMoveVisual(ZERO_STICK);
+        updateVector('move', ZERO_STICK);
+        setActive('move', false);
       });
-      setMoveVisual(next);
-      onTranslation(next);
-    },
-    onFinalize: () => {
-      setMovePressed(false);
-      setMoveVisual(ZERO_STICK);
-      onTranslation(ZERO_STICK);
-      setStickActive('move', false);
-    },
-  });
-  const turnGesture = usePanGesture({
-    enabled: controlAvailable,
-    minDistance: 0,
-    shouldCancelWhenOutside: false,
-    runOnJS: true,
-    simultaneousWith: moveGesture,
-    onBegin: () => { setTurnPressed(true); setStickActive('turn', true); },
-    onUpdate: (event) => {
-      const next = clampJoystick({
-        x: event.translationX / joystickTravel,
-        y: event.translationY / joystickTravel,
+    const turn = Gesture.Pan()
+      .enabled(controlAvailable)
+      .minDistance(0)
+      .shouldCancelWhenOutside(false)
+      .runOnJS(true)
+      .onBegin(() => { setTurnPressed(true); setActive('turn', true); })
+      .onUpdate((event) => {
+        const next = clampJoystick({
+          x: event.translationX / joystickTravel,
+          y: event.translationY / joystickTravel,
+        });
+        setTurnVisual(next);
+        updateVector('turn', next);
+      })
+      .onFinalize(() => {
+        setTurnPressed(false);
+        setTurnVisual(ZERO_STICK);
+        updateVector('turn', ZERO_STICK);
+        setActive('turn', false);
       });
-      setTurnVisual(next);
-      onRotation(next);
-    },
-    onFinalize: () => {
-      setTurnPressed(false);
-      setTurnVisual(ZERO_STICK);
-      onRotation(ZERO_STICK);
-      setStickActive('turn', false);
-    },
-  });
+    move.simultaneousWithExternalGesture(turn);
+    turn.simultaneousWithExternalGesture(move);
+    return Object.freeze({ move, turn });
+  }, [controlAvailable, joystickTravel, sendVelocity]);
 
   useEffect(() => {
     let active = true;
@@ -386,9 +384,9 @@ export default function ControlScreen() {
 
     <View style={[styles.joysticks, { gap: layout.joystickGap }]}>
       <Joystick label="MOVE" size={layout.joystickDiameter} disabled={!controlAvailable}
-        value={moveVisual} pressed={movePressed} gesture={moveGesture} />
+        value={moveVisual} pressed={movePressed} gesture={joystickGestures.move} />
       <Joystick label="TURN" size={layout.joystickDiameter} disabled={!controlAvailable}
-        value={turnVisual} pressed={turnPressed} gesture={turnGesture} />
+        value={turnVisual} pressed={turnPressed} gesture={joystickGestures.turn} />
     </View>
 
     <View style={[
