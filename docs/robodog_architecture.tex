@@ -155,42 +155,42 @@ necessary because a 100\,s RMS value can hide startup or touchdown spikes.
 
 \subsection{Local evidence map}
 
-{\footnotesize
+\begin{center}\footnotesize
 \begin{tabular}{@{}lp{0.67\textwidth}@{}}
 \toprule
 \textbf{Claim area} & \textbf{Source files and artifacts} \\
 \midrule
 Generated rigid-body model &
-\path{tools/cad_to_model.py};
-\path{ros2_ws/src/robodog_description/config/robot_parameters.yaml};
-\path{ros2_ws/src/robodog_description/urdf/robodog.urdf.xacro} \\
+\code{tools/cad\_to\_model.py};
+\code{ros2\_ws/src/robodog\_description/config/robot\_parameters.yaml};
+\code{ros2\_ws/src/robodog\_description/urdf/robodog.urdf.xacro} \\
 RS06 ratings and knee belt &
-\path{docs/rs06_datasheet_audit.md};
-\path{ros2_ws/src/robodog_description/config/robstride06.yaml};
-\path{ros2_ws/src/robodog_hardware/robodog_hardware/transmission.py} \\
+\code{docs/rs06\_datasheet\_audit.md};
+\code{ros2\_ws/src/robodog\_description/config/robstride06.yaml};
+\code{ros2\_ws/src/robodog\_hardware/robodog\_hardware/transmission.py} \\
 Control loop and ROS contracts &
-\path{ros2_ws/src/robodog_control/robodog_control/control_node.py};
-\path{ros2_ws/src/robodog_msgs/msg/*.msg};
-\path{ros2_ws/src/robodog_msgs/srv/*.srv} \\
+\code{ros2\_ws/src/robodog\_control/robodog\_control/control\_node.py};
+\code{ros2\_ws/src/robodog\_msgs/msg/*.msg};
+\code{ros2\_ws/src/robodog\_msgs/srv/*.srv} \\
 Kinematics and force mapping &
-\path{ros2_ws/src/robodog_control/robodog_control/kinematics.py};
-\path{ros2_ws/src/robodog_control/test/test_kinematics.py} \\
+\code{ros2\_ws/src/robodog\_control/robodog\_control/kinematics.py};
+\code{ros2\_ws/src/robodog\_control/test/test\_kinematics.py} \\
 Gait and balance controller &
-\path{ros2_ws/src/robodog_control/robodog_control/gait.py};
-\path{ros2_ws/src/robodog_control/robodog_control/balance.py};
-\path{ros2_ws/src/robodog_control/config/gaits.yaml} \\
+\code{ros2\_ws/src/robodog\_control/robodog\_control/gait.py};
+\code{ros2\_ws/src/robodog\_control/robodog\_control/balance.py};
+\code{ros2\_ws/src/robodog\_control/config/gaits.yaml} \\
 28\,kg torque report &
-\path{docs/rs06_28kg_1ms_100s.md};
-\path{docs/rs06_28kg_1ms_100s.json};
-\path{docs/rs06_28kg_1ms_100s.csv};
-\path{tools/torque_report.py} \\
+\code{docs/rs06\_28kg\_1ms\_100s.md};
+\code{docs/rs06\_28kg\_1ms\_100s.json};
+\code{docs/rs06\_28kg\_1ms\_100s.csv};
+\code{tools/torque\_report.py} \\
 RGB-D mapping and saved scans &
-\path{docs/mapping.md};
-\path{ros2_ws/src/robodog_perception/launch/mapping.launch.py};
-\path{ros2_ws/src/robodog_perception/robodog_perception/map_export.py};
-\path{ros2_ws/src/robodog_msgs/srv/SaveMap.srv} \\
+\code{docs/mapping.md};
+\code{ros2\_ws/src/robodog\_perception/launch/mapping.launch.py};
+\code{ros2\_ws/src/robodog\_perception/robodog\_perception/map\_export.py};
+\code{ros2\_ws/src/robodog\_msgs/srv/SaveMap.srv} \\
 Primary-source research note &
-\path{docs/research/robodog_scientific_foundations.md} \\
+\code{docs/research/robodog\_scientific\_foundations.md} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -537,6 +537,20 @@ Swing leg              & 60  & 1.5 & tracks the unloaded trajectory \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\subsection{Finite joint-space trajectories}
+
+Named poses use a fifth-order minimum-jerk blend rather than a position step.
+For normalized time $s=\operatorname{clip}(t/T,0,1)$,
+\[
+  h(s)=10s^3-15s^4+6s^5,\qquad
+  q^*(t)=q_0+h(s)(q_1-q_0).
+\]
+Because $h'(0)=h'(1)=h''(0)=h''(1)=0$, the transition begins and ends with
+zero target velocity and acceleration. The greeting is a simulation-only
+whole-body motion with its own support-polygon check and recovery to stand. It
+is an operator demonstration, not a locomotion gait or evidence of hardware
+stability.
 
 \subsection{Gravity feed-forward and the force convention}
 
@@ -1121,6 +1135,34 @@ write directly into controller internals. This is why the same launch file can
 turn mapping on for MuJoCo and leave it disabled for hardware without changing
 the controller.
 
+\subsection{External packages and their roles}
+
+{\footnotesize
+\begin{longtable}{@{}p{0.23\textwidth}p{0.20\textwidth}p{0.47\textwidth}@{}}
+\toprule
+\textbf{Package/library} & \textbf{Layer} & \textbf{Use in RoboDog} \\
+\midrule
+\endhead
+ROS 2 Humble, \code{rclpy} & middleware & Python nodes, typed publishers/subscribers, services, parameters and executor integration. \\
+\code{launch}, \code{launch\_ros}, \code{ament\_index\_python} & composition & backend/world arguments, package-share discovery and conditional node composition. \\
+\code{rosidl\_default\_*} & interfaces & generates language bindings for nine messages and six services in \code{robodog\_msgs}. \\
+\code{sensor\_msgs}, \code{geometry\_msgs}, \code{std\_msgs}, \code{std\_srvs} & contracts & joint, IMU, image, calibration, cloud, pose, twist, scalar and trigger-compatible data. \\
+\code{tf2\_ros} & geometry & control broadcasts \code{odom}$\to$\code{base\_link}; the static robot tree and SLAM correction complete the transform chain. \\
+URDF/Xacro and \code{robot\_state\_publisher} & model/TF & expands the generated robot description and converts \code{/joint\_states} into movable and static link transforms. \\
+RViz2, \code{visualization\_msgs} & inspection & renders the robot, shared world markers, camera products, 2D occupancy and 3D occupied points. \\
+NumPy, PyYAML & numerics/config & kinematics, least-squares force distribution, arrays, parameter validation and generated model/config loading. \\
+MuJoCo & simulation & generalized-coordinate rigid-body/contact dynamics, renderer, sensor values and applied actuator force used by the metrics. \\
+RTAB-Map ROS & SLAM & synchronized RGB-D graph construction, loop closures, databases, 2D grid, assembled cloud and OctoMap products. \\
+OctoMap/\code{octomap\_server} & occupancy/export & message/service types and \code{octomap\_saver\_node}; no independent mapping server is launched. \\
+\code{image\_transport} & camera ecosystem & declares the ROS image transport integration surface; the current publisher emits raw image topics directly. \\
+aiohttp, Pillow/OpenCV & web/media & HTTP/WebSocket server and optional JPEG encoding for the MJPEG camera endpoint. \\
+python-can & hardware option & SocketCAN transport for RS06 frames; absent from simulation-only installs. \\
+Avahi & discovery & advertises \code{\_robodog.\_tcp} on the trusted LAN; the descriptor endpoint remains available without it. \\
+Expo 57, React 19, React Native 0.86 & mobile shell & navigation, responsive portrait/landscape UI and native build/runtime. \\
+Gesture Handler, WebView, Expo Router & mobile control & simultaneous joysticks, same-origin command bridge, MJPEG view and screen routing. \\
+\bottomrule
+\end{longtable}}
+
 \subsection{The hardware boundary}
 \label{sec:boundary}
 
@@ -1165,7 +1207,7 @@ motors.
 camera pipeline additionally launches RTAB-Map by default; hardware depth and
 odometry integration remain prerequisites for enabling mapping there.}{1.0}
 
-\begin{center}\footnotesize
+{\footnotesize
 \begin{longtable}{@{}p{0.31\textwidth}p{0.20\textwidth}p{0.09\textwidth}p{0.30\textwidth}@{}}
 \toprule
 \textbf{Topic} & \textbf{Type} & \textbf{Rate/QoS} & \textbf{Owner and purpose} \\
@@ -1213,6 +1255,17 @@ the wider ROS ecosystem expects it.
 
 \archfig{simulation_architecture}{The MJCF and the URDF are generated from the
 same parameters, so the physics and the kinematics cannot drift apart.}{1.0}
+
+MuJoCo advances generalized coordinates $q$ and velocities $v$ under the
+multibody equation
+\[
+  M(q)\dot v+c(q,v)=\tau+J_c(q)^{\mathsf T}f_c,
+\]
+where $M$ is the mass matrix, $c$ collects bias terms, $\tau$ includes applied
+actuator generalized force and $J_c^{\mathsf T}f_c$ represents constraint and
+contact forces~\cite{mujoco-paper,mujoco-computation}. RoboDog records the
+actuator contribution \code{qfrc\_actuator}; it does not label total contact or
+constraint reaction as motor torque.
 
 \subsection{Fidelity choices}
 
@@ -1347,6 +1400,17 @@ $\sigma_z = z^2 \sigma_d / (f b)$ --- about 4\,mm at 1\,m and 140\,mm at 6\,m --
 and the point cloud is filtered to \code{max\_usable\_range\_m} rather than the
 datasheet maximum.
 
+For a registered depth sample $z(u,v)$ and calibrated intrinsics
+$(f_x,f_y,c_x,c_y)$, the organized point cloud uses the pinhole inverse
+projection
+\[
+  X=(u-c_x)z/f_x,\qquad Y=(v-c_y)z/f_y,\qquad Z=z.
+\]
+Invalid or out-of-range pixels are omitted. The optical frame follows REP-103:
+$Z$ forward, $X$ right and $Y$ down; TF places each observation into the map
+frame. Registration, matching timestamps and one optical origin are therefore
+part of the geometry, not presentation metadata.
+
 \begin{caveat}{Camera parameters are placeholders}
 Resolution, field of view, range and baseline in
 \code{config/nuwa\_hp60c.yaml} are plausible for a device of this class but have
@@ -1379,6 +1443,26 @@ OctoMap is the volumetric occupancy representation: it stores probabilistic 3D
 free/occupied/unknown space in an octree. Running an independent accumulating
 OctoMap mapper beside graph SLAM would make loop-closure corrections ambiguous,
 so this stack uses the OctoMap products assembled by RTAB-Map's map manager.
+
+RTAB-Map associates each accepted observation with a pose-graph node. Visual
+features propose loop closures, geometric registration constrains candidate
+links, and graph optimization can revise older poses~\cite{rtabmap-paper}.
+The database retains this graph and its sensor observations. It is richer than
+an occupancy export because later optimization can rebuild map products from
+corrected node poses.
+
+OctoMap stores occupancy in an adaptive octree. For voxel $n$, a binary sensor
+model updates log odds rather than overwriting a Boolean state:
+\[
+ L_t(n)=\operatorname{clip}\!\left(
+ L_{t-1}(n)+\log\frac{p(n\mid z_t)}{1-p(n\mid z_t)}-L_0,
+ L_{\min},L_{\max}\right),
+ \qquad p_t(n)=\frac{1}{1+e^{-L_t(n)}}.
+\]
+Ray tracing marks traversed cells as free and endpoint cells as occupied;
+unobserved cells remain unknown~\cite{octomap}. The 5\,cm cell size controls
+map discretization and memory use. It does not improve camera accuracy or SLAM
+pose accuracy.
 
 \paragraph{Frame ownership.} Control publishes \code{odom}$\to$\code{base\_link}
 because the walking controller owns base feedback. RTAB-Map is configured with
