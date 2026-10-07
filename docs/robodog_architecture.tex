@@ -148,7 +148,8 @@ The torque measurements in this document use MuJoCo's applied actuator
 generalized force. MuJoCo documents actuator force transmission into
 \code{mjData.qfrc\_actuator}; sampling that field gives the torque actually
 applied by the physics actuator at the joint DOF, after the command path and
-model limits, rather than only the requested impedance term~\cite{mujoco-computation}. RMS is then
+model limits, rather than only the requested impedance term
+~\cite{mujoco-paper,mujoco-computation}. RMS is then
 computed as a time-weighted load summary, and it is reported together with
 peaks, overload exposure, speed at peak and clipping. That combination is
 necessary because a 100\,s RMS value can hide startup or touchdown spikes.
@@ -569,7 +570,7 @@ A single normalised cycle phase advances at the step frequency. Each leg has a
 fixed offset and is in stance for \code{duty\_factor} of its period.
 Diagonal pairing produces a trot, lateral pairing a pace, and fore/hind pairing
 a bound, consistent with the classical quadruped gait taxonomy
-~\cite{raibert}.
+~\cite{raibert-gaits}.
 
 \begin{center}\small
 \begin{tabular}{@{}llrrl@{}}
@@ -1256,7 +1257,7 @@ multibody equation
 \]
 where $M$ is the mass matrix, $c$ collects bias terms, $\tau$ includes applied
 actuator generalized force and $J_c^{\mathsf T}f_c$ represents constraint and
-contact forces~\cite{mujoco-computation}. RoboDog records the
+contact forces~\cite{mujoco-paper,mujoco-computation}. RoboDog records the
 actuator contribution \code{qfrc\_actuator}; it does not label total contact or
 constraint reaction as motor torque.
 
@@ -1739,9 +1740,11 @@ stairs, jumps, pace and bound still need separate validation.
 Performance and electrical values follow the manufacturer's September 17, 2026
 RS-series specification; the July RS06 manual supplies protocol details.
 \href{rs06_datasheet_audit.md}{The RS06 datasheet audit} records source links,
-page references, source hashes and differences between these documents.
+page references, source hashes and differences between these
+documents~\cite{robstride-audit}.
 The research pass behind this revision is captured in
-\href{research/robodog_scientific_foundations.md}{docs/research/robodog\_scientific\_foundations.md};
+\href{research/robodog_scientific_foundations.md}{docs/research/robodog\_scientific\_foundations.md}
+~\cite{scientific-foundations};
 external claims below cite primary project pages, specifications, source code
 or peer-reviewed robotics papers rather than secondary tutorials.
 
