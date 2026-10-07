@@ -230,7 +230,7 @@ Panels.remote = {
     feedback.className += " remote-feedback";
     const video = el("div", "videoframe remote-video");
     const image = el("img");
-    image.src = "/api/video";
+    image.src = "/stream/color.mjpg";
     image.alt = "Live robot camera";
     video.append(image);
 

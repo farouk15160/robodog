@@ -55,7 +55,8 @@ def export_plan(*, output_directory: str = "", name: str = "",
 
 def mapping_plan(*, mode: str, backend: str, camera_backend: str,
                  use_camera: bool, world: str, database: str = "",
-                 ros_home: str | None = None) -> MappingPlan:
+                 ros_home: str | None = None,
+                 now: datetime | None = None) -> MappingPlan:
     if mode == "none":
         return MappingPlan(False)
     if mode == "auto" and (backend != "mujoco" or camera_backend != "sim" or not use_camera):
@@ -76,7 +77,12 @@ def mapping_plan(*, mode: str, backend: str, camera_backend: str,
     if world not in ("flat", "house"):
         raise ValueError(f"Unsupported mapping world: {world}")
     root = Path(ros_home or os.environ.get("ROS_HOME", "~/.ros")).expanduser()
-    path = Path(database).expanduser() if database else root / "robodog/maps" / f"{world}.db"
+    if database:
+        path = Path(database).expanduser()
+    else:
+        started = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        session = started.strftime(f"{world}-%Y%m%d-%H%M%S-%f.db")
+        path = root / "robodog/maps" / session
     path = path.absolute()
     if path.is_dir():
         raise ValueError(f"Mapping database must be a file, not a directory: {path}")

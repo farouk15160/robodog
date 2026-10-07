@@ -1,5 +1,6 @@
-"""Mapping startup must preserve maps and reject unavailable sensor pipelines."""
+"""Mapping startup must preserve saved sessions and reject unavailable pipelines."""
 from pathlib import Path
+from datetime import datetime, timezone
 import importlib.util
 import struct
 import yaml
@@ -53,11 +54,12 @@ def test_auto_mapping_disables_unsupported_sensor_pipelines(kwargs):
     assert result.database_path is None
 
 
-def test_simulation_maps_are_named_by_world_without_creating_files(tmp_path):
-    flat = plan(world="flat", ros_home=str(tmp_path))
-    house = plan(ros_home=str(tmp_path))
-    assert flat.database_path == tmp_path / "robodog/maps/flat.db"
-    assert house.database_path == tmp_path / "robodog/maps/house.db"
+def test_simulation_starts_a_new_timestamped_map_session_without_creating_files(tmp_path):
+    now = datetime(2026, 10, 7, 16, 59, 0, 123456, tzinfo=timezone.utc)
+    flat = plan(world="flat", ros_home=str(tmp_path), now=now)
+    house = plan(ros_home=str(tmp_path), now=now)
+    assert flat.database_path == tmp_path / "robodog/maps/flat-20261007-165900-123456.db"
+    assert house.database_path == tmp_path / "robodog/maps/house-20261007-165900-123456.db"
     assert not (tmp_path / "robodog").exists()
 
 

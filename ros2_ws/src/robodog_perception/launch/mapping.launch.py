@@ -29,7 +29,7 @@ def _setup(context):
     config = os.path.join(get_package_share_directory("robodog_perception"),
                           "config", "rtabmap.yaml")
     return [
-        LogInfo(msg=f"RGB-D SLAM + OctoMap: {plan.database_path} (preserved on restart); "
+        LogInfo(msg=f"RGB-D SLAM + OctoMap session: {plan.database_path}; "
                     "simulation ground-truth odometry, outputs /robodog/mapping/*"),
         Node(package="rtabmap_slam", executable="rtabmap", name="rtabmap",
              namespace="robodog/mapping", output="screen",
@@ -53,7 +53,7 @@ def generate_launch_description():
         DeclareLaunchArgument("use_camera", default_value="true"),
         DeclareLaunchArgument("world", default_value="flat"),
         DeclareLaunchArgument("mapping_database", default_value="",
-                              description="Existing/new database; default is a separate file per world"),
+                              description="Existing/new database; default creates a timestamped session"),
         DeclareLaunchArgument("mapping_export_directory", default_value="",
                               description="Absolute room-scan export root; default is under ROS_HOME"),
         OpaqueFunction(function=_setup),

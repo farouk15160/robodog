@@ -9,27 +9,32 @@ RMS diagnostics remain on the Dashboard.
 
 ## Start and connect
 
-For local use, launch normally and open the direct page at
-<http://localhost:8080/remote>. The **Remote Control** tab and browser
-back/forward navigation use the same route:
+Launch normally. Open <http://localhost:8080/remote> on the robot, or find the
+robot's LAN address with `hostname -I` and open
+`http://<robot-ip>:8080/remote` from a phone, tablet or laptop on the same
+network. The **Remote Control** tab and browser back/forward navigation use the
+same route:
 
 ```bash
 ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house
 ```
 
-The server binds to loopback by default. To use a phone on the same trusted
-LAN, bind it to all interfaces and open `http://<robot-ip>:8080/remote` on the phone:
+The server listens on all network interfaces by default. To restrict it to the
+robot itself, bind it to loopback:
 
 ```bash
 ros2 launch robodog_bringup robot.launch.py \
-  backend:=mujoco world:=house web_host:=0.0.0.0
+  backend:=mujoco world:=house web_host:=127.0.0.1
 ```
 
 The server requires the command WebSocket to have the GUI's same origin, but it
-does not provide login, authorization or TLS. `web_host:=0.0.0.0` is therefore
-for an isolated, trusted LAN. Do not expose port 8080 to the internet. Put an
-authenticated TLS reverse proxy and network access control in front of it if
-it must cross an untrusted network.
+also restricts command origins to `localhost`, literal private/link-local IP
+addresses, or names listed in `allowed_command_hosts` in `web.yaml`. This blocks
+DNS-rebinding hostnames. The server does not provide login, authorization or
+TLS. The default LAN binding is for an isolated, trusted network. Do not expose
+port 8080 to the internet. Put an authenticated TLS reverse proxy and network
+access control in front of it if it must cross an untrusted network, and add the
+proxy's DNS name to `allowed_command_hosts`.
 
 ## Drive controls
 
@@ -63,20 +68,24 @@ latched stop.
 ## Greeting
 
 **Greeting** performs a short front-left-leg wave and returns to the stand
-pose. It is accepted only in MuJoCo, with joints enabled, no latched emergency
-stop, and the controller already at a stable stand pose. Any gait or velocity
-request cancels the greeting and first returns the robot to stand. Hardware
-rejects this behavior until three-leg stability has been validated on the
-assembled robot.
+pose. One press is enough: in MuJoCo the controller first enables the joints,
+moves the joints to the stand pose, and starts the wave when they settle within
+0.15 rad. The request is rejected while the emergency stop is latched and a
+queued greeting expires if the joints do not settle within 10 seconds. Because
+this is a simulation-only animation, a fallen simulated body does not block the
+button indefinitely. A new pose, joint, gait, nonzero velocity, disable or
+emergency-stop command cancels a queued greeting. A velocity or gait command
+also cancels an active greeting and returns to stand. Hardware rejects this
+behavior until three-leg stability has been validated on the assembled robot.
 
 ## Save a room scan
 
 When RTAB-Map is active, **Save room scan** creates one immutable export of the
 map accumulated so far. The optional name accepts 1–64 letters, digits, dots,
-underscores or dashes. The browser cannot choose a server filesystem path. By
-default exports go below `~/.ros/robodog/exports`; an operator can set a fixed
-server-side root with the `mapping_export_directory:=/absolute/path` launch
-argument.
+underscores or dashes and must start with a letter or digit. The browser cannot
+choose a server filesystem path. By default exports go below
+`${ROS_HOME:-~/.ros}/robodog/exports`; an operator can set a fixed server-side
+root with the `mapping_export_directory:=/absolute/path` launch argument.
 
 The equivalent CLI supports an explicit absolute destination:
 

@@ -78,6 +78,32 @@ def test_local_binding_rejects_foreign_host_even_with_matching_origin():
     asyncio.run(check())
 
 
+def test_lan_binding_rejects_rebound_dns_host_even_with_matching_origin():
+    async def check():
+        app = WebApp(SimpleNamespace(state=None),
+                     {"host": "0.0.0.0", "stream_rate_hz": 20},
+                     str(Path(__file__).resolve().parents[1] / "www"), {})
+        async with TestClient(TestServer(app.app)) as client:
+            with pytest.raises(WSServerHandshakeError) as error:
+                async with client.ws_connect("/ws", origin="http://untrusted.example",
+                                             headers={"Host": "untrusted.example"}):
+                    pass
+            assert error.value.status == 403
+    asyncio.run(check())
+
+
+def test_lan_binding_accepts_a_matching_private_ip_origin():
+    async def check():
+        app = WebApp(SimpleNamespace(state=None),
+                     {"host": "0.0.0.0", "stream_rate_hz": 20},
+                     str(Path(__file__).resolve().parents[1] / "www"), {"robot": "robodog"})
+        async with TestClient(TestServer(app.app)) as client:
+            async with client.ws_connect("/ws", origin="http://192.168.1.20",
+                                         headers={"Host": "192.168.1.20"}) as ws:
+                assert await ws.receive_json() == {"type": "info", "data": {"robot": "robodog"}}
+    asyncio.run(check())
+
+
 @pytest.mark.parametrize("simulation,expected", [(True, 2.0), (False, 0.5)])
 def test_velocity_command_allows_two_only_in_simulation(simulation, expected):
     async def check():

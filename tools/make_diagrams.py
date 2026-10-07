@@ -462,8 +462,8 @@ def perception_pipeline() -> Diagram:
           "exact RGB-D synchronization, 2 Hz\n5 cm cells; 4 m depth range\nowns map -> odom", kind="node")
     d.box("rviz", 790, 520, 350, 110, "Mapping RViz view",
           "map: 2D occupancy grid\noctomap_occupied_space: 3D cells\nrobot + world markers in map frame", kind="external")
-    d.box("store", 390, 710, 290, 105, "Per-world database",
-          "$ROS_HOME/robodog/maps/<world>.db\notherwise ~/.ros/robodog/maps/<world>.db\nrestart preserves graph + observations", kind="store")
+    d.box("store", 390, 710, 290, 105, "Timestamped session database",
+          "$ROS_HOME/robodog/maps/\n<world>-<UTC timestamp>.db\nexplicit path resumes a saved session", kind="store")
     d.box("export", 790, 710, 350, 105, "Backup and export",
           "rtabmap/backup: database .back\noctomap_saver_node: full ColorOcTree .ot\nNo separate mapping server required", kind="store")
     d.edge("cfg", "simb")

@@ -73,6 +73,7 @@ const stop = find(body, node => node.textContent === "STOP MOVEMENT");
 const save = find(body, node => node.textContent === "Save room scan");
 const scanName = find(body, node => node["aria-label"] === "Room scan name");
 const speedLimit = find(body, node => node["aria-label"] === "Maximum driving speed");
+const cameraImage = find(body, node => node.tagName === "IMG");
 const sticks = findAll(body, node => node.className.includes("joystick-pad"));
 assert.ok(walk && greeting && stop && save && scanName && speedLimit,
   "remote actions and safe scan name input should be visible");
@@ -80,6 +81,8 @@ assert.equal(sticks.length, 2, "two touch/mouse joysticks should be rendered");
 assert.match(sticks[0]["aria-label"], /forward.*lateral/i);
 assert.match(sticks[1]["aria-label"], /turn/i);
 assert.equal(speedLimit.value, .5, "remote drive starts at the conservative hardware limit");
+assert.equal(cameraImage.src, "/stream/color.mjpg",
+  "remote camera must use the server's MJPEG stream route");
 
 walk.onclick();
 greeting.onclick();

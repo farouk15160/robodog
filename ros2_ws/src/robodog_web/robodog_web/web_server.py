@@ -32,6 +32,7 @@ PROTOCOL (v1)
 from __future__ import annotations
 
 import asyncio
+from ipaddress import ip_address
 import json
 import math
 import os
@@ -71,6 +72,20 @@ FAULT_BITS = [(1, "POSITION_LIMIT"), (2, "VELOCITY_LIMIT"), (4, "TORQUE_LIMIT"),
               (8, "OVERTEMPERATURE"), (16, "COMMUNICATION"), (32, "ENCODER"),
               (64, "UNDERVOLTAGE"), (128, "OVERCURRENT"), (256, "NOT_ENABLED"),
               (512, "WATCHDOG")]
+
+
+def trusted_command_hostname(hostname: str | None,
+                             allowed_hosts: list[str] | None = None) -> bool:
+    """Accept literal local-network addresses or an explicit server allowlist."""
+    name = (hostname or "").rstrip(".").lower()
+    allowed = {str(value).rstrip(".").lower() for value in (allowed_hosts or [])}
+    if name == "localhost" or name in allowed:
+        return True
+    try:
+        address = ip_address(name)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_private or address.is_link_local
 
 
 def decode_faults(flags: int) -> list[str]:
@@ -389,13 +404,13 @@ class WebApp:
         origin = request.headers.get("Origin")
         if origin != f"{request.scheme}://{request.host}":
             raise web.HTTPForbidden(reason="command socket requires the GUI origin")
-        if self.cfg.get("host", "127.0.0.1") in {"127.0.0.1", "localhost", "::1"}:
-            try:
-                hostname = urlsplit(origin).hostname
-            except ValueError:
-                raise web.HTTPForbidden(reason="invalid command origin")
-            if hostname not in {"127.0.0.1", "localhost", "::1"}:
-                raise web.HTTPForbidden(reason="local GUI requires a loopback host")
+        try:
+            hostname = urlsplit(origin).hostname
+        except ValueError:
+            raise web.HTTPForbidden(reason="invalid command origin")
+        if not trusted_command_hostname(hostname, self.cfg.get("allowed_command_hosts")):
+            raise web.HTTPForbidden(
+                reason="command socket requires a local IP or allowed hostname")
         ws = web.WebSocketResponse(heartbeat=20.0)
         await ws.prepare(request)
         self.clients.add(ws)

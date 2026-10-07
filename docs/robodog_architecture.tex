@@ -1325,14 +1325,15 @@ processing. Cell size is resolution, not sensor accuracy. The namespace
 subscribed; the map cache remains when viewers disconnect. Mapping RViz uses
 the \code{map} frame and shows both 2D and 3D occupancy.
 
-\paragraph{Persistence and export.} Databases are preserved separately by world:
+\paragraph{Persistence and export.} Each launch creates a preserved,
+timestamped database for its world:
 \begin{lstlisting}
-$ROS_HOME/robodog/maps/<world>.db
+$ROS_HOME/robodog/maps/<world>-<UTC timestamp>.db
 # When ROS_HOME is unset:
-~/.ros/robodog/maps/<world>.db
+~/.ros/robodog/maps/<world>-<UTC timestamp>.db
 \end{lstlisting}
-Restarting reuses the database. To select another file without deleting the
-previous session, pass this launch argument:
+To deliberately continue or inspect a specific file without deleting any
+session, pass this launch argument:
 \begin{lstlisting}
 mapping_database:=/absolute/path/session.db
 \end{lstlisting}
@@ -1590,7 +1591,9 @@ ros2 run robodog_sim generate_models
 ros2 launch robodog_bringup robot.launch.py \
   backend:=mujoco world:=house
 \end{lstlisting}
-Open \url{http://localhost:8080} for diagnostics. Additional launch arguments:
+Open \url{http://localhost:8080} on the robot, or
+\code{http://<robot-ip>:8080/remote} from another device on the same trusted
+LAN. Use \code{web\_host:=127.0.0.1} for local-only access. Additional launch arguments:
 \begin{itemize}
 \item \code{world:=flat}: use the proving ground.
 \item \code{mujoco\_viewer:=true}: open the physics viewer.

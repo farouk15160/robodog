@@ -51,7 +51,12 @@ The room-scan exporter keeps a subscription to `/robodog/mapping/cloud_map`, so 
 
 ## Preserve and export maps
 
-The default database is `$ROS_HOME/robodog/maps/<world>.db`, or `~/.ros/robodog/maps/<world>.db` when `ROS_HOME` is unset. Restarting reuses it; nothing deletes it automatically. To start a separate mapping session, choose a new path:
+Every default launch creates a timestamped database at
+`$ROS_HOME/robodog/maps/<world>-<UTC timestamp>.db`, or under
+`~/.ros/robodog/maps` when `ROS_HOME` is unset. Existing files are never
+deleted. This avoids mixing unrelated room scans and prevents a damaged old
+graph from taking down the live mapper. To deliberately continue or inspect a
+specific session, provide its path:
 
 ```bash
 ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house mapping:=rtabmap mapping_database:=/absolute/path/house-session.db
@@ -73,7 +78,7 @@ The service includes the `rtabmap` node name; the corresponding topic does not. 
 
 ### Save one complete room scan
 
-The Remote Control page's **Save room scan** button calls `/robodog/mapping/save_map`. It saves a self-contained, immutable session under `~/.ros/robodog/exports` by default. You can set another absolute root at launch:
+The Remote Control page's **Save room scan** button calls `/robodog/mapping/save_map`. It saves a self-contained, immutable session under `${ROS_HOME:-~/.ros}/robodog/exports` by default. You can set another absolute root at launch:
 
 ```bash
 ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house \

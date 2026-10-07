@@ -170,6 +170,8 @@ class RoboDogControlNode(Node):
         self.active_gait = "stand"
         self.trajectory: JointTrajectory | None = None
         self.greeting: GreetingMotion | None = None
+        self._greeting_pending = False
+        self._greeting_pending_until = 0.0
         self.external_cmd: JointCommand | None = None
         self._external_stamp = 0.0
         self.enabled = False
@@ -355,6 +357,8 @@ class RoboDogControlNode(Node):
             c.velocity[:] = qd
             c.kp[:] = self.kp_default
             c.kd[:] = self.kd_default
+            if self.trajectory is None and self._greeting_pending:
+                self._start_pending_greeting()
             return c, age
 
         if self.controller == "gait":
@@ -594,6 +598,7 @@ class RoboDogControlNode(Node):
     def _on_joint_command(self, msg: JointCommandArray) -> None:
         with self._lock:
             self.greeting = None
+            self._cancel_pending_greeting()
             c = self.external_cmd.copy() if self.external_cmd is not None else JointCommand()
             index = {n: i for i, n in enumerate(JOINT_NAMES)}
             for name, jc in zip(msg.names, msg.commands):
@@ -636,6 +641,8 @@ class RoboDogControlNode(Node):
                 return
             vx, vy, wz = values_or_error
             moving = (abs(vx) + abs(vy) + abs(wz)) > 1e-3
+            if moving:
+                self._cancel_pending_greeting()
             if self.controller == "greeting":
                 self.greeting = None
                 self.trajectory = JointTrajectory.with_speed_limit(
@@ -708,6 +715,7 @@ class RoboDogControlNode(Node):
         p.stance_height_m = float(d.get("stance_height_m", p.stance_height_m))
 
     def _apply_gait(self, msg: GaitCommand) -> tuple[bool, str]:
+        self._cancel_pending_greeting()
         if self.controller == "greeting":
             self.greeting = None
             self.trajectory = JointTrajectory.with_speed_limit(
@@ -783,6 +791,8 @@ class RoboDogControlNode(Node):
                 float(self.get_parameter("pose_transition_max_velocity_rad_s").value))
         self.trajectory = traj
         self.greeting = None
+        self._greeting_pending = False
+        self._greeting_pending_until = 0.0
         self._last_cmd_vel_stamp = None
         self.controller = "pose"
         self.active_pose = name
@@ -795,42 +805,62 @@ class RoboDogControlNode(Node):
                     "greeting is simulation-only until three-leg stability is validated on hardware")
             elif self.safety.latched:
                 res.success, res.message = False, "e-stop latched, clear it first"
-            elif not self.enabled:
-                res.success, res.message = False, "joints are disabled"
-            elif (self.controller != "pose" or self.active_pose != "stand" or
-                  self.trajectory is not None):
-                res.success, res.message = False, "greeting requires a stable stand pose"
             else:
-                ready, reason = self._greeting_readiness()
-                if not ready:
-                    res.success, res.message = False, reason
-                else:
-                    self.greeting = GreetingMotion(
-                        self._last_state.position, self.poses["stand"],
-                        self.q_lower, self.q_upper)
-                    self.controller = "greeting"
-                    self.active_pose = "greeting"
-                    self.active_gait = "stand"
+                already_standing = (self.enabled and self.controller == "pose" and
+                                    self.active_pose == "stand" and
+                                    self.trajectory is None)
+                ready, _reason = self._greeting_readiness() if already_standing else (False, "")
+                if ready:
+                    self._begin_greeting()
                     res.success, res.message = True, (
                         f"greeting accepted ({self.greeting.duration:.2f} s, front-left leg)")
+                else:
+                    ok, message, _duration = self._start_pose("stand", 0.0)
+                    if not ok:
+                        res.success, res.message = False, message
+                    else:
+                        self._greeting_pending = True
+                        self._greeting_pending_until = time.monotonic() + 10.0
+                        res.success, res.message = True, (
+                            "moving to stand; greeting will start automatically")
         return res
 
+    def _begin_greeting(self) -> None:
+        self.greeting = GreetingMotion(
+            self._last_state.position, self.poses["stand"],
+            self.q_lower, self.q_upper)
+        self._greeting_pending = False
+        self._greeting_pending_until = 0.0
+        self.controller = "greeting"
+        self.active_pose = "greeting"
+        self.active_gait = "stand"
+
+    def _cancel_pending_greeting(self) -> None:
+        self._greeting_pending = False
+        self._greeting_pending_until = 0.0
+
+    def _start_pending_greeting(self) -> bool:
+        if not self._greeting_pending:
+            return False
+        if time.monotonic() > self._greeting_pending_until:
+            self._greeting_pending = False
+            self._greeting_pending_until = 0.0
+            self.get_logger().warn("greeting cancelled: joints did not reach stand within 10 s")
+            return False
+        ready, _reason = self._greeting_readiness()
+        if not ready:
+            return False
+        self._begin_greeting()
+        return True
+
     def _greeting_readiness(self) -> tuple[bool, str]:
-        base = self._base
-        if base is None:
-            return False, "greeting requires live body and foot-contact feedback"
-        feedback = np.concatenate((base.position, base.orientation, base.linear_velocity,
-                                   base.angular_velocity, self._last_state.position))
-        if not np.all(np.isfinite(feedback)):
-            return False, "greeting requires finite body and joint feedback"
-        if not bool(np.all(base.foot_contact)):
-            return False, "greeting requires all four feet in contact before lifting one"
-        roll, pitch = roll_pitch_from_quat(base.orientation)
-        height = self.P["named_poses"]["stand"]["base_height_m"]
-        if abs(roll) > 0.15 or abs(pitch) > 0.15 or abs(base.position[2] - height) > 0.08:
-            return False, "greeting requires a level body at stand height"
-        if np.linalg.norm(base.linear_velocity) > 0.10 or np.linalg.norm(base.angular_velocity) > 0.25:
-            return False, "greeting requires the body to be stationary"
+        # Greeting is simulation-only. Requiring contact and base-pose
+        # feedback here made the button impossible to use after a simulated
+        # stumble: commanding the stand joint pose cannot right a fallen free
+        # body. Wait only for the stand trajectory to settle, then run the
+        # bounded animation. Hardware remains rejected in _srv_greeting().
+        if not np.all(np.isfinite(self._last_state.position)):
+            return False, "greeting requires finite joint feedback"
         if np.max(np.abs(self._last_state.position - self.poses["stand"])) > 0.15:
             return False, "greeting requires joints settled at the stand pose"
         return True, "ready"
@@ -847,6 +877,8 @@ class RoboDogControlNode(Node):
             with self._lock:
                 self.controller = "idle"
                 self._last_cmd_vel_stamp = None
+                self.greeting = None
+                self._cancel_pending_greeting()
             self._enable(False)
             res.success, res.latched, res.message = True, True, "e-stop engaged"
         else:
@@ -905,6 +937,8 @@ class RoboDogControlNode(Node):
             if not on:
                 self.controller = "idle"
                 self._last_cmd_vel_stamp = None
+                self.greeting = None
+                self._cancel_pending_greeting()
             else:
                 self._q_hold = self._last_state.position.copy()
 

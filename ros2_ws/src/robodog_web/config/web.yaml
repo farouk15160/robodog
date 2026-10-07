@@ -6,10 +6,14 @@
 # Adding, removing or reordering a panel is a change here, not in JavaScript.
 robodog_web:
   port: 8080
-  # Local control by default. Remote binding is an explicit trusted-network
-  # choice: there are no user accounts or TLS here. Prefer an SSH tunnel.
+  # Listen on every interface so a phone or laptop on the robot's trusted LAN
+  # can open the GUI. There are no user accounts or TLS here; use 127.0.0.1
+  # when remote access is not wanted.
   # ROS parameter `host` overrides this setting when explicitly provided.
-  host: "127.0.0.1"
+  host: "0.0.0.0"
+  # Command WebSockets accept localhost, literal private/link-local IPs, and
+  # names explicitly listed here. Add a reverse-proxy DNS name when needed.
+  allowed_command_hosts: []
   stream_rate_hz: 20.0      # telemetry push rate; the UI redraws at this rate
   # Joysticks refresh faster than this. A dropped tab or network link then
   # publishes zero velocity; the controller has a second independent timeout.

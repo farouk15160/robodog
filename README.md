@@ -76,8 +76,10 @@ ros2 run robodog_sim generate_models        # build the MuJoCo models
 ros2 launch robodog_bringup robot.launch.py backend:=mujoco world:=house
 ```
 
-Open **http://localhost:8080** for the GUI. RViz starts alongside. The GUI binds
-localhost and checks WebSocket origins by default. Simulation automatically
+Open **http://localhost:8080** on the robot, or
+**http://<robot-ip>:8080/remote** from a phone or laptop on the same trusted
+LAN. The GUI listens on all interfaces and checks WebSocket origins by default.
+Use `web_host:=127.0.0.1` for local-only access. Simulation automatically
 enables and stands; real CAN hardware stays disabled unless explicitly enabled,
 and its joints must be physically calibrated first.
 
@@ -137,8 +139,9 @@ much smaller surface from a web page that can move a 19.72 kg machine.
 The **Remote Control** page adds two touch joysticks, `WASD`/arrow keyboard
 control, live camera and motion/safety feedback, a simulation-only Greeting,
 and an atomic **Save room scan** action. Its speed slider starts at 0.5 m/s.
-Open it directly at `http://localhost:8080/remote`, or use the Remote Control
-tab.
+Open it directly at `http://localhost:8080/remote` on the robot or
+`http://<robot-ip>:8080/remote` from another LAN device, or use the Remote
+Control tab.
 Motion is dead-man controlled: held inputs refresh at 10 Hz, and release,
 focus loss, disconnect or either server/controller timeout commands zero
 velocity. See the [remote-control runbook](docs/remote_control.md), including

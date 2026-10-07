@@ -20,9 +20,11 @@ motion on joints that have not been marked `calibrated: true` after physical
 commissioning. Real IMU/base feedback is not integrated: hardware travel commands
 are rejected while base feedback is unavailable.
 
-The GUI binds localhost and validates WebSocket origins by default. Changing
-network exposure is a separate deployment decision, not a requirement for local
-simulation use.
+The GUI binds all interfaces for phone and laptop access on a trusted robot LAN,
+and validates WebSocket origins. Command sockets accept localhost, literal
+private/link-local IP addresses, and server-configured `allowed_command_hosts`.
+Use `web_host:=127.0.0.1` to restrict it to the robot itself. The GUI has no
+login or TLS and must not be exposed directly to an untrusted network.
 
 The default `mapping:=auto` enables RTAB-Map RGB-D SLAM and its graph-corrected
 OctoMap with `backend:=mujoco`, `camera_backend:=sim`, and `use_camera:=true`.
@@ -43,8 +45,7 @@ robot odometry must be integrated before hardware mapping is supported.
 
 Output topics are under `/robodog/mapping`: `map`, `octomap_binary`,
 `octomap_full`, and `octomap_occupied_space`. Map products are produced when
-subscribed; the mapping RViz view subscribes automatically. Databases persist at
-`${ROS_HOME:-~/.ros}/robodog/maps/{flat,house}.db`. Override with
-`mapping_database:=/absolute/path/session.db` for a separate session or to reload
-another map. Startup never deletes an existing database. Existing databases are
-reopened for mapping, not localization-only operation.
+subscribed; the mapping RViz view subscribes automatically. Each launch creates
+a timestamped database under `${ROS_HOME:-~/.ros}/robodog/maps`. Override with
+`mapping_database:=/absolute/path/session.db` to select a specific new or existing
+session. Startup never deletes an existing database.
